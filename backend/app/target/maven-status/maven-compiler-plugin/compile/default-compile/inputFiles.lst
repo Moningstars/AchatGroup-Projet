@@ -1,0 +1,10 @@
+E:\plateforme-opportunites\backend\app\src\main\java\com\plateformeopportunites\common\config\DataInitializer.java
+E:\plateforme-opportunites\backend\app\src\main\java\com\plateformeopportunites\common\controller\AdminStatsController.java
+E:\plateforme-opportunites\backend\app\src\main\java\com\plateformeopportunites\common\controller\StatsController.java
+E:\plateforme-opportunites\backend\app\src\main\java\com\plateformeopportunites\common\dto\AdminStatsResponse.java
+E:\plateforme-opportunites\backend\app\src\main\java\com\plateformeopportunites\common\dto\StatsResponse.java
+E:\plateforme-opportunites\backend\app\src\main\java\com\plateformeopportunites\common\listener\EventListeners.java
+E:\plateforme-opportunites\backend\app\src\main\java\com\plateformeopportunites\common\scheduler\ClotureScheduler.java
+E:\plateforme-opportunites\backend\app\src\main\java\com\plateformeopportunites\common\sse\SseController.java
+E:\plateforme-opportunites\backend\app\src\main\java\com\plateformeopportunites\common\sse\SseService.java
+E:\plateforme-opportunites\backend\app\src\main\java\com\plateformeopportunites\plateforme_opportunites\PlateformeOpportunitesApplication.java

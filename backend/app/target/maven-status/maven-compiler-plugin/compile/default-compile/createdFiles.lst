@@ -1,0 +1,7 @@
+com\plateformeopportunites\common\config\DataInitializer.class
+com\plateformeopportunites\common\dto\StatsResponse$StatsResponseBuilder.class
+com\plateformeopportunites\common\dto\StatsResponse.class
+com\plateformeopportunites\common\listener\EventListeners.class
+com\plateformeopportunites\common\scheduler\ClotureScheduler.class
+com\plateformeopportunites\common\controller\StatsController.class
+com\plateformeopportunites\plateforme_opportunites\PlateformeOpportunitesApplication.class

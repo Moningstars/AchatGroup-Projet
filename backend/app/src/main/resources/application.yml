@@ -1,0 +1,54 @@
+spring:
+  application:
+    name: plateforme-opportunites
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/plateforme_opportunites
+    username: postgres
+    password: uripisser
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    
+    open-in-view: false
+    # show-sql: true
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+
+  jackson:
+    default-property-inclusion: non_null
+
+  servlet:
+    multipart:
+      max-file-size: 15MB
+      max-request-size: 15MB
+
+server:
+  port: 8080
+
+app:
+  jwt:
+    secret-participant: secret_participant_very_long_key_min_256_bits_change_this
+    secret-admin: secret_admin_very_long_key_min_256_bits_change_this
+    expiration: 86400000
+  upload-dir: ./uploads
+
+paygate:
+  auth-token: 0323aca6-c7f6-474e-92c7-45336cd203a9
+  api-url: https://paygateglobal.com/api/v1/pay
+  dev-mode: true
+
+pusher:
+  app-id: "2181144"
+  key: "d11ffa95081b56f378aa"
+  secret: "6bcb24824dd36af79756"
+  cluster: "eu"
