@@ -13,6 +13,9 @@ public class CreerCommanditaireRequest {
     @NotBlank
     private String prenom;
 
+    @NotBlank
+    private String societe;
+
     @NotBlank @Email
     private String email;
 

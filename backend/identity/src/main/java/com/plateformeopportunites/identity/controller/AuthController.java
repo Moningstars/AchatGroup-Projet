@@ -19,44 +19,29 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@Tag(name = "Authentification", description = "Connexion et inscription par OTP via numéro de téléphone")
+@Tag(name = "Authentification", description = "Connexion et inscription par numéro de téléphone (Firebase Phone Auth)")
 public class AuthController {
 
     private final AuthService authService;
     private final JwtService jwtService;
 
-    // ── Étape 1 : envoi OTP ──────────────────────────────────────────────────────
+    // ── Vérification du token Firebase (Phone Auth) ──────────────────────────────
 
     @Operation(
-        summary = "Initier l'authentification",
-        description = "Envoie un OTP au numéro fourni. Retourne mode=CONNEXION si le numéro existe déjà, mode=INSCRIPTION sinon.",
+        summary = "Vérifier un token Firebase (Phone Auth)",
+        description = "L'envoi et la saisie du code OTP se font côté client via le SDK Firebase. " +
+                "Cet endpoint vérifie l'ID token résultant et retourne un JWT applicatif. " +
+                "Si le numéro n'existait pas → crée le compte.",
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             content = @Content(examples = @ExampleObject(value = """
-                { "indicatif": "+228", "telephone": "90123456" }
+                { "idToken": "eyJhbGciOi..." }
                 """))
         )
     )
     @SecurityRequirement(name = "")
-    @PostMapping("/initier")
-    public ResponseEntity<InitierAuthResponse> initierAuth(@Valid @RequestBody InitierAuthRequest req) {
-        return ResponseEntity.ok(authService.initierAuth(req));
-    }
-
-    // ── Étape 2 : vérification OTP ───────────────────────────────────────────────
-
-    @Operation(
-        summary = "Vérifier l'OTP",
-        description = "Valide le code OTP. Si le numéro n'existait pas → crée le compte. Retourne toujours un JWT.",
-        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            content = @Content(examples = @ExampleObject(value = """
-                { "telephone": "+22890123456", "code": "123456" }
-                """))
-        )
-    )
-    @SecurityRequirement(name = "")
-    @PostMapping("/verifier")
-    public ResponseEntity<AuthResponse> verifierAuth(@Valid @RequestBody VerifierAuthRequest req) {
-        return ResponseEntity.ok(authService.verifierAuth(req));
+    @PostMapping("/verifier-token")
+    public ResponseEntity<AuthResponse> verifierFirebaseToken(@Valid @RequestBody VerifierFirebaseTokenRequest req) {
+        return ResponseEntity.ok(authService.verifierFirebaseToken(req));
     }
 
     // ── Déconnexion ──────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import com.plateformeopportunites.sondage.dto.CreerSondageRequest;
 import com.plateformeopportunites.sondage.dto.ModifierSondageRequest;
 import com.plateformeopportunites.sondage.dto.ReponseAValiderDTO;
 import com.plateformeopportunites.sondage.dto.SondageResponse;
+import com.plateformeopportunites.sondage.dto.SondageResultatDTO;
 import com.plateformeopportunites.sondage.service.SondageService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -65,6 +66,16 @@ public class AdminSondageController {
     @GetMapping("/{id}/reponses/a-valider")
     public ResponseEntity<List<ReponseAValiderDTO>> reponsesAValider(@PathVariable UUID id) {
         return ResponseEntity.ok(sondageService.listerReponsesAValider(id));
+    }
+
+    @GetMapping("/{id}/repondants")
+    public ResponseEntity<List<ReponseAValiderDTO>> repondants(@PathVariable UUID id) {
+        return ResponseEntity.ok(sondageService.listerRepondants(id));
+    }
+
+    @GetMapping("/{id}/resultats")
+    public ResponseEntity<SondageResultatDTO> resultats(@PathVariable UUID id) {
+        return ResponseEntity.ok(sondageService.genererResultats(id));
     }
 
     @PatchMapping("/{id}/cloturer")

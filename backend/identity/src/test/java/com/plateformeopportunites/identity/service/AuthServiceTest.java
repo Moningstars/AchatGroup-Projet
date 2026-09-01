@@ -29,48 +29,17 @@ class AuthServiceTest {
 
     @Mock private UtilisateurRepository utilisateurRepository;
     @Mock private AdministrateurRepository administrateurRepository;
-    @Mock private OtpService otpService;
+    @Mock private FirebaseAuthVerifier firebaseAuthVerifier;
     @Mock private JwtService jwtService;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private ApplicationEventPublisher eventPublisher;
     @InjectMocks private AuthService authService;
 
-    // ── initierAuth ──────────────────────────────────────────────────────────────
+    // ── verifierFirebaseToken ────────────────────────────────────────────────────
 
     @Test
-    void initierAuth_numeroInexistant_retourneInscription() {
-        when(utilisateurRepository.existsByTelephone("+22890123456")).thenReturn(false);
-        when(otpService.generer("+22890123456")).thenReturn("123456");
-
-        InitierAuthRequest req = new InitierAuthRequest();
-        req.setIndicatif("+228");
-        req.setTelephone("90123456");
-
-        InitierAuthResponse resp = authService.initierAuth(req);
-
-        assertEquals("INSCRIPTION", resp.getMode());
-        assertEquals("123456", resp.getCodeDevMode());
-    }
-
-    @Test
-    void initierAuth_numeroExistant_retourneConnexion() {
-        when(utilisateurRepository.existsByTelephone("+22890123456")).thenReturn(true);
-        when(otpService.generer("+22890123456")).thenReturn("654321");
-
-        InitierAuthRequest req = new InitierAuthRequest();
-        req.setIndicatif("+228");
-        req.setTelephone("90123456");
-
-        InitierAuthResponse resp = authService.initierAuth(req);
-
-        assertEquals("CONNEXION", resp.getMode());
-    }
-
-    // ── verifierAuth ─────────────────────────────────────────────────────────────
-
-    @Test
-    void verifierAuth_otpCorrect_compteInexistant_crееCompteEtPublieEvenement() {
-        when(otpService.verifier("+22890123456", "123456")).thenReturn(true);
+    void verifierFirebaseToken_tokenValide_compteInexistant_creeCompteEtPublieEvenement() {
+        when(firebaseAuthVerifier.verifierEtExtraireTelephone("valid-id-token")).thenReturn("+22890123456");
         when(utilisateurRepository.findByTelephone("+22890123456")).thenReturn(Optional.empty());
 
         Utilisateur nouveau = Utilisateur.builder()
@@ -81,11 +50,10 @@ class AuthServiceTest {
         when(utilisateurRepository.save(any())).thenReturn(nouveau);
         when(jwtService.generateParticipantToken(any(), anyString())).thenReturn("jwt-token");
 
-        VerifierAuthRequest req = new VerifierAuthRequest();
-        req.setTelephone("+22890123456");
-        req.setCode("123456");
+        VerifierFirebaseTokenRequest req = new VerifierFirebaseTokenRequest();
+        req.setIdToken("valid-id-token");
 
-        AuthResponse resp = authService.verifierAuth(req);
+        AuthResponse resp = authService.verifierFirebaseToken(req);
 
         assertEquals("jwt-token", resp.getToken());
         assertEquals("PARTICIPANT", resp.getRole());
@@ -93,21 +61,20 @@ class AuthServiceTest {
     }
 
     @Test
-    void verifierAuth_otpCorrect_compteExistant_connecteSansCreation() {
+    void verifierFirebaseToken_tokenValide_compteExistant_connecteSansCreation() {
         Utilisateur existant = Utilisateur.builder()
                 .id(UUID.randomUUID())
                 .telephone("+22890123456")
                 .profilComplete(true)
                 .build();
-        when(otpService.verifier("+22890123456", "111111")).thenReturn(true);
+        when(firebaseAuthVerifier.verifierEtExtraireTelephone("valid-id-token")).thenReturn("+22890123456");
         when(utilisateurRepository.findByTelephone("+22890123456")).thenReturn(Optional.of(existant));
         when(jwtService.generateParticipantToken(any(), anyString())).thenReturn("jwt-existing");
 
-        VerifierAuthRequest req = new VerifierAuthRequest();
-        req.setTelephone("+22890123456");
-        req.setCode("111111");
+        VerifierFirebaseTokenRequest req = new VerifierFirebaseTokenRequest();
+        req.setIdToken("valid-id-token");
 
-        AuthResponse resp = authService.verifierAuth(req);
+        AuthResponse resp = authService.verifierFirebaseToken(req);
 
         assertEquals("jwt-existing", resp.getToken());
         verify(utilisateurRepository, never()).save(any());
@@ -115,14 +82,14 @@ class AuthServiceTest {
     }
 
     @Test
-    void verifierAuth_otpInvalide_leveException() {
-        when(otpService.verifier("+22890123456", "000000")).thenReturn(false);
+    void verifierFirebaseToken_tokenInvalide_leveException() {
+        when(firebaseAuthVerifier.verifierEtExtraireTelephone("bad-id-token"))
+                .thenThrow(new IllegalArgumentException("Token Firebase invalide ou expiré"));
 
-        VerifierAuthRequest req = new VerifierAuthRequest();
-        req.setTelephone("+22890123456");
-        req.setCode("000000");
+        VerifierFirebaseTokenRequest req = new VerifierFirebaseTokenRequest();
+        req.setIdToken("bad-id-token");
 
-        assertThrows(IllegalArgumentException.class, () -> authService.verifierAuth(req));
+        assertThrows(IllegalArgumentException.class, () -> authService.verifierFirebaseToken(req));
         verify(utilisateurRepository, never()).findByTelephone(anyString());
     }
 

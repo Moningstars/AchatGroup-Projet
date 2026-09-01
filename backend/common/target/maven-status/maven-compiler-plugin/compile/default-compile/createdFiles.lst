@@ -2,8 +2,11 @@ com\plateformeopportunites\common\enums\TypeRecompense.class
 com\plateformeopportunites\common\event\RecompenseEvent.class
 com\plateformeopportunites\common\enums\StatutParticipation.class
 com\plateformeopportunites\common\enums\TypeTransactionPlateforme.class
+com\plateformeopportunites\common\enums\SourceRevenus.class
+com\plateformeopportunites\common\enums\TypePiece.class
 com\plateformeopportunites\common\enums\StatutTransaction.class
 com\plateformeopportunites\security\JwtService.class
+com\plateformeopportunites\common\config\PusherConfig.class
 com\plateformeopportunites\common\enums\StatutValidation.class
 com\plateformeopportunites\common\enums\StatutOpportunite.class
 com\plateformeopportunites\common\enums\TypeQuestion.class
@@ -18,8 +21,11 @@ com\plateformeopportunites\common\enums\StatutCompte.class
 com\plateformeopportunites\common\event\UtilisateurCreeEvent.class
 com\plateformeopportunites\common\config\OpenApiConfig.class
 com\plateformeopportunites\common\enums\NiveauAcces.class
+com\plateformeopportunites\common\enums\PageCible.class
 com\plateformeopportunites\common\enums\TypeTransaction.class
 com\plateformeopportunites\common\enums\OperateurMobile.class
 com\plateformeopportunites\common\event\RemboursementEvent.class
 com\plateformeopportunites\common\enums\StatutSondage.class
+com\plateformeopportunites\common\service\PusherNotificationService.class
 com\plateformeopportunites\common\config\WebConfig.class
+com\plateformeopportunites\common\event\SseNotificationEvent.class

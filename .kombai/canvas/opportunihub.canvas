@@ -146,7 +146,7 @@
       "created": "2026-07-10T23:23:10.606478+00:00",
       "modified": "2026-07-10T23:23:10.606478+00:00",
       "id": "var_251932080240",
-      "viewportScrollY": 1
+      "viewportScrollY": 0
     },
     "var_c66d2845e2e9": {
       "type": "variant",
@@ -237,7 +237,8 @@
       "comments": [],
       "created": "2026-07-10T23:35:25.721773+00:00",
       "modified": "2026-07-10T23:35:25.721773+00:00",
-      "id": "var_c02063608628"
+      "id": "var_c02063608628",
+      "viewportScrollY": 76
     },
     "var_d055fca881a1": {
       "type": "variant",
@@ -397,7 +398,7 @@
       "created": "2026-07-10T23:46:21.444725+00:00",
       "modified": "2026-07-10T23:46:21.444725+00:00",
       "id": "var_aac2ee0309de",
-      "viewportScrollY": 2322
+      "viewportScrollY": 0
     },
     "var_d07cd97303c5": {
       "type": "variant",
@@ -470,7 +471,8 @@
       "comments": [],
       "created": "2026-07-11T07:40:15.168701+00:00",
       "modified": "2026-07-11T07:40:15.168701+00:00",
-      "id": "var_82dac9dba3ee"
+      "id": "var_82dac9dba3ee",
+      "viewportScrollY": 0
     },
     "var_cd9f0c48fb02": {
       "type": "variant",
@@ -506,7 +508,7 @@
       "created": "2026-07-11T07:40:15.208525+00:00",
       "modified": "2026-07-11T07:40:15.208525+00:00",
       "id": "var_7bf5f6365fb7",
-      "viewportScrollY": 1568
+      "viewportScrollY": 0
     },
     "var_42f610662c0c": {
       "type": "variant",
@@ -541,7 +543,7 @@
       "created": "2026-07-11T07:45:29.045433+00:00",
       "modified": "2026-07-11T07:45:29.045433+00:00",
       "id": "var_9a4322468016",
-      "viewportScrollY": 1848
+      "viewportScrollY": 0
     },
     "var_b35fa2998b38": {
       "type": "variant",
@@ -559,7 +561,7 @@
       "created": "2026-07-11T07:45:29.081665+00:00",
       "modified": "2026-07-11T07:45:29.081665+00:00",
       "id": "var_b35fa2998b38",
-      "viewportScrollY": 1865
+      "viewportScrollY": 0
     },
     "var_0ba97da86c99": {
       "type": "variant",
@@ -594,7 +596,7 @@
       "created": "2026-07-13T14:25:00.969534+00:00",
       "modified": "2026-07-13T14:25:00.969534+00:00",
       "id": "var_84ca49f72f6d",
-      "viewportScrollY": 683
+      "viewportScrollY": 0
     },
     "var_6740842abb52": {
       "type": "variant",

@@ -35,11 +35,23 @@ public class Opportunite {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(columnDefinition = "TEXT")
+    private String specsPointsForts;
+
+    @Column(columnDefinition = "TEXT")
+    private String specsCasUsage;
+
+    @Column(columnDefinition = "TEXT")
+    private String specsFinePrint;
+
     @Column(nullable = false)
     private BigDecimal prixNormal;
 
     @Column(nullable = false)
     private Integer seuilMinimum;
+
+    /** Plafond de participants/quantité (ex: stock fournisseur limité). NULL = pas de plafond. */
+    private Integer seuilMaximal;
 
     @Column(nullable = false)
     private Integer participantsActuels;

@@ -11,6 +11,7 @@ public class CommanditaireResponse {
     private UUID id;
     private String nom;
     private String prenom;
+    private String societe;
     private String email;
     private String telephone;
     private StatutCommanditaire statut;

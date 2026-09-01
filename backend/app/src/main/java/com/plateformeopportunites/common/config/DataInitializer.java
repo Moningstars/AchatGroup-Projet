@@ -5,16 +5,11 @@ import com.plateformeopportunites.finance.entity.WalletPlateforme;
 import com.plateformeopportunites.finance.repository.WalletPlateformeRepository;
 import com.plateformeopportunites.identity.entity.Administrateur;
 import com.plateformeopportunites.identity.repository.AdministrateurRepository;
+import com.plateformeopportunites.opportunite.dto.CreerOpportuniteRequest;
 import com.plateformeopportunites.opportunite.entity.Banniere;
-import com.plateformeopportunites.opportunite.entity.Categorie;
-import com.plateformeopportunites.opportunite.entity.Opportunite;
-import com.plateformeopportunites.opportunite.entity.OpportuniteImage;
-import com.plateformeopportunites.opportunite.entity.PalierPrix;
 import com.plateformeopportunites.opportunite.repository.BanniereRepository;
-import com.plateformeopportunites.opportunite.repository.CategorieRepository;
-import com.plateformeopportunites.opportunite.repository.OpportuniteImageRepository;
 import com.plateformeopportunites.opportunite.repository.OpportuniteRepository;
-import com.plateformeopportunites.opportunite.repository.PalierPrixRepository;
+import com.plateformeopportunites.opportunite.service.OpportuniteService;
 import com.plateformeopportunites.sondage.dto.CreerEligibiliteRequest;
 import com.plateformeopportunites.sondage.dto.CreerSondageRequest;
 import com.plateformeopportunites.sondage.dto.SondageResponse;
@@ -43,14 +38,14 @@ public class DataInitializer implements CommandLineRunner {
 
     private final AdministrateurRepository administrateurRepository;
     private final PasswordEncoder passwordEncoder;
-    private final CategorieRepository categorieRepository;
-    private final OpportuniteRepository opportuniteRepository;
-    private final PalierPrixRepository palierPrixRepository;
-    private final OpportuniteImageRepository imageRepository;
     private final WalletPlateformeRepository walletPlateformeRepository;
 
     private final JdbcTemplate jdbcTemplate;
     private final BanniereRepository banniereRepository;
+
+    // ── Opportunités ─────────────────────────────────────────────────────────
+    private final OpportuniteService opportuniteService;
+    private final OpportuniteRepository opportuniteRepository;
 
     // ── Sondage ──────────────────────────────────────────────────────────────
     private final SondageService sondageService;
@@ -65,14 +60,14 @@ public class DataInitializer implements CommandLineRunner {
         corrigerContraintesSchema();
         Administrateur admin = creerAdminSiAbsent();
         initialiserWalletPlateforme();
-        if (opportuniteRepository.count() == 0) {
-            seederOpportunites(admin);
-        }
         // Toujours recréer les sondages de démo (purge + recréation complète)
         supprimerTousSondages();
         seederSondages(admin);
         if (banniereRepository.count() == 0) {
             seederBannieres();
+        }
+        if (opportuniteRepository.count() == 0) {
+            seederOpportunites(admin);
         }
     }
 
@@ -137,195 +132,6 @@ public class DataInitializer implements CommandLineRunner {
             return superAdmin;
         }
         return administrateurRepository.findAll().get(0);
-    }
-
-    // ── Opportunités ──────────────────────────────────────────────────────────
-
-    private Categorie cat(String nom, String icone) {
-        return categorieRepository.findByNom(nom)
-                .orElseGet(() -> categorieRepository.save(
-                        Categorie.builder().nom(nom).icone(icone).build()));
-    }
-
-    private Opportunite creerOpp(Administrateur admin, Categorie categorie,
-                                  String titre, String description,
-                                  BigDecimal prixNormal, int seuilMin,
-                                  int participants, int joursRestants) {
-        Opportunite opp = Opportunite.builder()
-                .admin(admin)
-                .categorie(categorie)
-                .titre(titre)
-                .description(description)
-                .prixNormal(prixNormal)
-                .seuilMinimum(seuilMin)
-                .dateExpiration(LocalDateTime.now().plusDays(joursRestants))
-                .statut(StatutOpportunite.ACTIVE)
-                .participantsActuels(participants)
-                .createdAt(LocalDateTime.now())
-                .build();
-        return opportuniteRepository.save(opp);
-    }
-
-    private void addPalier(Opportunite opp, int min, int max, BigDecimal prix) {
-        palierPrixRepository.save(PalierPrix.builder()
-                .opportunite(opp).seuilMin(min).seuilMax(max).prix(prix).build());
-    }
-
-    private void addImage(Opportunite opp, String seed, String legende, int ordre) {
-        imageRepository.save(OpportuniteImage.builder()
-                .opportunite(opp)
-                .url("https://picsum.photos/seed/" + seed + "/800/600")
-                .legende(legende)
-                .ordre(ordre)
-                .createdAt(LocalDateTime.now())
-                .build());
-    }
-
-    @Transactional
-    protected void seederOpportunites(Administrateur admin) {
-        log.info("=== Seeding 10 opportunités de démonstration ===");
-
-        Categorie electronique  = cat("Électronique",  "📱");
-        Categorie vehicules     = cat("Véhicules",     "🚗");
-        Categorie maison        = cat("Maison",        "🏠");
-        Categorie alimentaire   = cat("Alimentaire",   "🛒");
-        Categorie informatique  = cat("Informatique",  "💻");
-        Categorie beaute        = cat("Beauté",        "✨");
-        Categorie mobilier      = cat("Mobilier",      "🪑");
-        Categorie sport         = cat("Sport",         "⚽");
-
-        // ── 1. DJI Mini 4 Pro ────────────────────────────────────────────────
-        Opportunite drone = creerOpp(admin, electronique,
-                "DJI Mini 4 Pro — Drone 4K HDR",
-                "Drone compact avec caméra 4K HDR, stabilisation sur 3 axes, autonomie 34 min. Idéal pour les voyages et créateurs de contenu. Poids inférieur à 249 g, ne nécessite pas d'enregistrement.",
-                new BigDecimal("485000"), 10, 7, 25);
-        addPalier(drone,  1,  9, new BigDecimal("420000"));
-        addPalier(drone, 10, 19, new BigDecimal("355000"));
-        addPalier(drone, 20, 29, new BigDecimal("310000"));
-        addPalier(drone, 30, 999, new BigDecimal("275000"));
-        addImage(drone, "dji-drone-box",     "Boîte d'emballage avec dimensions",  0);
-        addImage(drone, "dji-drone-storage", "Affichage stockage et accessoires",   1);
-        addImage(drone, "dji-drone-case",    "Mallette de protection waterproof",   2);
-        addImage(drone, "dji-drone-field",   "Utilisation terrain — en vol",        3);
-
-        // ── 2. Trottinette électrique Xiaomi ────────────────────────────────
-        Opportunite trottinette = creerOpp(admin, vehicules,
-                "Xiaomi Electric Scooter 4 Pro",
-                "Trottinette électrique avec autonomie de 55 km, vitesse max 25 km/h, moteur 700 W, pneus anti-crevaison 10 pouces. Pliable et légère.",
-                new BigDecimal("195000"), 8, 12, 18);
-        addPalier(trottinette,  1,  7, new BigDecimal("170000"));
-        addPalier(trottinette,  8, 14, new BigDecimal("145000"));
-        addPalier(trottinette, 15, 999, new BigDecimal("125000"));
-        addImage(trottinette, "scooter-box",  "Trottinette pliée — vue de face",    0);
-        addImage(trottinette, "scooter-ride", "En utilisation sur route",            1);
-        addImage(trottinette, "scooter-fold", "Mécanisme de pliage compact",         2);
-        addImage(trottinette, "scooter-app",  "Application de contrôle smartphone", 3);
-
-        // ── 3. Robot aspirateur ECOVACS ────────────────────────────────────
-        Opportunite robot = creerOpp(admin, maison,
-                "ECOVACS DEEBOT T20 Pro — Robot Aspirateur",
-                "Robot aspirateur et laveur 2-en-1. Aspiration 6000 Pa, navigation laser LIDAR, station de vidange automatique, compatible avec assistant vocal.",
-                new BigDecimal("135000"), 10, 5, 30);
-        addPalier(robot,  1,  9, new BigDecimal("118000"));
-        addPalier(robot, 10, 19, new BigDecimal("98000"));
-        addPalier(robot, 20, 999, new BigDecimal("82000"));
-        addImage(robot, "robot-vacuum-top",    "Vue du dessus — détail capteur",  0);
-        addImage(robot, "robot-vacuum-action", "En fonctionnement dans salon",    1);
-        addImage(robot, "robot-vacuum-base",   "Station de charge et vidange",    2);
-        addImage(robot, "robot-vacuum-map",    "Carte maison sur application",    3);
-
-        // ── 4. Lot de courses premium ────────────────────────────────────────
-        Opportunite courses = creerOpp(admin, alimentaire,
-                "Lot de courses familiales — Panier Premium",
-                "Panier de 25 kg comprenant huiles, farines, légumineuses, produits laitiers longue conservation et conserves. Sélection de marques premium livrée à domicile.",
-                new BigDecimal("38500"), 20, 35, 10);
-        addPalier(courses,  1, 19, new BigDecimal("34000"));
-        addPalier(courses, 20, 49, new BigDecimal("28500"));
-        addPalier(courses, 50, 999, new BigDecimal("24000"));
-        addImage(courses, "grocery-basket",  "Contenu complet du panier",           0);
-        addImage(courses, "grocery-fresh",   "Produits frais inclus",                1);
-        addImage(courses, "grocery-dry",     "Épicerie sèche sélectionnée",          2);
-        addImage(courses, "grocery-deliver", "Livraison à domicile en camion frigo", 3);
-
-        // ── 5. MacBook Air M2 ───────────────────────────────────────────────
-        Opportunite macbook = creerOpp(admin, informatique,
-                "Apple MacBook Air M2 — 13 pouces 8 Go / 256 Go",
-                "Ordinateur portable ultra-fin avec puce M2, écran Liquid Retina 13,6 pouces, autonomie jusqu'à 18 heures. Idéal pour les professionnels et étudiants.",
-                new BigDecimal("895000"), 5, 3, 45);
-        addPalier(macbook,  1,  4, new BigDecimal("780000"));
-        addPalier(macbook,  5,  9, new BigDecimal("695000"));
-        addPalier(macbook, 10, 999, new BigDecimal("640000"));
-        addImage(macbook, "macbook-open",    "MacBook ouvert — affichage clavier",  0);
-        addImage(macbook, "macbook-side",    "Profil ultra-fin",                    1);
-        addImage(macbook, "macbook-ports",   "Ports USB-C et MagSafe",              2);
-        addImage(macbook, "macbook-screen",  "Écran Retina — rendu couleurs",       3);
-
-        // ── 6. Kit beauté L'Oréal ───────────────────────────────────────────
-        Opportunite beaute_kit = creerOpp(admin, beaute,
-                "Kit Beauté L'Oréal Paris — Soin Complet",
-                "Kit de 12 produits comprenant sérum, crème de jour, nuit, contour des yeux, masques et soins hydratants. Coffret édition prestige.",
-                new BigDecimal("48000"), 15, 18, 15);
-        addPalier(beaute_kit,  1, 14, new BigDecimal("42000"));
-        addPalier(beaute_kit, 15, 29, new BigDecimal("36000"));
-        addPalier(beaute_kit, 30, 999, new BigDecimal("30000"));
-        addImage(beaute_kit, "beauty-kit-full",  "Kit complet — 12 produits",        0);
-        addImage(beaute_kit, "beauty-serum",     "Sérum hydratant — zoom texture",   1);
-        addImage(beaute_kit, "beauty-cream",     "Crème de nuit régénérante",        2);
-        addImage(beaute_kit, "beauty-packaging", "Coffret emballage cadeau",          3);
-
-        // ── 7. Canapé d'angle ──────────────────────────────────────────────
-        Opportunite canape = creerOpp(admin, mobilier,
-                "Canapé d'angle convertible — 5 places",
-                "Canapé d'angle modulable, tissu microfibre ultra-doux, méridienne réversible, coffre de rangement intégré. Disponible en gris anthracite et beige naturel.",
-                new BigDecimal("345000"), 5, 2, 60);
-        addPalier(canape,  1,  4, new BigDecimal("295000"));
-        addPalier(canape,  5, 11, new BigDecimal("255000"));
-        addPalier(canape, 12, 999, new BigDecimal("220000"));
-        addImage(canape, "sofa-corner",    "Canapé en angle — vue d'ensemble",    0);
-        addImage(canape, "sofa-fabric",    "Détail tissu microfibre",              1);
-        addImage(canape, "sofa-storage",   "Coffre de rangement intégré",         2);
-        addImage(canape, "sofa-room",      "Mise en scène salon moderne",         3);
-
-        // ── 8. Vélo électrique ────────────────────────────────────────────
-        Opportunite velo = creerOpp(admin, vehicules,
-                "Vélo électrique Urbain — 250 W / 36 V",
-                "Vélo électrique pliable avec moteur brushless 250 W, batterie 36 V 10 Ah (autonomie 60 km), écran LCD, freins à disque hydrauliques, poids 22 kg.",
-                new BigDecimal("285000"), 8, 6, 35);
-        addPalier(velo,  1,  7, new BigDecimal("245000"));
-        addPalier(velo,  8, 14, new BigDecimal("210000"));
-        addPalier(velo, 15, 999, new BigDecimal("185000"));
-        addImage(velo, "ebike-side",    "Vélo électrique — profil complet",     0);
-        addImage(velo, "ebike-display", "Écran LCD et commandes guidon",         1);
-        addImage(velo, "ebike-motor",   "Moteur roue arrière brushless",         2);
-        addImage(velo, "ebike-fold",    "Mécanisme de pliage — compact",         3);
-
-        // ── 9. Samsung Smart TV 65" ─────────────────────────────────────────
-        Opportunite tv = creerOpp(admin, electronique,
-                "Samsung QLED 4K 65\" — Smart TV 2024",
-                "Téléviseur QLED 4K 65 pouces avec Quantum Dot, HDR10+, 120 Hz, Tizen OS, 4 ports HDMI 2.1, son Dolby Atmos. Gaming mode & Multi-View inclus.",
-                new BigDecimal("420000"), 12, 15, 20);
-        addPalier(tv,  1, 11, new BigDecimal("370000"));
-        addPalier(tv, 12, 24, new BigDecimal("320000"));
-        addPalier(tv, 25, 999, new BigDecimal("278000"));
-        addImage(tv, "samsung-tv-front",  "Samsung QLED — vue de face",           0);
-        addImage(tv, "samsung-tv-angle",  "Angle pied design",                    1);
-        addImage(tv, "samsung-tv-ports",  "Connectique HDMI et USB arrière",      2);
-        addImage(tv, "samsung-tv-setup",  "Installation salon — ambiance",        3);
-
-        // ── 10. Kit Yoga premium ────────────────────────────────────────────
-        Opportunite yoga = creerOpp(admin, sport,
-                "Kit Yoga Complet Premium — 8 accessoires",
-                "Kit yoga professionnel : tapis TPE antidérapant 6 mm, 2 briques en mousse, sangle de stretching, roue de yoga, sac de transport, 2 balles de massage. Pour tous niveaux.",
-                new BigDecimal("32000"), 20, 28, 12);
-        addPalier(yoga,  1, 19, new BigDecimal("27500"));
-        addPalier(yoga, 20, 39, new BigDecimal("22000"));
-        addPalier(yoga, 40, 999, new BigDecimal("18500"));
-        addImage(yoga, "yoga-mat-full",   "Kit complet posé sur tapis",           0);
-        addImage(yoga, "yoga-mat-detail", "Texture tapis TPE antidérapant",       1);
-        addImage(yoga, "yoga-blocks",     "Briques et sangle de stretching",      2);
-        addImage(yoga, "yoga-session",    "Séance en cours — utilisation réelle", 3);
-
-        log.info("=== 10 opportunités créées avec succès ===");
     }
 
     // ── Sondages ──────────────────────────────────────────────────────────────
@@ -529,6 +335,123 @@ public class DataInitializer implements CommandLineRunner {
         o.setOrdre(ordre);
         o.setEstCorrecte(estCorrecte);
         return o;
+    }
+
+    // ── Opportunités (achats groupés) ───────────────────────────────────────────
+
+    /** Un item du catalogue de démo : catégorie, titre, prix normal (FCFA), seuil minimum de participants, jours avant expiration. */
+    private record OpportuniteSeed(String categorie, String titre, long prixNormal, int seuilMinimum, int joursExpiration) {}
+
+    private void seederOpportunites(Administrateur admin) {
+        // Sélection pensée pour l'Afrique de l'Ouest (Togo, Bénin, Côte d'Ivoire, Sénégal) :
+        // mélange de pagnes/mode locale, produits alimentaires de base, énergie solaire/groupes
+        // électrogènes (délestage), mobilité (motos), et biens de consommation courants.
+        // Pas d'image ni de description détaillée — à compléter ensuite côté admin.
+        List<OpportuniteSeed> seeds = List.of(
+            // ── Mode (pagnes, tissus, vêtements locaux) ──
+            new OpportuniteSeed("Mode", "Pagne Wax Hollandais 6 yards", 22000, 25, 30),
+            new OpportuniteSeed("Mode", "Ensemble boubou bazin riche brodé homme", 35000, 15, 25),
+            new OpportuniteSeed("Mode", "Kaba façonné prêt-à-coudre", 18000, 20, 20),
+            new OpportuniteSeed("Mode", "Pagne Java authentique 6 yards", 15000, 30, 28),
+            new OpportuniteSeed("Mode", "Sac à main en tissu Kente tissé", 12000, 40, 15),
+            new OpportuniteSeed("Mode", "Chemise homme imprimé Ankara", 9000, 35, 18),
+            new OpportuniteSeed("Mode", "Foulard / gèlè en soie imprimée", 6000, 50, 12),
+            new OpportuniteSeed("Mode", "Sandales en cuir tressé artisanales", 8500, 30, 22),
+
+            // ── Électronique (énergie, téléphonie, ventilation) ──
+            new OpportuniteSeed("Électronique", "Groupe électrogène essence 3.5 kVA", 185000, 12, 45),
+            new OpportuniteSeed("Électronique", "Kit solaire complet (panneau 100W + batterie + régulateur)", 95000, 20, 35),
+            new OpportuniteSeed("Électronique", "Smartphone Android 4G 64 Go", 42000, 25, 30),
+            new OpportuniteSeed("Électronique", "Ventilateur sur pied rechargeable", 25000, 30, 20),
+            new OpportuniteSeed("Électronique", "Régulateur de tension pour réfrigérateur", 15000, 25, 18),
+            new OpportuniteSeed("Électronique", "Lampe solaire rechargeable à panneau intégré", 7500, 60, 15),
+            new OpportuniteSeed("Électronique", "Chargeur solaire portable multi-USB", 6000, 50, 14),
+
+            // ── Alimentaire (denrées de base) ──
+            new OpportuniteSeed("Alimentaire", "Sac de riz local Ganta-Digue 50kg", 27000, 20, 21),
+            new OpportuniteSeed("Alimentaire", "Bidon d'huile de palme rouge 20L", 18000, 25, 18),
+            new OpportuniteSeed("Alimentaire", "Carton de gari qualité supérieure 25kg", 12000, 30, 20),
+            new OpportuniteSeed("Alimentaire", "Sac de farine de maïs 25kg", 9500, 35, 15),
+            new OpportuniteSeed("Alimentaire", "Carton de sucre en morceaux 10kg", 8000, 40, 12),
+            new OpportuniteSeed("Alimentaire", "Bidon de lait en poudre enrichi 2.5kg", 6500, 45, 14),
+            new OpportuniteSeed("Alimentaire", "Sac d'igname séché (cossettes) 25kg", 14000, 25, 20),
+
+            // ── Maison ──
+            new OpportuniteSeed("Maison", "Matelas mousse haute densité 1m40", 45000, 15, 25),
+            new OpportuniteSeed("Maison", "Réchaud à gaz 2 feux avec bouteille", 22000, 20, 20),
+            new OpportuniteSeed("Maison", "Moustiquaire imprégnée grand lit", 5000, 60, 12),
+            new OpportuniteSeed("Maison", "Batterie de cuisine en inox 12 pièces", 28000, 20, 22),
+            new OpportuniteSeed("Maison", "Bidons d'eau potable 20L (lot de 10)", 3500, 80, 10),
+            new OpportuniteSeed("Maison", "Ventilateur brasseur d'air industriel", 32000, 15, 25),
+
+            // ── Beauté (cosmétiques locaux) ──
+            new OpportuniteSeed("Beauté", "Beurre de karité brut du Nord 1kg", 4500, 50, 15),
+            new OpportuniteSeed("Beauté", "Savon noir traditionnel artisanal (lot de 5)", 5500, 45, 14),
+            new OpportuniteSeed("Beauté", "Huile de coco vierge pressée à froid 500ml", 4000, 50, 12),
+            new OpportuniteSeed("Beauté", "Kit tresses / mèches synthétiques premium", 8000, 35, 18),
+            new OpportuniteSeed("Beauté", "Gommage corporel au marc de café local", 3500, 55, 10),
+
+            // ── Informatique ──
+            new OpportuniteSeed("Informatique", "Ordinateur portable reconditionné Core i5", 165000, 10, 40),
+            new OpportuniteSeed("Informatique", "Imprimante multifonction jet d'encre", 55000, 15, 30),
+            new OpportuniteSeed("Informatique", "Clé USB 64 Go (lot de 3)", 7000, 40, 12),
+            new OpportuniteSeed("Informatique", "Routeur Wi-Fi 4G portable", 28000, 20, 20),
+            new OpportuniteSeed("Informatique", "Casque audio Bluetooth antibruit", 18000, 25, 18),
+
+            // ── Véhicules (mobilité) ──
+            new OpportuniteSeed("Véhicules", "Moto utilitaire 125cc neuve", 620000, 8, 60),
+            new OpportuniteSeed("Véhicules", "Casque de moto homologué", 12000, 30, 20),
+            new OpportuniteSeed("Véhicules", "Kit de pièces détachées moto (plaquettes + chaîne)", 15000, 25, 18),
+            new OpportuniteSeed("Véhicules", "Pneu moto renforcé (la paire)", 22000, 20, 20),
+            new OpportuniteSeed("Véhicules", "Vélo tout-terrain robuste", 75000, 15, 30),
+
+            // ── Mobilier ──
+            new OpportuniteSeed("Mobilier", "Salon en résine tressée (3 pièces)", 95000, 12, 35),
+            new OpportuniteSeed("Mobilier", "Lot de 6 chaises plastiques empilables", 18000, 25, 18),
+            new OpportuniteSeed("Mobilier", "Armoire métallique 2 portes", 42000, 15, 25),
+            new OpportuniteSeed("Mobilier", "Table pliante de marché renforcée", 22000, 20, 20),
+
+            // ── Sport ──
+            new OpportuniteSeed("Sport", "Ballons de football officiels (lot de 10)", 45000, 15, 20),
+            new OpportuniteSeed("Sport", "Tenue de sport complète (short + maillot)", 8000, 40, 15),
+            new OpportuniteSeed("Sport", "Vélo d'appartement pliable", 65000, 12, 30)
+        );
+
+        for (OpportuniteSeed s : seeds) {
+            CreerOpportuniteRequest req = new CreerOpportuniteRequest();
+            req.setTitre(s.titre());
+            req.setCategorie(s.categorie());
+            req.setPrixNormal(BigDecimal.valueOf(s.prixNormal()));
+            req.setSeuilMinimum(s.seuilMinimum());
+            req.setDateExpiration(LocalDateTime.now().plusDays(s.joursExpiration()));
+            req.setActif(true);
+            req.setPaliers(palierDegressifs(s.prixNormal(), s.seuilMinimum()));
+            opportuniteService.creer(admin.getId(), req);
+        }
+        log.info("=== {} opportunités d'achat groupé créées (sans image ni description — à compléter) ===", seeds.size());
+    }
+
+    /** Trois paliers de prix dégressifs (-8%, -15%, -22% par rapport au prix normal) selon le nombre de participants. */
+    private List<CreerOpportuniteRequest.PalierPrixRequest> palierDegressifs(long prixNormal, int seuilMinimum) {
+        int max1 = seuilMinimum;
+        int max2 = seuilMinimum * 2;
+        return List.of(
+            palier(1, max1, arrondir5(Math.round(prixNormal * 0.92))),
+            palier(max1 + 1, max2, arrondir5(Math.round(prixNormal * 0.85))),
+            palier(max2 + 1, max2 * 5, arrondir5(Math.round(prixNormal * 0.78)))
+        );
+    }
+
+    private long arrondir5(long valeur) {
+        return Math.round(valeur / 5.0) * 5;
+    }
+
+    private CreerOpportuniteRequest.PalierPrixRequest palier(int seuilMin, int seuilMax, long prix) {
+        CreerOpportuniteRequest.PalierPrixRequest p = new CreerOpportuniteRequest.PalierPrixRequest();
+        p.setSeuilMin(seuilMin);
+        p.setSeuilMax(seuilMax);
+        p.setPrix(BigDecimal.valueOf(prix));
+        return p;
     }
 
     // ── Bannières ─────────────────────────────────────────────────────────────

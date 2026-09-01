@@ -117,6 +117,9 @@ public class KycService {
         u.setNiveauVerification(NiveauVerification.EN_ATTENTE);
         utilisateurRepository.save(u);
 
+        eventPublisher.publishEvent(new SseNotificationEvent(this,
+                "admin:global", "KYC_SOUMIS", "{\"utilisateurId\":\"" + utilisateurId + "\"}"));
+
         return getStatut(utilisateurId);
     }
 

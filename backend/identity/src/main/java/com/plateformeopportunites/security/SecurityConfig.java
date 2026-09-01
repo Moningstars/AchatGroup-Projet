@@ -41,8 +41,7 @@ public class SecurityConfig {
                                 new AntPathRequestMatcher("/api/sondages/mes-participations", HttpMethod.GET.name())
                         ).hasRole("PARTICIPANT")
                         .requestMatchers(
-                                AntPathRequestMatcher.antMatcher("/api/auth/initier"),
-                                AntPathRequestMatcher.antMatcher("/api/auth/verifier"),
+                                AntPathRequestMatcher.antMatcher("/api/auth/verifier-token"),
                                 AntPathRequestMatcher.antMatcher("/api/admin/auth/**"),
                                 AntPathRequestMatcher.antMatcher("/api/opportunites"),
                                 AntPathRequestMatcher.antMatcher("/api/opportunites/**"),
@@ -50,6 +49,8 @@ public class SecurityConfig {
                                 AntPathRequestMatcher.antMatcher("/api/bannieres"),
                                 AntPathRequestMatcher.antMatcher("/api/events/opportunite/**"),
                                 AntPathRequestMatcher.antMatcher("/api/events/sondage/**"),
+                                AntPathRequestMatcher.antMatcher("/api/events/opportunites"),
+                                AntPathRequestMatcher.antMatcher("/api/events/sondages"),
                                 AntPathRequestMatcher.antMatcher("/uploads/**"),
                                 AntPathRequestMatcher.antMatcher("/swagger-ui/**"),
                                 AntPathRequestMatcher.antMatcher("/swagger-ui.html"),

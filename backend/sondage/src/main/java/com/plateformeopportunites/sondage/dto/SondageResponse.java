@@ -14,6 +14,7 @@ public class SondageResponse {
     private UUID id;
     private UUID commanditaireId;
     private String commanditaireNom;
+    private String commanditaireSociete;
     private String titre;
     private String description;
     private Integer quotaVise;

@@ -1,16 +1,21 @@
-import { useEffect, useState } from 'react'
-import { TrendingUp, Users, Package, ClipboardList, Wallet, Clock } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { TrendingUp, Users, Package, ClipboardList, Wallet, Clock, AlertTriangle } from 'lucide-react'
 import { StatCard, AreaChart, ProgressBar, Spinner } from '../components/ui'
 import { getAdminStats, getAdminOpportunites } from '../services/api'
+import { useSSE } from '../hooks/useSSE'
+import { useAuth } from '../context/AuthContext'
 
 function fmt(n) {
   return Number(n || 0).toLocaleString('fr-FR')
 }
 
 export default function Dashboard() {
+  const { token } = useAuth()
   const [stats, setStats] = useState(null)
   const [opportunites, setOpportunites] = useState([])
   const [loading, setLoading] = useState(true)
+  const [presqueCompletes, setPresqueCompletes] = useState([])
+  const refetchTimer = useRef(null)
 
   useEffect(() => {
     Promise.all([getAdminStats(), getAdminOpportunites()])
@@ -18,6 +23,36 @@ export default function Dashboard() {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
+
+  // Les agrégats (moyennes, soldes...) sont recalculés côté serveur — on les
+  // rafraîchit (avec un léger debounce) plutôt que de les recalculer en JS.
+  const refetchStats = () => {
+    clearTimeout(refetchTimer.current)
+    refetchTimer.current = setTimeout(() => {
+      getAdminStats().then(setStats).catch(() => {})
+    }, 500)
+  }
+
+  useSSE('events/opportunites', {
+    COMPTEUR: ({ id, participantsActuels, prixActuel }) => {
+      setOpportunites(prev => prev.map(op => op.id === id ? { ...op, participantsActuels, prixActuel } : op))
+      refetchStats()
+    },
+    STATUT: ({ id, statut }) => {
+      setOpportunites(prev => prev.map(op => op.id === id ? { ...op, statut } : op))
+      refetchStats()
+    },
+  })
+  useSSE('events/sondages', { COMPTEUR: refetchStats, STATUT: refetchStats })
+  useSSE('admin/events/global', {
+    KYC_SOUMIS: refetchStats,
+    RETRAIT_DEMANDE: refetchStats,
+    OPPORTUNITE_PRESQUE_COMPLETE: ({ id, titre, participantsActuels, seuilMaximal }) => {
+      setPresqueCompletes(prev => prev.some(o => o.id === id)
+        ? prev
+        : [...prev, { id, titre, participantsActuels, seuilMaximal }])
+    },
+  }, token)
 
   if (loading) return <Spinner />
 
@@ -61,6 +96,15 @@ export default function Dashboard() {
       value: fmt(stats?.retraitsEnAttente), sub: 'à approuver',
       accentColor: '#D97706',
       alert: stats?.retraitsEnAttente > 0 ? stats.retraitsEnAttente : 0,
+    },
+    {
+      icon: AlertTriangle, label: 'Bientôt complètes',
+      value: fmt(presqueCompletes.length),
+      sub: presqueCompletes.length > 0
+        ? presqueCompletes.map(o => o.titre).slice(0, 2).join(', ') + (presqueCompletes.length > 2 ? '…' : '')
+        : 'Aucune pour le moment',
+      accentColor: '#DC2626',
+      alert: presqueCompletes.length > 0 ? presqueCompletes.length : 0,
     },
   ]
 

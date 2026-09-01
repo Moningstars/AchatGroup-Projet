@@ -24,7 +24,7 @@ function initiales(nom, prenom) {
 // ── Modal : nouveau commanditaire ────────────────────────────────────────────
 
 function NouveauCommanditaireModal({ onClose, onSaved }) {
-  const [form, setForm] = useState({ nom: '', prenom: '', email: '', telephone: '' })
+  const [form, setForm] = useState({ nom: '', prenom: '', societe: '', email: '', telephone: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -61,6 +61,10 @@ function NouveauCommanditaireModal({ onClose, onSaved }) {
               <label className={labelCls}>Prénom *</label>
               <input required value={form.prenom} onChange={e => set('prenom', e.target.value)} className={inputCls} />
             </div>
+          </div>
+          <div>
+            <label className={labelCls}>Société *</label>
+            <input required value={form.societe} onChange={e => set('societe', e.target.value)} className={inputCls} />
           </div>
           <div>
             <label className={labelCls}>Email *</label>
@@ -133,6 +137,7 @@ export default function Commanditaires() {
       return (
         c.nom?.toLowerCase().includes(q) ||
         c.prenom?.toLowerCase().includes(q) ||
+        c.societe?.toLowerCase().includes(q) ||
         c.email?.toLowerCase().includes(q) ||
         c.telephone?.toLowerCase().includes(q)
       )
@@ -179,7 +184,7 @@ export default function Commanditaires() {
         </div>
 
         <div className="mt-4 flex flex-wrap gap-3 items-center">
-          <SearchInput value={search} onChange={setSearch} placeholder="Nom, email, téléphone…" />
+          <SearchInput value={search} onChange={setSearch} placeholder="Nom, société, email, téléphone…" />
           <div className="flex gap-1.5 flex-wrap">
             {FILTER_LABELS.map((label, idx) => (
               <FilterPill key={label} label={label} active={filterIdx === idx} onClick={() => setFilterIdx(idx)} />
@@ -199,6 +204,7 @@ export default function Commanditaires() {
             <thead>
               <tr>
                 <Th>Commanditaire</Th>
+                <Th>Société</Th>
                 <Th>Email</Th>
                 <Th>Téléphone</Th>
                 <Th>Statut</Th>
@@ -219,6 +225,7 @@ export default function Commanditaires() {
                       </div>
                     </div>
                   </Td>
+                  <Td><span className="text-[12.5px] text-slate-700">{c.societe || '—'}</span></Td>
                   <Td><span className="text-[12.5px] text-slate-700">{c.email || '—'}</span></Td>
                   <Td><span className="text-[12px] font-mono text-slate-500">{c.telephone || '—'}</span></Td>
                   <Td>

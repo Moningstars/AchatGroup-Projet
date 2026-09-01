@@ -14,6 +14,12 @@ public class CreerOpportuniteRequest {
 
     private String description;
 
+    private String specsPointsForts;
+
+    private String specsCasUsage;
+
+    private String specsFinePrint;
+
     @NotNull
     @DecimalMin("0")
     private BigDecimal prixNormal;
@@ -21,6 +27,10 @@ public class CreerOpportuniteRequest {
     @NotNull
     @Min(1)
     private Integer seuilMinimum;
+
+    /** Plafond de participants/quantité (optionnel, ex: stock fournisseur limité). */
+    @Min(1)
+    private Integer seuilMaximal;
 
     @NotNull
     @Future

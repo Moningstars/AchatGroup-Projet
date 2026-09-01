@@ -14,9 +14,13 @@ public class OpportuniteResponse {
     private UUID id;
     private String titre;
     private String description;
+    private String specsPointsForts;
+    private String specsCasUsage;
+    private String specsFinePrint;
     private BigDecimal prixNormal;
     private BigDecimal prixActuel;
     private Integer seuilMinimum;
+    private Integer seuilMaximal;
     private Integer participantsActuels;
     private LocalDateTime dateExpiration;
     private StatutOpportunite statut;

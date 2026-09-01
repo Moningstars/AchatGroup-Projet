@@ -1,7 +1,16 @@
 com\plateformeopportunites\common\config\DataInitializer.class
 com\plateformeopportunites\common\dto\StatsResponse$StatsResponseBuilder.class
 com\plateformeopportunites\common\dto\StatsResponse.class
+com\plateformeopportunites\common\config\DataInitializer$OpportuniteSeed.class
 com\plateformeopportunites\common\listener\EventListeners.class
+com\plateformeopportunites\common\controller\AdminStatsController.class
+com\plateformeopportunites\common\dto\AdminStatsResponse.class
+com\plateformeopportunites\common\dto\AdminStatsResponse$PointMensuel$PointMensuelBuilder.class
+com\plateformeopportunites\common\dto\AdminStatsResponse$AdminStatsResponseBuilder.class
 com\plateformeopportunites\common\scheduler\ClotureScheduler.class
+com\plateformeopportunites\common\sse\AdminSseController.class
 com\plateformeopportunites\common\controller\StatsController.class
+com\plateformeopportunites\common\sse\SseController.class
+com\plateformeopportunites\common\sse\SseService.class
+com\plateformeopportunites\common\dto\AdminStatsResponse$PointMensuel.class
 com\plateformeopportunites\plateforme_opportunites\PlateformeOpportunitesApplication.class

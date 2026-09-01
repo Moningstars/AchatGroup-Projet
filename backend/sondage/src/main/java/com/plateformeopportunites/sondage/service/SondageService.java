@@ -26,6 +26,7 @@ import com.plateformeopportunites.sondage.dto.MonEligibiliteResponse;
 import com.plateformeopportunites.sondage.dto.RepondreRequest;
 import com.plateformeopportunites.sondage.dto.ReponseAValiderDTO;
 import com.plateformeopportunites.sondage.dto.SondageResponse;
+import com.plateformeopportunites.sondage.dto.SondageResultatDTO;
 import com.plateformeopportunites.sondage.entity.*;
 import com.plateformeopportunites.sondage.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -162,8 +163,11 @@ public class SondageService {
         sondage.setStatut(StatutSondage.ACTIF);
         sondageRepository.save(sondage);
 
+        String payloadActif = "{\"id\":\"" + sondageId + "\",\"statut\":\"ACTIF\"}";
         eventPublisher.publishEvent(new SseNotificationEvent(this,
-                "sondage:" + sondageId, "STATUT", "{\"statut\":\"ACTIF\"}"));
+                "sondage:" + sondageId, "STATUT", payloadActif));
+        eventPublisher.publishEvent(new SseNotificationEvent(this,
+                "sondages:global", "STATUT", payloadActif));
     }
 
     @Transactional
@@ -181,8 +185,11 @@ public class SondageService {
         sondage.setStatut(StatutSondage.EN_ATTENTE_DISTRIBUTION);
         sondageRepository.save(sondage);
 
+        String payloadDistribution = "{\"id\":\"" + sondageId + "\",\"statut\":\"EN_ATTENTE_DISTRIBUTION\"}";
         eventPublisher.publishEvent(new SseNotificationEvent(this,
-                "sondage:" + sondageId, "STATUT", "{\"statut\":\"EN_ATTENTE_DISTRIBUTION\"}"));
+                "sondage:" + sondageId, "STATUT", payloadDistribution));
+        eventPublisher.publishEvent(new SseNotificationEvent(this,
+                "sondages:global", "STATUT", payloadDistribution));
     }
 
     @Transactional
@@ -411,6 +418,9 @@ public class SondageService {
 
             sondage.setRepondantsActuels(sondage.getRepondantsActuels() + 1);
             sondageRepository.save(sondage);
+            eventPublisher.publishEvent(new SseNotificationEvent(this,
+                    "sondages:global", "COMPTEUR",
+                    "{\"id\":\"" + sondageId + "\",\"repondantsActuels\":" + sondage.getRepondantsActuels() + "}"));
 
             distribuerRecompense(saved, ModeDistribution.AUTO);
         }
@@ -452,6 +462,9 @@ public class SondageService {
             Sondage sondage = reponse.getSondage();
             sondage.setRepondantsActuels(sondage.getRepondantsActuels() + 1);
             sondageRepository.save(sondage);
+            eventPublisher.publishEvent(new SseNotificationEvent(this,
+                    "sondages:global", "COMPTEUR",
+                    "{\"id\":\"" + sondage.getId() + "\",\"repondantsActuels\":" + sondage.getRepondantsActuels() + "}"));
 
             distribuerRecompense(reponse, ModeDistribution.MANUEL);
         }
@@ -484,6 +497,123 @@ public class SondageService {
                         .recompenseVersee(r.getRecompenseVersee())
                         .build())
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReponseAValiderDTO> listerRepondants(UUID sondageId) {
+        return sondageReponseRepository.findBySondageIdOrderByCreatedAtDesc(sondageId)
+                .stream()
+                .map(r -> ReponseAValiderDTO.builder()
+                        .id(r.getId())
+                        .participantNom(r.getUtilisateur().getNom())
+                        .participantContact(r.getUtilisateur().getTelephone())
+                        .statutValidation(r.getStatutValidation())
+                        .createdAt(r.getCreatedAt())
+                        .valideeAt(r.getValideeAt())
+                        .recompenseVersee(r.getRecompenseVersee())
+                        .build())
+                .toList();
+    }
+
+    // ─── Résultats (consultation admin) ──────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public SondageResultatDTO genererResultats(UUID sondageId) {
+        Sondage sondage = getSondage(sondageId);
+
+        List<SondageReponse> reponsesValidees = sondageReponseRepository
+                .findBySondageIdAndStatutValidationWithDetails(sondageId, StatutValidation.VALIDE);
+        int repondantsValides = reponsesValidees.size();
+
+        List<ReponseDetail> tousDetails = reponsesValidees.stream()
+                .flatMap(r -> r.getDetails().stream())
+                .toList();
+
+        List<Question> questions = questionRepository.findBySondageIdOrderByOrdre(sondageId);
+
+        String commanditaireNom = null;
+        String commanditaireSociete = null;
+        if (sondage.getCommanditaireId() != null) {
+            Commanditaire commanditaire = commanditaireRepository.findById(sondage.getCommanditaireId()).orElse(null);
+            if (commanditaire != null) {
+                commanditaireNom = commanditaire.getNom() + " " + commanditaire.getPrenom();
+                commanditaireSociete = commanditaire.getSociete();
+            }
+        }
+
+        List<SondageResultatDTO.QuestionResultat> resultatsParQuestion = questions.stream()
+                .map(q -> {
+                    List<ReponseDetail> detailsQuestion = tousDetails.stream()
+                            .filter(d -> d.getQuestion().getId().equals(q.getId()))
+                            .toList();
+
+                    List<SondageResultatDTO.OptionResultat> repartition = null;
+                    List<String> verbatims = null;
+
+                    if (q.getTypeQuestion() == TypeQuestion.CHOIX_UNIQUE
+                            || q.getTypeQuestion() == TypeQuestion.CHOIX_MULTIPLE) {
+                        repartition = q.getOptions().stream()
+                                .map(o -> {
+                                    long count = detailsQuestion.stream()
+                                            .filter(d -> d.getOptionReponse() != null
+                                                    && d.getOptionReponse().getId().equals(o.getId()))
+                                            .count();
+                                    return SondageResultatDTO.OptionResultat.builder()
+                                            .optionId(o.getId())
+                                            .libelle(o.getLibelle())
+                                            .count(count)
+                                            .pourcentage(pourcentage(count, repondantsValides))
+                                            .build();
+                                })
+                                .toList();
+                    } else if (q.getTypeQuestion() == TypeQuestion.OUI_NON) {
+                        repartition = detailsQuestion.stream()
+                                .map(ReponseDetail::getValeurTexte)
+                                .filter(v -> v != null && !v.isBlank())
+                                .collect(Collectors.groupingBy(v -> v, Collectors.counting()))
+                                .entrySet().stream()
+                                .map(e -> SondageResultatDTO.OptionResultat.builder()
+                                        .optionId(null)
+                                        .libelle(e.getKey())
+                                        .count(e.getValue())
+                                        .pourcentage(pourcentage(e.getValue(), repondantsValides))
+                                        .build())
+                                .toList();
+                    } else {
+                        verbatims = detailsQuestion.stream()
+                                .map(ReponseDetail::getValeurTexte)
+                                .filter(v -> v != null && !v.isBlank())
+                                .toList();
+                    }
+
+                    return SondageResultatDTO.QuestionResultat.builder()
+                            .questionId(q.getId())
+                            .ordre(q.getOrdre())
+                            .texte(q.getTexte())
+                            .typeQuestion(q.getTypeQuestion())
+                            .repartition(repartition)
+                            .verbatims(verbatims)
+                            .build();
+                })
+                .toList();
+
+        return SondageResultatDTO.builder()
+                .sondageId(sondage.getId())
+                .titre(sondage.getTitre())
+                .commanditaireNom(commanditaireNom)
+                .commanditaireSociete(commanditaireSociete)
+                .quotaVise(sondage.getQuotaVise())
+                .repondantsValides(repondantsValides)
+                .tauxCompletion(pourcentage(repondantsValides, sondage.getQuotaVise()))
+                .budgetDistribue(sondage.getBudgetDistribue())
+                .resultatsParQuestion(resultatsParQuestion)
+                .build();
+    }
+
+    private BigDecimal pourcentage(long count, int total) {
+        if (total <= 0) return BigDecimal.ZERO;
+        return BigDecimal.valueOf(count * 100.0 / total)
+                .setScale(1, java.math.RoundingMode.HALF_UP);
     }
 
     // ─── Scheduler ───────────────────────────────────────────────────────────
@@ -559,16 +689,20 @@ public class SondageService {
                 .toList();
 
         String commanditaireNom = null;
+        String commanditaireSociete = null;
         if (s.getCommanditaireId() != null) {
-            commanditaireNom = commanditaireRepository.findById(s.getCommanditaireId())
-                    .map(c -> c.getNom() + " " + c.getPrenom())
-                    .orElse(null);
+            Commanditaire commanditaire = commanditaireRepository.findById(s.getCommanditaireId()).orElse(null);
+            if (commanditaire != null) {
+                commanditaireNom = commanditaire.getNom() + " " + commanditaire.getPrenom();
+                commanditaireSociete = commanditaire.getSociete();
+            }
         }
 
         return SondageResponse.builder()
                 .id(s.getId())
                 .commanditaireId(s.getCommanditaireId())
                 .commanditaireNom(commanditaireNom)
+                .commanditaireSociete(commanditaireSociete)
                 .titre(s.getTitre())
                 .description(s.getDescription())
                 .quotaVise(s.getQuotaVise())

@@ -1,6 +1,8 @@
 import axios from 'axios'
 
-const BASE_URL = 'http://localhost:8080/api'
+// Dérivé de l'hôte utilisé pour charger la page (PC ou téléphone sur le même
+// réseau) au lieu de 'localhost' en dur, qui ne désignerait que l'appareil lui-même.
+const BASE_URL = `http://${window.location.hostname}:8080/api`
 export const TOKEN_KEY = 'opportunihub-admin-token'
 
 const api = axios.create({ baseURL: BASE_URL })
@@ -38,6 +40,12 @@ export const cloturerOpportunite = (id) =>
 export const creerOpportunite = (data) =>
   api.post('/admin/opportunites', data).then(r => r.data)
 
+export const modifierOpportunite = (id, data) =>
+  api.patch(`/admin/opportunites/${id}`, data).then(r => r.data)
+
+export const genererSpecsOpportunite = (data) =>
+  api.post('/admin/opportunites/generer-specs', data).then(r => r.data)
+
 // Images opportunité (admin)
 export const uploadOpportuniteImage = (id, formData) =>
   api.post(`/admin/opportunites/${id}/images`, formData, {
@@ -49,6 +57,9 @@ export const getOpportuniteImages = (id) =>
 
 export const deleteOpportuniteImage = (id, imageId) =>
   api.delete(`/admin/opportunites/${id}/images/${imageId}`).then(r => r.data)
+
+export const getParticipantsOpportunite = (id) =>
+  api.get(`/admin/opportunites/${id}/participants`).then(r => r.data)
 
 // Sondages (admin)
 export const getAdminSondages = () =>
@@ -80,6 +91,12 @@ export const getReponsesAValider = (id) =>
 
 export const validerReponse = (reponseId, approuve) =>
   api.patch(`/admin/sondages/reponses/${reponseId}/valider`, null, { params: { approuve } }).then(r => r.data)
+
+export const getSondageResultats = (id) =>
+  api.get(`/admin/sondages/${id}/resultats`).then(r => r.data)
+
+export const getRepondantsSondage = (id) =>
+  api.get(`/admin/sondages/${id}/repondants`).then(r => r.data)
 
 // Utilisateurs (admin)
 export const getAdminUtilisateurs = () =>

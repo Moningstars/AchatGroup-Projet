@@ -5,7 +5,7 @@ import {
   toggleBanniere, supprimerBanniere,
 } from '../services/api'
 
-const BASE_URL = 'http://localhost:8080'
+const BASE_URL = `http://${window.location.hostname}:8080`
 
 const PAGE_OPTS = [
   { value: 'ACCUEIL',   label: 'Accueil' },

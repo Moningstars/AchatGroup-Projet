@@ -10,6 +10,7 @@ E:\plateforme-opportunites\backend\sondage\src\main\java\com\plateformeopportuni
 E:\plateforme-opportunites\backend\sondage\src\main\java\com\plateformeopportunites\sondage\dto\RepondreRequest.java
 E:\plateforme-opportunites\backend\sondage\src\main\java\com\plateformeopportunites\sondage\dto\ReponseAValiderDTO.java
 E:\plateforme-opportunites\backend\sondage\src\main\java\com\plateformeopportunites\sondage\dto\SondageResponse.java
+E:\plateforme-opportunites\backend\sondage\src\main\java\com\plateformeopportunites\sondage\dto\SondageResultatDTO.java
 E:\plateforme-opportunites\backend\sondage\src\main\java\com\plateformeopportunites\sondage\entity\OptionEligibilite.java
 E:\plateforme-opportunites\backend\sondage\src\main\java\com\plateformeopportunites\sondage\entity\OptionReponse.java
 E:\plateforme-opportunites\backend\sondage\src\main\java\com\plateformeopportunites\sondage\entity\Question.java

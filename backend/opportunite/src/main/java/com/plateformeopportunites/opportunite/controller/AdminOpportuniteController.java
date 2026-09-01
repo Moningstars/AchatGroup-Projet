@@ -1,7 +1,12 @@
 package com.plateformeopportunites.opportunite.controller;
 
 import com.plateformeopportunites.opportunite.dto.CreerOpportuniteRequest;
+import com.plateformeopportunites.opportunite.dto.GenererSpecsRequest;
+import com.plateformeopportunites.opportunite.dto.GenererSpecsResponse;
+import com.plateformeopportunites.opportunite.dto.ModifierOpportuniteRequest;
 import com.plateformeopportunites.opportunite.dto.OpportuniteResponse;
+import com.plateformeopportunites.opportunite.dto.ParticipantOpportuniteResponse;
+import com.plateformeopportunites.opportunite.service.AiSpecService;
 import com.plateformeopportunites.opportunite.service.ImageStorageService;
 import com.plateformeopportunites.opportunite.service.OpportuniteService;
 import jakarta.validation.Valid;
@@ -24,6 +29,7 @@ public class AdminOpportuniteController {
 
     private final OpportuniteService opportuniteService;
     private final ImageStorageService imageStorageService;
+    private final AiSpecService aiSpecService;
 
     @GetMapping
     public ResponseEntity<List<OpportuniteResponse>> lister() {
@@ -37,6 +43,17 @@ public class AdminOpportuniteController {
                 .body(opportuniteService.creer(UUID.fromString(auth.getName()), req));
     }
 
+    @PatchMapping("/{id}")
+    public ResponseEntity<OpportuniteResponse> modifier(@PathVariable UUID id,
+                                                          @Valid @RequestBody ModifierOpportuniteRequest req) {
+        return ResponseEntity.ok(opportuniteService.modifier(id, req));
+    }
+
+    @PostMapping("/generer-specs")
+    public ResponseEntity<GenererSpecsResponse> genererSpecs(@Valid @RequestBody GenererSpecsRequest req) {
+        return ResponseEntity.ok(aiSpecService.genererSpecs(req));
+    }
+
     @PatchMapping("/{id}/activer")
     public ResponseEntity<Void> activer(Authentication auth, @PathVariable UUID id) {
         opportuniteService.activer(UUID.fromString(auth.getName()), id);
@@ -47,6 +64,11 @@ public class AdminOpportuniteController {
     public ResponseEntity<Void> cloturer(@PathVariable UUID id) {
         opportuniteService.cloturerAvecSucces(id);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/{id}/participants")
+    public ResponseEntity<List<ParticipantOpportuniteResponse>> listerParticipants(@PathVariable UUID id) {
+        return ResponseEntity.ok(opportuniteService.listerParticipants(id));
     }
 
     // ── Image management ────────────────────────────────────────────────────

@@ -24,33 +24,16 @@ public class AuthService {
 
     private final UtilisateurRepository utilisateurRepository;
     private final AdministrateurRepository administrateurRepository;
-    private final OtpService otpService;
+    private final FirebaseAuthVerifier firebaseAuthVerifier;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
 
-    // ── Étape 1 : envoi OTP (connexion ou inscription selon si le numéro existe) ─
+    // ── Vérification du token Firebase (Phone Auth) → connexion ou création de compte ─
 
     @Transactional
-    public InitierAuthResponse initierAuth(InitierAuthRequest req) {
-        String telephone = normaliserTelephone(req.getIndicatif(), req.getTelephone());
-
-        boolean existe = utilisateurRepository.existsByTelephone(telephone);
-        String mode = existe ? "CONNEXION" : "INSCRIPTION";
-
-        String code = otpService.generer(telephone);
-        return new InitierAuthResponse(mode, "Code OTP envoyé avec succès", code);
-    }
-
-    // ── Étape 2 : vérification OTP → connexion ou création de compte ────────────
-
-    @Transactional
-    public AuthResponse verifierAuth(VerifierAuthRequest req) {
-        String telephone = req.getTelephone().trim();
-
-        if (!otpService.verifier(telephone, req.getCode())) {
-            throw new IllegalArgumentException("Code OTP invalide ou expiré");
-        }
+    public AuthResponse verifierFirebaseToken(VerifierFirebaseTokenRequest req) {
+        String telephone = firebaseAuthVerifier.verifierEtExtraireTelephone(req.getIdToken());
 
         Utilisateur utilisateur = utilisateurRepository.findByTelephone(telephone)
                 .orElseGet(() -> {
@@ -152,7 +135,4 @@ public class AuthService {
                 .build();
     }
 
-    private String normaliserTelephone(String indicatif, String telephone) {
-        return (indicatif.trim() + telephone.trim()).replaceAll("\\s+", "");
-    }
 }

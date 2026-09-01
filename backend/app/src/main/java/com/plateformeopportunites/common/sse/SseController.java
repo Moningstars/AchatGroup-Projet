@@ -25,6 +25,16 @@ public class SseController {
         return sseService.subscribe("sondage:" + id);
     }
 
+    @GetMapping(value = "/opportunites", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter opportunitesGlobal() {
+        return sseService.subscribe("opportunites:global");
+    }
+
+    @GetMapping(value = "/sondages", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter sondagesGlobal() {
+        return sseService.subscribe("sondages:global");
+    }
+
     @GetMapping(value = "/notifications", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter notifications(Authentication auth) {
         return sseService.subscribe("user:" + auth.getName());

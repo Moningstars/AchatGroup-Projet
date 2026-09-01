@@ -37,6 +37,7 @@ public class AdminCommanditaireController {
         Commanditaire c = Commanditaire.builder()
                 .nom(req.getNom())
                 .prenom(req.getPrenom())
+                .societe(req.getSociete())
                 .email(req.getEmail())
                 .telephone(req.getTelephone())
                 .build();
@@ -66,6 +67,7 @@ public class AdminCommanditaireController {
                 .id(c.getId())
                 .nom(c.getNom())
                 .prenom(c.getPrenom())
+                .societe(c.getSociete())
                 .email(c.getEmail())
                 .telephone(c.getTelephone())
                 .statut(c.getStatut())

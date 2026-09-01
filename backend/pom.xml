@@ -4,9 +4,9 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- ══════════════════════════════════════════════════════════════
-         PARENT — hérite de Spring Boot pour la gestion des versions
-         ══════════════════════════════════════════════════════════════ -->
+    <!-- ==================================================================
+         PARENT - herite de Spring Boot pour la gestion des versions
+         ================================================================== -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -20,9 +20,9 @@
     <packaging>pom</packaging>
     <name>Plateforme Opportunités — Parent</name>
 
-    <!-- ══════════════════════════════════════════════════════════════
-         MODULES — ordre respecte les dépendances inter-modules
-         ══════════════════════════════════════════════════════════════ -->
+    <!-- ==================================================================
+         MODULES - ordre respecte les dependances inter-modules
+         ================================================================== -->
     <modules>
         <module>common</module>
         <module>identity</module>
@@ -32,19 +32,20 @@
         <module>app</module>
     </modules>
 
-    <!-- ══════════════════════════════════════════════════════════════
-         PROPRIÉTÉS GLOBALES
-         ══════════════════════════════════════════════════════════════ -->
+    <!-- ==================================================================
+         PROPRIETES GLOBALES
+         ================================================================== -->
     <properties>
         <java.version>21</java.version>
         <jjwt.version>0.12.6</jjwt.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
         <springdoc.version>2.6.0</springdoc.version>
+        <firebase-admin.version>9.10.0</firebase-admin.version>
     </properties>
 
-    <!-- ══════════════════════════════════════════════════════════════
-         GESTION DES VERSIONS — tous les modules héritent de ceci
-         ══════════════════════════════════════════════════════════════ -->
+    <!-- ==================================================================
+         GESTION DES VERSIONS - tous les modules heritent de ceci
+         ================================================================== -->
     <dependencyManagement>
         <dependencies>
 
@@ -108,16 +109,23 @@
                 <version>${springdoc.version}</version>
             </dependency>
 
+            <!-- Firebase Admin SDK (vérification des ID tokens Phone Auth) -->
+            <dependency>
+                <groupId>com.google.firebase</groupId>
+                <artifactId>firebase-admin</artifactId>
+                <version>${firebase-admin.version}</version>
+            </dependency>
+
         </dependencies>
     </dependencyManagement>
 
-    <!-- ══════════════════════════════════════════════════════════════
-         PLUGINS PARTAGÉS — hérités par tous les modules
-         ══════════════════════════════════════════════════════════════ -->
+    <!-- ==================================================================
+         PLUGINS PARTAGES - herites par tous les modules
+         ================================================================== -->
     <build>
         <pluginManagement>
             <plugins>
-                <!-- Désactivé sur tous les modules sauf app/ qui l'override avec skip=false -->
+                <!-- Desactive sur tous les modules sauf app/ qui l'override avec skip=false -->
                 <plugin>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>

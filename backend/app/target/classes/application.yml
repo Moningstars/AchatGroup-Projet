@@ -2,16 +2,20 @@ spring:
   application:
     name: plateforme-opportunites
 
+  config:
+    import: "optional:file:./secrets.properties"
+
   datasource:
     url: jdbc:postgresql://localhost:5432/plateforme_opportunites
     username: postgres
-    password: uripisser
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
       ddl-auto: update
-    
+
+
     open-in-view: false
     # show-sql: true
 
@@ -37,18 +41,40 @@ server:
 
 app:
   jwt:
-    secret-participant: secret_participant_very_long_key_min_256_bits_change_this
-    secret-admin: secret_admin_very_long_key_min_256_bits_change_this
+    secret-participant: ${JWT_SECRET_PARTICIPANT}
+    secret-admin: ${JWT_SECRET_ADMIN}
     expiration: 86400000
   upload-dir: ./uploads
 
 paygate:
-  auth-token: 0323aca6-c7f6-474e-92c7-45336cd203a9
+  auth-token: ${PAYGATE_AUTH_TOKEN}
   api-url: https://paygateglobal.com/api/v1/pay
   dev-mode: true
 
+ovh:
+  sms:
+    endpoint: https://eu.api.ovh.com/1.0
+    service-name: ${OVH_SMS_SERVICE_NAME:}
+    application-key: ${OVH_SMS_APPLICATION_KEY:}
+    application-secret: ${OVH_SMS_APPLICATION_SECRET:}
+    consumer-key: ${OVH_SMS_CONSUMER_KEY:}
+    dev-mode: true
+
+firebase:
+  credentials-path: ${FIREBASE_CREDENTIALS_PATH:./firebase-service-account.json}
+  dev-mode: true
+
+anthropic:
+  api-key: ${ANTHROPIC_API_KEY:}
+  api-url: https://api.anthropic.com/v1/messages
+  dev-mode: true
+
+gemini:
+  api-key: ${GEMINI_API_KEY}
+  api-url: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent
+
 pusher:
-  app-id: "2181144"
-  key: "d11ffa95081b56f378aa"
-  secret: "6bcb24824dd36af79756"
+  app-id: ${PUSHER_APP_ID}
+  key: ${PUSHER_KEY}
+  secret: ${PUSHER_SECRET}
   cluster: "eu"

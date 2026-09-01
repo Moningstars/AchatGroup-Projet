@@ -23,6 +23,8 @@ public class Commanditaire {
     @Column(nullable = false)
     private String prenom;
 
+    private String societe;
+
     @Column(nullable = false, unique = true)
     private String email;
 

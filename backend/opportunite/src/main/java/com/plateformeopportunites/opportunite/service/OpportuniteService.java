@@ -14,7 +14,9 @@ import com.plateformeopportunites.identity.repository.AdministrateurRepository;
 import com.plateformeopportunites.identity.repository.UtilisateurRepository;
 import com.plateformeopportunites.opportunite.dto.CreerOpportuniteRequest;
 import com.plateformeopportunites.opportunite.dto.MaParticipationOpportuniteResponse;
+import com.plateformeopportunites.opportunite.dto.ModifierOpportuniteRequest;
 import com.plateformeopportunites.opportunite.dto.OpportuniteResponse;
+import com.plateformeopportunites.opportunite.dto.ParticipantOpportuniteResponse;
 import com.plateformeopportunites.opportunite.entity.Opportunite;
 import com.plateformeopportunites.opportunite.entity.OpportuniteImage;
 import com.plateformeopportunites.opportunite.entity.PalierPrix;
@@ -70,8 +72,12 @@ public class OpportuniteService {
                 .categorie(categorie)
                 .titre(req.getTitre())
                 .description(req.getDescription())
+                .specsPointsForts(req.getSpecsPointsForts())
+                .specsCasUsage(req.getSpecsCasUsage())
+                .specsFinePrint(req.getSpecsFinePrint())
                 .prixNormal(req.getPrixNormal())
                 .seuilMinimum(req.getSeuilMinimum())
+                .seuilMaximal(req.getSeuilMaximal())
                 .dateExpiration(req.getDateExpiration())
                 .statut(statut)
                 .participantsActuels(0)
@@ -79,6 +85,9 @@ public class OpportuniteService {
         opportunite = opportuniteRepository.save(opportunite);
 
         validerPaliers(req.getPaliers());
+        int maxPalier = req.getPaliers().stream()
+                .mapToInt(CreerOpportuniteRequest.PalierPrixRequest::getSeuilMax).max().orElse(0);
+        validerSeuilMaximal(req.getSeuilMaximal(), req.getSeuilMinimum(), maxPalier);
 
         for (CreerOpportuniteRequest.PalierPrixRequest p : req.getPaliers()) {
             palierPrixRepository.save(PalierPrix.builder()
@@ -134,6 +143,68 @@ public class OpportuniteService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<ParticipantOpportuniteResponse> listerParticipants(UUID opportuniteId) {
+        return participationRepository.findByOpportuniteId(opportuniteId)
+                .stream()
+                .map(p -> ParticipantOpportuniteResponse.builder()
+                        .id(p.getId())
+                        .utilisateurId(p.getUtilisateur().getId())
+                        .nom(p.getUtilisateur().getNom())
+                        .telephone(p.getUtilisateur().getTelephone())
+                        .quantite(p.getQuantite())
+                        .montantGele(p.getMontantGele())
+                        .statut(p.getStatut())
+                        .createdAt(p.getCreatedAt())
+                        .build())
+                .toList();
+    }
+
+    @Transactional
+    public OpportuniteResponse modifier(UUID opportuniteId, ModifierOpportuniteRequest req) {
+        Opportunite opp = getOpportunite(opportuniteId);
+
+        if (req.getTitre() != null && !req.getTitre().isBlank()) opp.setTitre(req.getTitre());
+        if (req.getDescription() != null) opp.setDescription(req.getDescription());
+        if (req.getSpecsPointsForts() != null) opp.setSpecsPointsForts(req.getSpecsPointsForts());
+        if (req.getSpecsCasUsage() != null) opp.setSpecsCasUsage(req.getSpecsCasUsage());
+        if (req.getSpecsFinePrint() != null) opp.setSpecsFinePrint(req.getSpecsFinePrint());
+        if (req.getPrixNormal() != null) opp.setPrixNormal(req.getPrixNormal());
+        if (req.getSeuilMinimum() != null) opp.setSeuilMinimum(req.getSeuilMinimum());
+        if (req.getSeuilMaximal() != null) opp.setSeuilMaximal(req.getSeuilMaximal());
+        if (req.getDateExpiration() != null) opp.setDateExpiration(req.getDateExpiration());
+        if (req.getCategorie() != null && !req.getCategorie().isBlank()) {
+            Categorie categorie = categorieRepository.findByNom(req.getCategorie())
+                    .orElseGet(() -> categorieRepository.save(
+                            Categorie.builder().nom(req.getCategorie()).build()));
+            opp.setCategorie(categorie);
+        }
+
+        boolean paliersFournis = req.getPaliers() != null && !req.getPaliers().isEmpty();
+        int maxPalier = paliersFournis
+                ? req.getPaliers().stream().mapToInt(CreerOpportuniteRequest.PalierPrixRequest::getSeuilMax).max().orElse(0)
+                : palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(opportuniteId)
+                        .stream().mapToInt(PalierPrix::getSeuilMax).max().orElse(0);
+        validerSeuilMaximal(opp.getSeuilMaximal(), opp.getSeuilMinimum(), maxPalier);
+
+        opportuniteRepository.save(opp);
+
+        if (paliersFournis) {
+            validerPaliers(req.getPaliers());
+            palierPrixRepository.deleteAll(palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(opportuniteId));
+            for (CreerOpportuniteRequest.PalierPrixRequest p : req.getPaliers()) {
+                palierPrixRepository.save(PalierPrix.builder()
+                        .opportunite(opp)
+                        .seuilMin(p.getSeuilMin())
+                        .seuilMax(p.getSeuilMax())
+                        .prix(p.getPrix())
+                        .build());
+            }
+        }
+
+        return toResponse(opp);
+    }
+
     @Transactional
     public void activer(UUID adminId, UUID opportuniteId) {
         Opportunite opp = getOpportunite(opportuniteId);
@@ -150,6 +221,12 @@ public class OpportuniteService {
         Opportunite opp = getOpportunite(opportuniteId);
         if (opp.getStatut() != StatutOpportunite.ACTIVE) {
             throw new IllegalArgumentException("Cette opportunité n'est pas active");
+        }
+        if (opp.getSeuilMaximal() != null && opp.getParticipantsActuels() + quantite > opp.getSeuilMaximal()) {
+            int restantes = opp.getSeuilMaximal() - opp.getParticipantsActuels();
+            throw new IllegalArgumentException(restantes <= 0
+                ? "Cette opportunité a atteint son plafond de participants."
+                : "Il ne reste que " + restantes + " place(s) disponible(s) pour cette opportunité.");
         }
 
         Utilisateur utilisateur = utilisateurRepository.findById(participantId)
@@ -184,11 +261,26 @@ public class OpportuniteService {
         }
 
         BigDecimal prixApres = calculerPrixActuel(opp);
+        String payloadCompteur = "{\"id\":\"" + opportuniteId + "\",\"participantsActuels\":" + opp.getParticipantsActuels()
+                + ",\"prixActuel\":" + prixApres.toPlainString() + "}";
         eventPublisher.publishEvent(new SseNotificationEvent(this,
-                "opportunite:" + opportuniteId,
-                "COMPTEUR",
-                "{\"participantsActuels\":" + opp.getParticipantsActuels()
-                        + ",\"prixActuel\":" + prixApres.toPlainString() + "}"));
+                "opportunite:" + opportuniteId, "COMPTEUR", payloadCompteur));
+        eventPublisher.publishEvent(new SseNotificationEvent(this,
+                "opportunites:global", "COMPTEUR", payloadCompteur));
+
+        if (opp.getSeuilMaximal() != null) {
+            if (opp.getParticipantsActuels() >= opp.getSeuilMaximal()) {
+                cloturerAvecSucces(opportuniteId);
+            } else {
+                int avant = opp.getParticipantsActuels() - quantite;
+                int seuil90 = (int) Math.ceil(opp.getSeuilMaximal() * 0.9);
+                if (avant < seuil90 && opp.getParticipantsActuels() >= seuil90) {
+                    eventPublisher.publishEvent(new SseNotificationEvent(this, "admin:global", "OPPORTUNITE_PRESQUE_COMPLETE",
+                        "{\"id\":\"" + opportuniteId + "\",\"titre\":\"" + opp.getTitre().replace("\"", "\\\"") + "\","
+                        + "\"participantsActuels\":" + opp.getParticipantsActuels() + ",\"seuilMaximal\":" + opp.getSeuilMaximal() + "}"));
+                }
+            }
+        }
     }
 
     @Transactional
@@ -197,8 +289,11 @@ public class OpportuniteService {
         opp.setStatut(StatutOpportunite.CLOTUREE);
         opportuniteRepository.save(opp);
         redisService.supprimerCompteur(opportuniteId);
+        String payloadCloture = "{\"id\":\"" + opportuniteId + "\",\"statut\":\"CLOTUREE\"}";
         eventPublisher.publishEvent(new SseNotificationEvent(this,
-                "opportunite:" + opportuniteId, "STATUT", "{\"statut\":\"CLOTUREE\"}"));
+                "opportunite:" + opportuniteId, "STATUT", payloadCloture));
+        eventPublisher.publishEvent(new SseNotificationEvent(this,
+                "opportunites:global", "STATUT", payloadCloture));
 
         List<Participation> participations = participationRepository
                 .findByOpportuniteIdAndStatut(opportuniteId, StatutParticipation.EN_ATTENTE);
@@ -216,8 +311,11 @@ public class OpportuniteService {
         opportuniteRepository.save(opp);
         redisService.supprimerCompteur(opportuniteId);
 
+        String payloadAnnulation = "{\"id\":\"" + opportuniteId + "\",\"statut\":\"ANNULEE\"}";
         eventPublisher.publishEvent(new SseNotificationEvent(this,
-                "opportunite:" + opportuniteId, "STATUT", "{\"statut\":\"ANNULEE\"}"));
+                "opportunite:" + opportuniteId, "STATUT", payloadAnnulation));
+        eventPublisher.publishEvent(new SseNotificationEvent(this,
+                "opportunites:global", "STATUT", payloadAnnulation));
         eventPublisher.publishEvent(new RemboursementEvent(this, opportuniteId));
     }
 
@@ -304,12 +402,25 @@ public class OpportuniteService {
         for (int i = 0; i < tries.size() - 1; i++) {
             var courant = tries.get(i);
             var suivant = tries.get(i + 1);
-            if (courant.getSeuilMax() >= suivant.getSeuilMin()) {
+            int attendu = courant.getSeuilMax() + 1;
+            if (suivant.getSeuilMin() != attendu) {
                 throw new IllegalArgumentException(
-                    "Les paliers de prix se chevauchent : ["
-                    + courant.getSeuilMin() + "–" + courant.getSeuilMax()
-                    + "] et [" + suivant.getSeuilMin() + "–" + suivant.getSeuilMax() + "]");
+                    "Les paliers doivent être contigus : le seuil min du palier ["
+                    + suivant.getSeuilMin() + "–" + suivant.getSeuilMax()
+                    + "] doit être " + attendu + " (juste après le seuil max du palier précédent ["
+                    + courant.getSeuilMin() + "–" + courant.getSeuilMax() + "])");
             }
+        }
+    }
+
+    private void validerSeuilMaximal(Integer seuilMaximal, Integer seuilMinimum, int maxPalier) {
+        if (seuilMaximal == null) return;
+        if (seuilMaximal < maxPalier) {
+            throw new IllegalArgumentException(
+                "Le seuil maximal (" + seuilMaximal + ") ne peut pas être inférieur au plafond du dernier palier (" + maxPalier + ")");
+        }
+        if (seuilMinimum != null && seuilMaximal < seuilMinimum) {
+            throw new IllegalArgumentException("Le seuil maximal ne peut pas être inférieur au seuil minimum");
         }
     }
 
@@ -372,9 +483,13 @@ public class OpportuniteService {
                 .id(opp.getId())
                 .titre(opp.getTitre())
                 .description(opp.getDescription())
+                .specsPointsForts(opp.getSpecsPointsForts())
+                .specsCasUsage(opp.getSpecsCasUsage())
+                .specsFinePrint(opp.getSpecsFinePrint())
                 .prixNormal(opp.getPrixNormal())
                 .prixActuel(calculerPrixActuel(opp))
                 .seuilMinimum(opp.getSeuilMinimum())
+                .seuilMaximal(opp.getSeuilMaximal())
                 .participantsActuels(compteurRedis)
                 .dateExpiration(opp.getDateExpiration())
                 .statut(opp.getStatut())

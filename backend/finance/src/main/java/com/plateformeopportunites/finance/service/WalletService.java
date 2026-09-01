@@ -9,6 +9,7 @@ import com.plateformeopportunites.common.enums.TypeTransactionPlateforme;
 import com.plateformeopportunites.common.enums.TypeRecompense;
 import com.plateformeopportunites.common.event.RetraitDemandeEvent;
 import com.plateformeopportunites.common.event.SseNotificationEvent;
+import com.plateformeopportunites.common.service.PusherNotificationService;
 import com.plateformeopportunites.finance.dto.AlimenterWalletRequest;
 import com.plateformeopportunites.finance.dto.PortefeuilleResponse;
 import com.plateformeopportunites.finance.dto.RechargeRequest;
@@ -31,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -43,6 +45,27 @@ public class WalletService {
     private final TransactionPlateformeRepository transactionPlateformeRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final UtilisateurRepository utilisateurRepository;
+    private final PusherNotificationService pusherNotificationService;
+
+    /**
+     * Notifie en temps réel (header, page portefeuille...) que le solde disponible d'un
+     * utilisateur vient de changer, avec le même contrat d'événement que PaygateService.
+     */
+    private void notifierSoldeDisponible(UUID participantId, String event, BigDecimal montant, Portefeuille portefeuille, String raison) {
+        pusherNotificationService.notifierUtilisateur(participantId, event, Map.of(
+                "montant", montant,
+                "nouveauSolde", portefeuille.getSoldeDisponible(),
+                "raison", raison
+        ));
+    }
+
+    private void notifierCredit(UUID participantId, BigDecimal montant, Portefeuille portefeuille, String raison) {
+        notifierSoldeDisponible(participantId, "wallet.credited", montant, portefeuille, raison);
+    }
+
+    private void notifierDebit(UUID participantId, BigDecimal montant, Portefeuille portefeuille, String raison) {
+        notifierSoldeDisponible(participantId, "wallet.debited", montant, portefeuille, raison);
+    }
 
     public PortefeuilleResponse getSolde(UUID participantId) {
         Portefeuille p = getPortefeuille(participantId);
@@ -70,6 +93,7 @@ public class WalletService {
                 .reference(req.getReference())
                 .build();
         transactionRepository.save(tx);
+        notifierCredit(participantId, req.getMontant(), portefeuille, "RECHARGE");
 
         return toResponse(portefeuille);
     }
@@ -102,8 +126,12 @@ public class WalletService {
                 .coordonnees(req.getCoordonnees())
                 .build();
         transactionRepository.save(tx);
+        notifierDebit(participantId, req.getMontant(), portefeuille, "RETRAIT_DEMANDE");
 
         eventPublisher.publishEvent(new RetraitDemandeEvent(this, participantId, req.getMontant()));
+        eventPublisher.publishEvent(new SseNotificationEvent(this,
+                "admin:global", "RETRAIT_DEMANDE",
+                "{\"utilisateurId\":\"" + participantId + "\",\"montant\":" + req.getMontant().toPlainString() + "}"));
     }
 
     public List<TransactionResponse> listerToutesTransactions() {
@@ -148,6 +176,7 @@ public class WalletService {
         portefeuilleRepository.save(portefeuille);
         tx.setStatut(StatutTransaction.ECHEC);
         transactionRepository.save(tx);
+        notifierCredit(tx.getUtilisateurId(), tx.getMontant(), portefeuille, "RETRAIT_REJETE");
 
         eventPublisher.publishEvent(new SseNotificationEvent(this,
                 "user:" + tx.getUtilisateurId(), "RETRAIT",
@@ -163,6 +192,7 @@ public class WalletService {
         portefeuille.setSoldeDisponible(portefeuille.getSoldeDisponible().subtract(montant));
         portefeuille.setSoldeGele(portefeuille.getSoldeGele().add(montant));
         portefeuilleRepository.save(portefeuille);
+        notifierDebit(participantId, montant, portefeuille, "SOUSCRIPTION");
     }
 
     @Transactional
@@ -178,6 +208,7 @@ public class WalletService {
         portefeuille.setSoldeGele(portefeuille.getSoldeGele().subtract(montant));
         portefeuille.setSoldeDisponible(portefeuille.getSoldeDisponible().add(montant));
         portefeuilleRepository.save(portefeuille);
+        notifierCredit(participantId, montant, portefeuille, "REMBOURSEMENT");
     }
 
     /**
@@ -197,6 +228,7 @@ public class WalletService {
                 .statut(StatutTransaction.SUCCESS)
                 .build();
         transactionRepository.save(tx);
+        notifierCredit(participantId, montant, portefeuille, "RECOMPENSE");
 
         eventPublisher.publishEvent(new SseNotificationEvent(this,
                 "user:" + participantId, "RECOMPENSE",
@@ -324,6 +356,7 @@ public class WalletService {
         portefeuille.setSoldePoints(portefeuille.getSoldePoints().subtract(montantPoints));
         portefeuille.setSoldeDisponible(portefeuille.getSoldeDisponible().add(montantFCFA));
         portefeuilleRepository.save(portefeuille);
+        notifierCredit(participantId, montantFCFA, portefeuille, "CONVERSION_POINTS");
 
         wp.setSoldePlateforme(wp.getSoldePlateforme().subtract(montantFCFA));
         walletPlateformeRepository.save(wp);
@@ -360,6 +393,12 @@ public class WalletService {
                 .statut(StatutTransaction.SUCCESS)
                 .reference(ref)
                 .build());
+
+        if (montant.compareTo(BigDecimal.ZERO) >= 0) {
+            notifierCredit(utilisateurId, montant, portefeuille, "AJUSTEMENT_ADMIN");
+        } else {
+            notifierDebit(utilisateurId, montant.abs(), portefeuille, "AJUSTEMENT_ADMIN");
+        }
 
         return toResponse(portefeuille);
     }

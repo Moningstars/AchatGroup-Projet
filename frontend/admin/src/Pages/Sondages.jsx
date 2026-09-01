@@ -2,16 +2,21 @@ import { useEffect, useState } from 'react'
 import {
   Loader2, Plus, Trash2, X, ChevronDown, ChevronUp,
   Edit2, CheckCircle2, XCircle, Clock, Users, Send,
-  AlertTriangle, ClipboardList, Eye,
+  AlertTriangle, ClipboardList, Eye, BarChart3,
 } from 'lucide-react'
 import { Badge, ProgressBar } from '../components/ui'
+import { useSSE } from '../hooks/useSSE'
 import {
   getAdminSondages, activerSondage, distribuerSondage, creerSondage,
   creerEligibilite, modifierSondage, supprimerSondage, cloturerSondage,
   getReponsesAValider, validerReponse, getAdminCommanditaires,
+  getSondageResultats, getRepondantsSondage,
 } from '../services/api'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
+
+const STATUT_VALIDATION_COLOR = { VALIDE: 'emerald', EN_ATTENTE_PREUVE: 'amber', REJETE: 'rose' }
+const STATUT_VALIDATION_LABEL = { VALIDE: 'Validée', EN_ATTENTE_PREUVE: 'En attente', REJETE: 'Rejetée' }
 
 function formatDate(dt) {
   if (!dt) return '—'
@@ -270,7 +275,9 @@ function NouveauSondageModal({ onClose, onSaved }) {
                 <select value={form.commanditaireId} onChange={e => setField('commanditaireId', e.target.value)} className={inputCls}>
                   <option value="">— Aucun (sondage interne) —</option>
                   {commanditaires.map(c => (
-                    <option key={c.id} value={c.id}>{c.nom} {c.prenom}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.nom} {c.prenom}{c.societe ? ` — ${c.societe}` : ''}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -640,9 +647,169 @@ function ReponsesModal({ sondageId, onClose, onChanged }) {
   )
 }
 
+// ─── ResultatsModal ──────────────────────────────────────────────────────────
+
+function ResultatsModal({ sondageId, onClose }) {
+  const [resultats, setResultats] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [repondants, setRepondants] = useState([])
+  const [loadingRepondants, setLoadingRepondants] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    getSondageResultats(sondageId)
+      .then(setResultats)
+      .catch(() => setError('Impossible de charger les résultats'))
+      .finally(() => setLoading(false))
+  }, [sondageId])
+
+  useEffect(() => {
+    setLoadingRepondants(true)
+    getRepondantsSondage(sondageId)
+      .then(setRepondants)
+      .catch(() => setRepondants([]))
+      .finally(() => setLoadingRepondants(false))
+  }, [sondageId])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+      <div className="my-8 w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <div>
+            <h3 className="text-lg font-bold text-slate-950">Résultats du sondage</h3>
+            {resultats && (
+              <p className="text-sm text-slate-500 mt-0.5 line-clamp-1">
+                {resultats.titre}
+                {resultats.commanditaireSociete && ` · ${resultats.commanditaireSociete}`}
+              </p>
+            )}
+          </div>
+          <button onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X size={20} /></button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {loading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 size={24} className="animate-spin text-violet-500" />
+            </div>
+          ) : error ? (
+            <p className="text-center text-sm text-rose-600 py-6">{error}</p>
+          ) : !resultats || resultats.repondantsValides === 0 ? (
+            <div className="py-6 text-center">
+              <BarChart3 size={36} className="mx-auto mb-3 text-slate-300" />
+              <p className="text-slate-500 font-medium">Aucune réponse validée pour l'instant</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Résumé */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-center">
+                  <p className="text-lg font-extrabold text-slate-800">
+                    {resultats.repondantsValides}/{resultats.quotaVise}
+                  </p>
+                  <p className="text-[11px] text-slate-500 font-medium">Répondants validés</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-center">
+                  <p className="text-lg font-extrabold text-slate-800">{fmt(resultats.tauxCompletion)}%</p>
+                  <p className="text-[11px] text-slate-500 font-medium">Taux de complétion</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-center">
+                  <p className="text-lg font-extrabold text-slate-800">{fmt(resultats.budgetDistribue)}</p>
+                  <p className="text-[11px] text-slate-500 font-medium">FCFA distribués</p>
+                </div>
+              </div>
+
+              {/* Par question */}
+              <div className="space-y-4">
+                {resultats.resultatsParQuestion.map((q, i) => (
+                  <div key={q.questionId} className="rounded-xl border border-slate-200 p-4">
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <p className="text-sm font-semibold text-slate-800 leading-snug">
+                        <span className="text-slate-400 font-mono text-xs mr-1.5">{String(q.ordre).padStart(2, '0')}.</span>
+                        {q.texte}
+                      </p>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 flex-shrink-0">
+                        {TYPE_Q[q.typeQuestion] || q.typeQuestion}
+                      </span>
+                    </div>
+
+                    {q.repartition && (
+                      <div className="space-y-2">
+                        {q.repartition.length === 0 ? (
+                          <p className="text-xs text-slate-400">Aucune réponse</p>
+                        ) : q.repartition.map((o, oi) => (
+                          <div key={o.optionId || oi}>
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <span className="text-slate-600 font-medium">{o.libelle}</span>
+                              <span className="text-slate-500">{o.count} · {fmt(o.pourcentage)}%</span>
+                            </div>
+                            <ProgressBar value={Number(o.pourcentage) || 0} color="violet" className="h-1.5" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {q.verbatims && (
+                      q.verbatims.length === 0 ? (
+                        <p className="text-xs text-slate-400">Aucune réponse</p>
+                      ) : (
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          {q.verbatims.map((v, vi) => (
+                            <p key={vi} className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2 text-xs text-slate-600">
+                              "{v}"
+                            </p>
+                          ))}
+                        </div>
+                      )
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Répondants */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+              Répondants ({repondants.length})
+            </p>
+            {loadingRepondants ? (
+              <div className="flex justify-center py-6">
+                <Loader2 size={20} className="animate-spin text-violet-500" />
+              </div>
+            ) : repondants.length === 0 ? (
+              <p className="text-sm text-slate-400">Aucun répondant pour l'instant.</p>
+            ) : (
+              <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 max-h-72 overflow-y-auto">
+                {repondants.map(r => (
+                  <div key={r.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 truncate">{r.participantNom || '—'}</p>
+                      <p className="text-xs text-slate-400 truncate">{r.participantContact || '—'} · {formatDatetime(r.createdAt)}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {r.recompenseVersee && (
+                        <span className="text-[10px] font-semibold text-emerald-600">Récompense versée</span>
+                      )}
+                      <Badge color={STATUT_VALIDATION_COLOR[r.statutValidation] || 'gray'}>
+                        {STATUT_VALIDATION_LABEL[r.statutValidation] || r.statutValidation}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── SondageCard ─────────────────────────────────────────────────────────────
 
-function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, onModifier, onSupprimer, onVoirReponses, onConfigurerElig }) {
+function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, onModifier, onSupprimer, onVoirReponses, onConfigurerElig, onVoirResultats }) {
   const [expanded, setExpanded] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
@@ -668,6 +835,7 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
             {survey.commanditaireNom && (
               <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
                 <span className="text-indigo-400">⬡</span> {survey.commanditaireNom}
+                {survey.commanditaireSociete && ` · ${survey.commanditaireSociete}`}
               </p>
             )}
             {survey.description && (
@@ -743,6 +911,13 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
                 className="flex items-center gap-1.5 rounded-lg bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50 transition">
                 {isActing('-distribuer') ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
                 Distribuer
+              </button>
+            )}
+
+            {!['BROUILLON'].includes(survey.statut) && (
+              <button onClick={() => onVoirResultats(survey.id)}
+                className="flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition">
+                <BarChart3 size={12} /> Résultats
               </button>
             )}
 
@@ -832,6 +1007,7 @@ export default function Sondages() {
   const [editSondage, setEditSondage] = useState(null)
   const [configEligSondage, setConfigEligSondage] = useState(null)
   const [reponsesSondageId, setReponsesSondageId] = useState(null)
+  const [resultatsSondageId, setResultatsSondageId] = useState(null)
 
   const fetchData = () => {
     setLoading(true)
@@ -842,6 +1018,16 @@ export default function Sondages() {
   }
 
   useEffect(() => { fetchData() }, [])
+
+  // Compteurs/statut mis à jour en direct
+  useSSE('events/sondages', {
+    COMPTEUR: ({ id, repondantsActuels }) => {
+      setSondages(prev => prev.map(s => s.id === id ? { ...s, repondantsActuels } : s))
+    },
+    STATUT: ({ id, statut }) => {
+      setSondages(prev => prev.map(s => s.id === id ? { ...s, statut } : s))
+    },
+  })
 
   const act = async (id, suffix, fn) => {
     setActionId(id + suffix)
@@ -896,6 +1082,12 @@ export default function Sondages() {
           sondageId={reponsesSondageId}
           onClose={() => setReponsesSondageId(null)}
           onChanged={fetchData}
+        />
+      )}
+      {resultatsSondageId && (
+        <ResultatsModal
+          sondageId={resultatsSondageId}
+          onClose={() => setResultatsSondageId(null)}
         />
       )}
 
@@ -990,6 +1182,7 @@ export default function Sondages() {
               onSupprimer={handleSupprimer}
               onVoirReponses={setReponsesSondageId}
               onConfigurerElig={setConfigEligSondage}
+              onVoirResultats={setResultatsSondageId}
             />
           ))}
         </div>
