@@ -43,6 +43,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 AntPathRequestMatcher.antMatcher("/api/auth/verifier-token"),
                                 AntPathRequestMatcher.antMatcher("/api/admin/auth/**"),
+                                AntPathRequestMatcher.antMatcher("/api/auth/dev/**"),
                                 AntPathRequestMatcher.antMatcher("/api/opportunites"),
                                 AntPathRequestMatcher.antMatcher("/api/opportunites/**"),
                                 AntPathRequestMatcher.antMatcher("/api/stats"),

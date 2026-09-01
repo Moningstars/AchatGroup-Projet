@@ -9,6 +9,7 @@ E:\plateforme-opportunites\backend\identity\src\main\java\com\plateformeopportun
 E:\plateforme-opportunites\backend\identity\src\main\java\com\plateformeopportunites\identity\dto\CheckIdentifiantResponse.java
 E:\plateforme-opportunites\backend\identity\src\main\java\com\plateformeopportunites\identity\dto\CommanditaireResponse.java
 E:\plateforme-opportunites\backend\identity\src\main\java\com\plateformeopportunites\identity\dto\CompleterProfilRequest.java
+E:\plateforme-opportunites\backend\identity\src\main\java\com\plateformeopportunites\identity\dto\ConnexionDevRequest.java
 E:\plateforme-opportunites\backend\identity\src\main\java\com\plateformeopportunites\identity\dto\ConnexionRequest.java
 E:\plateforme-opportunites\backend\identity\src\main\java\com\plateformeopportunites\identity\dto\CreerAdminRequest.java
 E:\plateforme-opportunites\backend\identity\src\main\java\com\plateformeopportunites\identity\dto\CreerCommanditaireRequest.java
