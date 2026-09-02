@@ -3,6 +3,7 @@ E:\plateforme-opportunites\backend\identity\src\main\java\com\plateformeopportun
 E:\plateforme-opportunites\backend\identity\src\main\java\com\plateformeopportunites\identity\controller\AdminKycController.java
 E:\plateforme-opportunites\backend\identity\src\main\java\com\plateformeopportunites\identity\controller\AdminUtilisateurController.java
 E:\plateforme-opportunites\backend\identity\src\main\java\com\plateformeopportunites\identity\controller\AuthController.java
+E:\plateforme-opportunites\backend\identity\src\main\java\com\plateformeopportunites\identity\controller\BeamsAuthController.java
 E:\plateforme-opportunites\backend\identity\src\main\java\com\plateformeopportunites\identity\controller\KycController.java
 E:\plateforme-opportunites\backend\identity\src\main\java\com\plateformeopportunites\identity\controller\PusherAuthController.java
 E:\plateforme-opportunites\backend\identity\src\main\java\com\plateformeopportunites\identity\dto\AuthResponse.java

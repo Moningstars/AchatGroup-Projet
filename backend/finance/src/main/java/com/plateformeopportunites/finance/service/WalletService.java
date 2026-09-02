@@ -8,7 +8,6 @@ import com.plateformeopportunites.common.enums.TypeTransaction;
 import com.plateformeopportunites.common.enums.TypeTransactionPlateforme;
 import com.plateformeopportunites.common.enums.TypeRecompense;
 import com.plateformeopportunites.common.event.RetraitDemandeEvent;
-import com.plateformeopportunites.common.event.SseNotificationEvent;
 import com.plateformeopportunites.common.service.PusherNotificationService;
 import com.plateformeopportunites.finance.dto.AlimenterWalletRequest;
 import com.plateformeopportunites.finance.dto.PortefeuilleResponse;
@@ -129,9 +128,8 @@ public class WalletService {
         notifierDebit(participantId, req.getMontant(), portefeuille, "RETRAIT_DEMANDE");
 
         eventPublisher.publishEvent(new RetraitDemandeEvent(this, participantId, req.getMontant()));
-        eventPublisher.publishEvent(new SseNotificationEvent(this,
-                "admin:global", "RETRAIT_DEMANDE",
-                "{\"utilisateurId\":\"" + participantId + "\",\"montant\":" + req.getMontant().toPlainString() + "}"));
+        pusherNotificationService.notifierAdmins("RETRAIT_DEMANDE",
+                Map.of("utilisateurId", participantId, "montant", req.getMontant()));
     }
 
     public List<TransactionResponse> listerToutesTransactions() {
@@ -158,9 +156,8 @@ public class WalletService {
         tx.setStatut(StatutTransaction.SUCCESS);
         transactionRepository.save(tx);
 
-        eventPublisher.publishEvent(new SseNotificationEvent(this,
-                "user:" + tx.getUtilisateurId(), "RETRAIT",
-                "{\"statut\":\"APPROUVE\",\"montant\":" + tx.getMontant().toPlainString() + "}"));
+        pusherNotificationService.notifierUtilisateur(tx.getUtilisateurId(), "RETRAIT",
+                Map.of("statut", "APPROUVE", "montant", tx.getMontant()));
     }
 
     @Transactional
@@ -178,9 +175,8 @@ public class WalletService {
         transactionRepository.save(tx);
         notifierCredit(tx.getUtilisateurId(), tx.getMontant(), portefeuille, "RETRAIT_REJETE");
 
-        eventPublisher.publishEvent(new SseNotificationEvent(this,
-                "user:" + tx.getUtilisateurId(), "RETRAIT",
-                "{\"statut\":\"REJETE\",\"montant\":" + tx.getMontant().toPlainString() + "}"));
+        pusherNotificationService.notifierUtilisateur(tx.getUtilisateurId(), "RETRAIT",
+                Map.of("statut", "REJETE", "montant", tx.getMontant()));
     }
 
     @Transactional
@@ -230,9 +226,8 @@ public class WalletService {
         transactionRepository.save(tx);
         notifierCredit(participantId, montant, portefeuille, "RECOMPENSE");
 
-        eventPublisher.publishEvent(new SseNotificationEvent(this,
-                "user:" + participantId, "RECOMPENSE",
-                "{\"montant\":" + montant.toPlainString() + ",\"type\":\"ARGENT\"}"));
+        pusherNotificationService.notifierUtilisateur(participantId, "RECOMPENSE",
+                Map.of("montant", montant, "type", "ARGENT"));
     }
 
     /**
@@ -253,9 +248,8 @@ public class WalletService {
                 .build();
         transactionRepository.save(tx);
 
-        eventPublisher.publishEvent(new SseNotificationEvent(this,
-                "user:" + participantId, "RECOMPENSE",
-                "{\"montant\":" + points.toPlainString() + ",\"type\":\"POINTS\"}"));
+        pusherNotificationService.notifierUtilisateur(participantId, "RECOMPENSE",
+                Map.of("montant", points, "type", "POINTS"));
     }
 
     /**

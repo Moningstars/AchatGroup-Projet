@@ -8,6 +8,7 @@ import com.plateformeopportunites.common.event.QuotaAtteintEvent;
 import com.plateformeopportunites.common.event.RemboursementEvent;
 import com.plateformeopportunites.common.event.SseNotificationEvent;
 import com.plateformeopportunites.common.redis.RedisService;
+import com.plateformeopportunites.common.service.PusherNotificationService;
 import com.plateformeopportunites.finance.service.WalletService;
 import com.plateformeopportunites.identity.entity.Administrateur;
 import com.plateformeopportunites.identity.entity.Utilisateur;
@@ -40,6 +41,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -56,6 +58,7 @@ public class OpportuniteService {
     private final WalletService walletService;
     private final ApplicationEventPublisher eventPublisher;
     private final RedisService redisService;
+    private final PusherNotificationService pusherNotificationService;
 
     @Transactional
     public OpportuniteResponse creer(UUID adminId, CreerOpportuniteRequest req) {
@@ -330,10 +333,6 @@ public class OpportuniteService {
 
     @Transactional
     public void souscrire(UUID participantId, UUID opportuniteId, Integer quantite) {
-        if (participationRepository.existsByUtilisateurIdAndOpportuniteId(participantId, opportuniteId)) {
-            throw new IllegalArgumentException("Déjà souscrit à cette opportunité");
-        }
-
         Opportunite opp = getOpportunite(opportuniteId);
         if (opp.getStatut() != StatutOpportunite.ACTIVE) {
             throw new IllegalArgumentException("Cette opportunité n'est pas active");
@@ -348,30 +347,45 @@ public class OpportuniteService {
         Utilisateur utilisateur = utilisateurRepository.findById(participantId)
                 .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable"));
 
+        // Prix des unités ajoutées, calculé au palier en vigueur au moment de cet achat —
+        // les unités déjà souscrites gardent le prix auquel elles ont été gelées.
         BigDecimal prixActuel = calculerPrixActuel(opp);
-        BigDecimal montantTotal = prixActuel.multiply(BigDecimal.valueOf(quantite));
+        BigDecimal montantSupplementaire = prixActuel.multiply(BigDecimal.valueOf(quantite));
 
-        walletService.gelerFonds(participantId, montantTotal, null);
+        walletService.gelerFonds(participantId, montantSupplementaire, null);
 
-        Participation participation = Participation.builder()
-                .utilisateur(utilisateur)
-                .opportunite(opp)
-                .quantite(quantite)
-                .montantGele(montantTotal)
-                .build();
+        // Une seule participation par utilisateur/opportunité : on augmente la quantité
+        // et le montant gelé au lieu de bloquer une deuxième souscription.
+        Participation participation = participationRepository
+                .findByUtilisateurIdAndOpportuniteId(participantId, opportuniteId)
+                .orElse(null);
+
+        if (participation != null) {
+            participation.setQuantite(participation.getQuantite() + quantite);
+            participation.setMontantGele(participation.getMontantGele().add(montantSupplementaire));
+        } else {
+            participation = Participation.builder()
+                    .utilisateur(utilisateur)
+                    .opportunite(opp)
+                    .quantite(quantite)
+                    .montantGele(montantSupplementaire)
+                    .build();
+        }
         participationRepository.save(participation);
 
         opp.setParticipantsActuels(opp.getParticipantsActuels() + quantite);
         opportuniteRepository.save(opp);
 
+        int avantMaj = opp.getParticipantsActuels() - quantite; // nombre de participants avant cette souscription
+
         try {
-            redisService.initialiserCompteurSiAbsent(opportuniteId, opp.getParticipantsActuels() - quantite);
+            redisService.initialiserCompteurSiAbsent(opportuniteId, avantMaj);
             long compteurRedis = redisService.incrementerParticipants(opportuniteId, quantite);
-            if (compteurRedis >= opp.getSeuilMinimum()) {
+            if (compteurRedis - quantite < opp.getSeuilMinimum() && compteurRedis >= opp.getSeuilMinimum()) {
                 eventPublisher.publishEvent(new QuotaAtteintEvent(this, opportuniteId));
             }
         } catch (Exception e) {
-            if (opp.getParticipantsActuels() >= opp.getSeuilMinimum()) {
+            if (avantMaj < opp.getSeuilMinimum() && opp.getParticipantsActuels() >= opp.getSeuilMinimum()) {
                 eventPublisher.publishEvent(new QuotaAtteintEvent(this, opportuniteId));
             }
         }
@@ -384,17 +398,59 @@ public class OpportuniteService {
         eventPublisher.publishEvent(new SseNotificationEvent(this,
                 "opportunites:global", "COMPTEUR", payloadCompteur));
 
+        // Palier de prix franchi : tous les participants déjà inscrits doivent le savoir,
+        // pas seulement celui qui vient de souscrire.
+        if (prixApres.compareTo(prixActuel) != 0) {
+            notifierTousParticipants(opportuniteId, "OPPORTUNITE_PALIER",
+                    Map.of("id", opportuniteId, "titre", opp.getTitre(), "nouveauPrix", prixApres));
+        }
+
+        // 80% du seuil minimum franchi : encourage les participants déjà inscrits, la validation approche.
+        int seuil80 = (int) Math.ceil(opp.getSeuilMinimum() * 0.8);
+        if (avantMaj < seuil80 && opp.getParticipantsActuels() >= seuil80 && opp.getParticipantsActuels() < opp.getSeuilMinimum()) {
+            notifierTousParticipants(opportuniteId, "OPPORTUNITE_PROGRESSION", Map.of(
+                    "id", opportuniteId, "titre", opp.getTitre(), "pourcentage", 80,
+                    "participantsActuels", opp.getParticipantsActuels(), "seuilMinimum", opp.getSeuilMinimum()));
+        }
+
         if (opp.getSeuilMaximal() != null) {
             if (opp.getParticipantsActuels() >= opp.getSeuilMaximal()) {
                 cloturerAvecSucces(opportuniteId);
             } else {
-                int avant = opp.getParticipantsActuels() - quantite;
                 int seuil90 = (int) Math.ceil(opp.getSeuilMaximal() * 0.9);
-                if (avant < seuil90 && opp.getParticipantsActuels() >= seuil90) {
-                    eventPublisher.publishEvent(new SseNotificationEvent(this, "admin:global", "OPPORTUNITE_PRESQUE_COMPLETE",
-                        "{\"id\":\"" + opportuniteId + "\",\"titre\":\"" + opp.getTitre().replace("\"", "\\\"") + "\","
-                        + "\"participantsActuels\":" + opp.getParticipantsActuels() + ",\"seuilMaximal\":" + opp.getSeuilMaximal() + "}"));
+                if (avantMaj < seuil90 && opp.getParticipantsActuels() >= seuil90) {
+                    pusherNotificationService.notifierAdmins("OPPORTUNITE_PRESQUE_COMPLETE", Map.of(
+                            "id", opportuniteId, "titre", opp.getTitre(),
+                            "participantsActuels", opp.getParticipantsActuels(), "seuilMaximal", opp.getSeuilMaximal()));
                 }
+            }
+        }
+    }
+
+    /** Notifie tous les participants d'une opportunité (seuil minimum atteint) — déclenché par QuotaAtteintEvent. */
+    @Transactional(readOnly = true)
+    public void notifierSeuilAtteint(UUID opportuniteId) {
+        Opportunite opp = getOpportunite(opportuniteId);
+        notifierTousParticipants(opportuniteId, "OPPORTUNITE_VALIDEE", Map.of("id", opportuniteId, "titre", opp.getTitre()));
+    }
+
+    /** Prévient les participants (et l'admin si le seuil minimum n'est pas atteint) des opportunités expirant sous 24h. */
+    public void notifierExpirationsProches() {
+        LocalDateTime maintenant = LocalDateTime.now();
+        List<Opportunite> proches = opportuniteRepository.findByStatutAndDateExpirationBetween(
+                StatutOpportunite.ACTIVE, maintenant, maintenant.plusHours(24));
+        for (Opportunite opp : proches) {
+            boolean premiereFois = redisService.marquerNotificationSiAbsent(
+                    "opportunite:" + opp.getId() + ":expiration-proche", 48 * 3600L);
+            if (!premiereFois) continue;
+
+            notifierTousParticipants(opp.getId(), "OPPORTUNITE_EXPIRATION_PROCHE",
+                    Map.of("id", opp.getId(), "titre", opp.getTitre()));
+
+            if (opp.getParticipantsActuels() < opp.getSeuilMinimum()) {
+                pusherNotificationService.notifierAdmins("OPPORTUNITE_RISQUE_ECHEC", Map.of(
+                        "id", opp.getId(), "titre", opp.getTitre(),
+                        "participantsActuels", opp.getParticipantsActuels(), "seuilMinimum", opp.getSeuilMinimum()));
             }
         }
     }
@@ -435,6 +491,9 @@ public class OpportuniteService {
                 "opportunite:" + opportuniteId, "STATUT", payloadAnnulation));
         eventPublisher.publishEvent(new SseNotificationEvent(this,
                 "opportunites:global", "STATUT", payloadAnnulation));
+
+        notifierTousParticipants(opportuniteId, "OPPORTUNITE_ECHEC", Map.of("id", opportuniteId, "titre", opp.getTitre()));
+
         eventPublisher.publishEvent(new RemboursementEvent(this, opportuniteId));
     }
 
@@ -633,6 +692,14 @@ public class OpportuniteService {
                 // Pas de date automatique nécessaire pour ces statuts.
             }
         }
+    }
+
+    /** Pousse une notification Pusher personnelle à chaque participant (distinct) d'une opportunité. */
+    private void notifierTousParticipants(UUID opportuniteId, String type, Map<String, Object> data) {
+        participationRepository.findByOpportuniteId(opportuniteId).stream()
+                .map(p -> p.getUtilisateur().getId())
+                .distinct()
+                .forEach(userId -> pusherNotificationService.notifierUtilisateur(userId, type, data));
     }
 
     private Opportunite getOpportunite(UUID id) {

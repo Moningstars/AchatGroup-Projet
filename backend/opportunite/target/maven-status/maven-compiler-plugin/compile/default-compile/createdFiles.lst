@@ -10,6 +10,7 @@ com\plateformeopportunites\opportunite\entity\Categorie.class
 com\plateformeopportunites\opportunite\dto\CreerOpportuniteRequest.class
 com\plateformeopportunites\opportunite\entity\OpportuniteImage$OpportuniteImageBuilder.class
 com\plateformeopportunites\opportunite\dto\MaParticipationOpportuniteResponse.class
+com\plateformeopportunites\opportunite\dto\ConfirmerReceptionRequest.class
 com\plateformeopportunites\opportunite\entity\Participation$ParticipationBuilder.class
 com\plateformeopportunites\opportunite\repository\OpportuniteRepository.class
 com\plateformeopportunites\opportunite\service\ImageStorageService.class
@@ -27,10 +28,12 @@ com\plateformeopportunites\opportunite\repository\PalierPrixRepository.class
 com\plateformeopportunites\opportunite\repository\OpportuniteImageRepository.class
 com\plateformeopportunites\opportunite\entity\Banniere.class
 com\plateformeopportunites\opportunite\dto\ModifierOpportuniteRequest.class
+com\plateformeopportunites\opportunite\service\OpportuniteService$1.class
 com\plateformeopportunites\opportunite\repository\CategorieRepository.class
 com\plateformeopportunites\opportunite\controller\BanniereController.class
 com\plateformeopportunites\opportunite\entity\Opportunite$OpportuniteBuilder.class
 com\plateformeopportunites\opportunite\dto\OpportuniteResponse$OpportuniteResponseBuilder.class
+com\plateformeopportunites\opportunite\dto\PlanifierParticipantsRequest.class
 com\plateformeopportunites\opportunite\entity\Banniere$BanniereBuilder.class
 com\plateformeopportunites\opportunite\dto\GenererSpecsResponse.class
 com\plateformeopportunites\opportunite\entity\Categorie$CategorieBuilder.class
@@ -38,6 +41,7 @@ com\plateformeopportunites\opportunite\dto\OpportuniteResponse$ImageResponse$Ima
 com\plateformeopportunites\opportunite\entity\Participation.class
 com\plateformeopportunites\opportunite\dto\OpportuniteResponse$PalierPrixResponse.class
 com\plateformeopportunites\opportunite\entity\PalierPrix.class
+com\plateformeopportunites\opportunite\dto\MettreAJourLivraisonRequest.class
 com\plateformeopportunites\opportunite\service\AiSpecService.class
 com\plateformeopportunites\opportunite\dto\BanniereResponse.class
 com\plateformeopportunites\opportunite\service\BanniereService.class

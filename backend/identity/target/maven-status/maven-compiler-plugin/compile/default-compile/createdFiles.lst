@@ -16,6 +16,7 @@ com\plateformeopportunites\identity\entity\Administrateur.class
 com\plateformeopportunites\identity\dto\KycDemandeResponse$KycDemandeResponseBuilder.class
 com\plateformeopportunites\identity\dto\UtilisateurDetailResponse$UtilisateurDetailResponseBuilder.class
 com\plateformeopportunites\identity\dto\CommanditaireResponse$CommanditaireResponseBuilder.class
+com\plateformeopportunites\identity\dto\ConnexionDevRequest.class
 com\plateformeopportunites\identity\dto\CommanditaireResponse.class
 com\plateformeopportunites\identity\controller\AdminKycController.class
 com\plateformeopportunites\identity\controller\AuthController.class
@@ -37,8 +38,10 @@ com\plateformeopportunites\identity\dto\KycStatusResponse$KycStatusResponseBuild
 com\plateformeopportunites\identity\entity\Utilisateur$UtilisateurBuilder.class
 com\plateformeopportunites\security\SecurityConfig.class
 com\plateformeopportunites\identity\dto\UtilisateurDetailResponse.class
+com\plateformeopportunites\identity\dto\VerifierFirebaseTokenRequest.class
 com\plateformeopportunites\identity\entity\Commanditaire.class
 com\plateformeopportunites\identity\service\AuthService.class
 com\plateformeopportunites\identity\controller\AdminAuthController.class
 com\plateformeopportunites\identity\dto\AuthResponse$AuthResponseBuilder.class
+com\plateformeopportunites\identity\service\FirebaseAuthVerifier.class
 com\plateformeopportunites\identity\dto\UtilisateurResponse$UtilisateurResponseBuilder.class

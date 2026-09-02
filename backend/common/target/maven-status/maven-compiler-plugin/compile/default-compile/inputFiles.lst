@@ -1,3 +1,4 @@
+E:\plateforme-opportunites\backend\common\src\main\java\com\plateformeopportunites\common\config\BeamsConfig.java
 E:\plateforme-opportunites\backend\common\src\main\java\com\plateformeopportunites\common\config\OpenApiConfig.java
 E:\plateforme-opportunites\backend\common\src\main\java\com\plateformeopportunites\common\config\PusherConfig.java
 E:\plateforme-opportunites\backend\common\src\main\java\com\plateformeopportunites\common\config\WebConfig.java
@@ -9,6 +10,7 @@ E:\plateforme-opportunites\backend\common\src\main\java\com\plateformeopportunit
 E:\plateforme-opportunites\backend\common\src\main\java\com\plateformeopportunites\common\enums\SourceRevenus.java
 E:\plateforme-opportunites\backend\common\src\main\java\com\plateformeopportunites\common\enums\StatutCommanditaire.java
 E:\plateforme-opportunites\backend\common\src\main\java\com\plateformeopportunites\common\enums\StatutCompte.java
+E:\plateforme-opportunites\backend\common\src\main\java\com\plateformeopportunites\common\enums\StatutLivraison.java
 E:\plateforme-opportunites\backend\common\src\main\java\com\plateformeopportunites\common\enums\StatutOpportunite.java
 E:\plateforme-opportunites\backend\common\src\main\java\com\plateformeopportunites\common\enums\StatutParticipation.java
 E:\plateforme-opportunites\backend\common\src\main\java\com\plateformeopportunites\common\enums\StatutSondage.java

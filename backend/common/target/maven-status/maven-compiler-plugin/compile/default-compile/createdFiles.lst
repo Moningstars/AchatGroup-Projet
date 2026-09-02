@@ -8,6 +8,7 @@ com\plateformeopportunites\common\enums\StatutTransaction.class
 com\plateformeopportunites\security\JwtService.class
 com\plateformeopportunites\common\config\PusherConfig.class
 com\plateformeopportunites\common\enums\StatutValidation.class
+com\plateformeopportunites\common\enums\StatutLivraison.class
 com\plateformeopportunites\common\enums\StatutOpportunite.class
 com\plateformeopportunites\common\enums\TypeQuestion.class
 com\plateformeopportunites\common\redis\RedisService.class

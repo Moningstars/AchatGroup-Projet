@@ -11,6 +11,7 @@ import Parametres from './Pages/Parametres'
 import Kyc from './Pages/Kyc'
 import Bannieres from './Pages/Bannieres'
 import Login from './Pages/Login'
+import { useBeams } from './hooks/useBeams'
 import './App.css'
 
 function ProtectedRoute({ children }) {
@@ -19,6 +20,8 @@ function ProtectedRoute({ children }) {
 }
 
 function App() {
+  useBeams()
+
   return (
     <BrowserRouter>
       <Routes>

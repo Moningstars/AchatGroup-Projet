@@ -2,7 +2,6 @@ package com.plateformeopportunites.common.sse;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -33,10 +32,5 @@ public class SseController {
     @GetMapping(value = "/sondages", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter sondagesGlobal() {
         return sseService.subscribe("sondages:global");
-    }
-
-    @GetMapping(value = "/notifications", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter notifications(Authentication auth) {
-        return sseService.subscribe("user:" + auth.getName());
     }
 }

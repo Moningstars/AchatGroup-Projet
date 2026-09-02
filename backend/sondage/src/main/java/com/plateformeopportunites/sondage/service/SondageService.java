@@ -9,6 +9,7 @@ import com.plateformeopportunites.common.enums.TypeRecompense;
 import com.plateformeopportunites.common.event.RecompenseEvent;
 import com.plateformeopportunites.common.event.SseNotificationEvent;
 import com.plateformeopportunites.common.redis.RedisService;
+import com.plateformeopportunites.common.service.PusherNotificationService;
 import com.plateformeopportunites.finance.service.WalletService;
 import com.plateformeopportunites.identity.entity.Administrateur;
 import com.plateformeopportunites.identity.entity.Commanditaire;
@@ -38,6 +39,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -57,6 +59,7 @@ public class SondageService {
     private final WalletService walletService;
     private final ApplicationEventPublisher eventPublisher;
     private final RedisService redisService;
+    private final PusherNotificationService pusherNotificationService;
 
     // ─── Création ─────────────────────────────────────────────────────────────
 
@@ -358,9 +361,9 @@ public class SondageService {
         Utilisateur utilisateur = utilisateurRepository.findById(participantId)
                 .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable"));
         Sondage sondage = getSondage(sondageId);
-        verifierSondageOuvert(sondage);
 
-        if (sondageReponseRepository.existsBySondageIdAndUtilisateurId(sondageId, participantId)) {
+        // Vérification Redis — atomique, évite les race conditions une fois les règles métier validées.
+        if (redisService.aDejaVote(sondageId, participantId)) {
             throw new IllegalArgumentException("Déjà répondu à ce sondage");
         }
 
@@ -380,10 +383,12 @@ public class SondageService {
             throw new IllegalArgumentException("Non éligible à ce sondage");
         }
 
-        // Vérification Redis — atomique, évite les race conditions une fois les règles métier validées.
-        if (redisService.aDejaVote(sondageId, participantId)) {
+        verifierSondageOuvert(sondage);
+
+        if (sondageReponseRepository.existsBySondageIdAndUtilisateurId(sondageId, participantId)) {
             throw new IllegalArgumentException("Déjà répondu à ce sondage");
         }
+
         boolean reserve = redisService.marquerVoteSiAbsent(sondageId, participantId, 90L * 24 * 3600);
         if (!reserve) {
             throw new IllegalArgumentException("Déjà répondu à ce sondage");
@@ -452,10 +457,6 @@ public class SondageService {
     public void validerPreuve(UUID sondageReponseId, boolean approuve) {
         SondageReponse reponse = sondageReponseRepository.findById(sondageReponseId)
                 .orElseThrow(() -> new IllegalArgumentException("Réponse introuvable"));
-
-        if (approuve && (reponse.getFichierPreuve() == null || reponse.getFichierPreuve().isBlank())) {
-            throw new IllegalArgumentException("Impossible d'approuver : aucune preuve fournie pour cette réponse");
-        }
 
         reponse.setStatutValidation(approuve ? StatutValidation.VALIDE : StatutValidation.REJETE);
         reponse.setValideeAt(LocalDateTime.now());
@@ -632,7 +633,7 @@ public class SondageService {
         for (Sondage s : expires) {
             distribuerManuel(s.getId());
             libererReliquatSiNecessaire(s);
-            s.setStatut(StatutSondage.CLOTURE);
+            s.setStatut(StatutSondage.EN_ATTENTE_DISTRIBUTION);
             sondageRepository.save(s);
         }
     }
@@ -668,9 +669,21 @@ public class SondageService {
         }
 
         // 3. Tracker le budget distribué sur le sondage
-        BigDecimal distribue = sondage.getBudgetDistribue() != null ? sondage.getBudgetDistribue() : BigDecimal.ZERO;
-        sondage.setBudgetDistribue(distribue.add(montantFCFA));
+        BigDecimal distribueAvant = sondage.getBudgetDistribue() != null ? sondage.getBudgetDistribue() : BigDecimal.ZERO;
+        BigDecimal distribueApres = distribueAvant.add(montantFCFA);
+        sondage.setBudgetDistribue(distribueApres);
         sondageRepository.save(sondage);
+
+        // Alerte admin la première fois que 80% du budget réservé est distribué.
+        BigDecimal reserve = sondage.getBudgetReserve();
+        if (reserve != null && reserve.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal seuil80 = reserve.multiply(new BigDecimal("0.8"));
+            if (distribueAvant.compareTo(seuil80) < 0 && distribueApres.compareTo(seuil80) >= 0) {
+                pusherNotificationService.notifierAdmins("SONDAGE_BUDGET_PRESQUE_EPUISE", Map.of(
+                        "id", sondage.getId(), "titre", sondage.getTitre(),
+                        "budgetDistribue", distribueApres, "budgetReserve", reserve));
+            }
+        }
 
         // 4. Marquer la récompense comme versée
         reponse.setRecompenseVersee(true);
@@ -683,27 +696,34 @@ public class SondageService {
         if (sondage.getStatut() != StatutSondage.ACTIF) {
             throw new IllegalStateException("Ce sondage n'est pas ouvert aux réponses");
         }
-        if (sondage.getDateExpiration().isBefore(LocalDateTime.now())) {
+        if (sondage.getDateExpiration() != null && sondage.getDateExpiration().isBefore(LocalDateTime.now())) {
             throw new IllegalStateException("Ce sondage est expiré");
         }
-        if (sondage.getRepondantsActuels() >= sondage.getQuotaVise()) {
+        int quotaVise = sondage.getQuotaVise() != null ? sondage.getQuotaVise() : 0;
+        if (sondage.getRepondantsActuels() >= quotaVise) {
             throw new IllegalStateException("Quota atteint : ce sondage n'accepte plus de réponses");
         }
         if (Boolean.TRUE.equals(sondage.getBudgetLibere())) {
             throw new IllegalStateException("Le budget de ce sondage a déjà été libéré");
         }
-        if (budgetRestant(sondage).compareTo(sondage.getRecompense()) < 0) {
+        BigDecimal montantRecompense = zero(sondage.getRecompense());
+        if (budgetRestant(sondage).compareTo(montantRecompense) < 0) {
             throw new IllegalStateException("Budget restant insuffisant pour accepter une nouvelle réponse récompensée");
         }
     }
 
     private BigDecimal calculerBudgetNecessaire(Sondage sondage) {
-        return zero(sondage.getRecompense()).multiply(BigDecimal.valueOf(sondage.getQuotaVise()));
+        int quotaVise = sondage.getQuotaVise() != null ? sondage.getQuotaVise() : 0;
+        return zero(sondage.getRecompense()).multiply(BigDecimal.valueOf(quotaVise));
     }
 
     private BigDecimal budgetRestant(Sondage sondage) {
         if (Boolean.TRUE.equals(sondage.getBudgetLibere())) return BigDecimal.ZERO;
-        BigDecimal restant = zero(sondage.getBudgetReserve()).subtract(zero(sondage.getBudgetDistribue()));
+        BigDecimal reserve = zero(sondage.getBudgetReserve());
+        if (reserve.compareTo(BigDecimal.ZERO) == 0 && sondage.getRecompense() != null && sondage.getQuotaVise() != null && sondage.getQuotaVise() > 0) {
+            reserve = zero(sondage.getRecompense()).multiply(BigDecimal.valueOf(sondage.getQuotaVise()));
+        }
+        BigDecimal restant = reserve.subtract(zero(sondage.getBudgetDistribue()));
         return restant.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : restant;
     }
 

@@ -3,13 +3,16 @@ E:\plateforme-opportunites\backend\opportunite\src\main\java\com\plateformeoppor
 E:\plateforme-opportunites\backend\opportunite\src\main\java\com\plateformeopportunites\opportunite\controller\BanniereController.java
 E:\plateforme-opportunites\backend\opportunite\src\main\java\com\plateformeopportunites\opportunite\controller\OpportuniteController.java
 E:\plateforme-opportunites\backend\opportunite\src\main\java\com\plateformeopportunites\opportunite\dto\BanniereResponse.java
+E:\plateforme-opportunites\backend\opportunite\src\main\java\com\plateformeopportunites\opportunite\dto\ConfirmerReceptionRequest.java
 E:\plateforme-opportunites\backend\opportunite\src\main\java\com\plateformeopportunites\opportunite\dto\CreerOpportuniteRequest.java
 E:\plateforme-opportunites\backend\opportunite\src\main\java\com\plateformeopportunites\opportunite\dto\GenererSpecsRequest.java
 E:\plateforme-opportunites\backend\opportunite\src\main\java\com\plateformeopportunites\opportunite\dto\GenererSpecsResponse.java
 E:\plateforme-opportunites\backend\opportunite\src\main\java\com\plateformeopportunites\opportunite\dto\MaParticipationOpportuniteResponse.java
+E:\plateforme-opportunites\backend\opportunite\src\main\java\com\plateformeopportunites\opportunite\dto\MettreAJourLivraisonRequest.java
 E:\plateforme-opportunites\backend\opportunite\src\main\java\com\plateformeopportunites\opportunite\dto\ModifierOpportuniteRequest.java
 E:\plateforme-opportunites\backend\opportunite\src\main\java\com\plateformeopportunites\opportunite\dto\OpportuniteResponse.java
 E:\plateforme-opportunites\backend\opportunite\src\main\java\com\plateformeopportunites\opportunite\dto\ParticipantOpportuniteResponse.java
+E:\plateforme-opportunites\backend\opportunite\src\main\java\com\plateformeopportunites\opportunite\dto\PlanifierParticipantsRequest.java
 E:\plateforme-opportunites\backend\opportunite\src\main\java\com\plateformeopportunites\opportunite\entity\Banniere.java
 E:\plateforme-opportunites\backend\opportunite\src\main\java\com\plateformeopportunites\opportunite\entity\Categorie.java
 E:\plateforme-opportunites\backend\opportunite\src\main\java\com\plateformeopportunites\opportunite\entity\Opportunite.java

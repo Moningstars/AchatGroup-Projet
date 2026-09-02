@@ -3,14 +3,14 @@ import { TrendingUp, Users, Package, ClipboardList, Wallet, Clock, AlertTriangle
 import { StatCard, AreaChart, ProgressBar, Spinner } from '../components/ui'
 import { getAdminStats, getAdminOpportunites } from '../services/api'
 import { useSSE } from '../hooks/useSSE'
-import { useAuth } from '../context/AuthContext'
+import { usePusher } from '../context/PusherContext'
 
 function fmt(n) {
   return Number(n || 0).toLocaleString('fr-FR')
 }
 
 export default function Dashboard() {
-  const { token } = useAuth()
+  const { on, off } = usePusher()
   const [stats, setStats] = useState(null)
   const [opportunites, setOpportunites] = useState([])
   const [loading, setLoading] = useState(true)
@@ -44,15 +44,22 @@ export default function Dashboard() {
     },
   })
   useSSE('events/sondages', { COMPTEUR: refetchStats, STATUT: refetchStats })
-  useSSE('admin/events/global', {
-    KYC_SOUMIS: refetchStats,
-    RETRAIT_DEMANDE: refetchStats,
-    OPPORTUNITE_PRESQUE_COMPLETE: ({ id, titre, participantsActuels, seuilMaximal }) => {
+
+  useEffect(() => {
+    const onPresqueComplete = ({ id, titre, participantsActuels, seuilMaximal }) => {
       setPresqueCompletes(prev => prev.some(o => o.id === id)
         ? prev
         : [...prev, { id, titre, participantsActuels, seuilMaximal }])
-    },
-  }, token)
+    }
+    on('KYC_SOUMIS', refetchStats)
+    on('RETRAIT_DEMANDE', refetchStats)
+    on('OPPORTUNITE_PRESQUE_COMPLETE', onPresqueComplete)
+    return () => {
+      off('KYC_SOUMIS', refetchStats)
+      off('RETRAIT_DEMANDE', refetchStats)
+      off('OPPORTUNITE_PRESQUE_COMPLETE', onPresqueComplete)
+    }
+  }, [])
 
   if (loading) return <Spinner />
 
