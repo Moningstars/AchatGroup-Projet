@@ -37,7 +37,10 @@ export default function Catalogue() {
   const [serverSearch, setServerSearch] = useState(location.state?.search || '')
   const [searchParams] = useSearchParams()
   const initialCategory = searchParams.get('cat') ?? location.state?.category ?? 'Tout'
-  const [selectedCategories, setSelectedCategories] = useState(initialCategory === 'Tout' ? [] : [initialCategory])
+  const initialCategories = Array.isArray(location.state?.categories)
+    ? location.state.categories
+    : initialCategory === 'Tout' ? [] : [initialCategory]
+  const [selectedCategories, setSelectedCategories] = useState(initialCategories)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [tri, setTri] = useState('recent')
   const [page, setPage] = useState(1)
