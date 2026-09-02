@@ -124,6 +124,7 @@ GEMINI_API_KEY=cle-gemini-si-utilisee
 PUSHER_APP_ID=id-pusher
 PUSHER_KEY=cle-pusher
 PUSHER_SECRET=secret-pusher
+DEV_AUTH_ENABLED=false
 ```
 
 Conseils :
@@ -132,6 +133,7 @@ Conseils :
 - ne jamais commiter `backend/secrets.properties` ;
 - changer le mot de passe admin initial après la première connexion ;
 - séparer les clés de test et les clés de production PayGate/Firebase/Pusher.
+- garder `DEV_AUTH_ENABLED=false` sur tout environnement exposé publiquement. Cette option sert uniquement aux tests locaux quand Firebase n'est pas encore configuré.
 
 Des fichiers d'exemple ont aussi été ajoutés au projet pour accélérer la préparation :
 
@@ -548,6 +550,7 @@ Avant une mise à jour importante :
 - Vérifier CORS côté backend.
 - Configurer PayGate avec les clés de production.
 - Configurer Firebase correctement pour le domaine public.
+- Vérifier que `DEV_AUTH_ENABLED=false` en production.
 - Configurer Pusher si les notifications privées sont utilisées.
 - Vérifier les limites d'upload et le stockage des fichiers.
 - Mettre en place des sauvegardes automatiques.

@@ -24,6 +24,7 @@ dist-ssr/
 .vscode/
 .DS_Store
 .runtime/
+.kombai/
 
 # Redis
 dump.rdb

@@ -45,6 +45,10 @@ app:
     secret-admin: ${JWT_SECRET_ADMIN}
     expiration: 86400000
   upload-dir: ./uploads
+  auth:
+    # Connexion participant sans Firebase, utile seulement en local/demo.
+    # Ne jamais activer sur un déploiement public.
+    dev-login-enabled: ${DEV_AUTH_ENABLED:false}
 
 paygate:
   auth-token: ${PAYGATE_AUTH_TOKEN}

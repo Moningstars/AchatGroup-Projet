@@ -11,6 +11,7 @@ import com.plateformeopportunites.identity.repository.AdministrateurRepository;
 import com.plateformeopportunites.identity.repository.UtilisateurRepository;
 import com.plateformeopportunites.security.JwtService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -29,12 +30,31 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
 
+    @Value("${app.auth.dev-login-enabled:false}")
+    private boolean devLoginEnabled;
+
     // ── Vérification du token Firebase (Phone Auth) → connexion ou création de compte ─
 
     @Transactional
     public AuthResponse verifierFirebaseToken(VerifierFirebaseTokenRequest req) {
         String telephone = firebaseAuthVerifier.verifierEtExtraireTelephone(req.getIdToken());
+        return connecterOuCreerParTelephone(telephone);
+    }
 
+    // ── Connexion locale / démonstration ────────────────────────────────────────
+    // Cette méthode contourne Firebase uniquement quand l'option explicite
+    // app.auth.dev-login-enabled=true est activée. Elle doit rester désactivée
+    // dans tout environnement exposé publiquement.
+
+    @Transactional
+    public AuthResponse connecterDev(String telephone) {
+        if (!devLoginEnabled) {
+            throw new IllegalStateException("Connexion dev désactivée");
+        }
+        return connecterOuCreerParTelephone(telephone);
+    }
+
+    private AuthResponse connecterOuCreerParTelephone(String telephone) {
         Utilisateur utilisateur = utilisateurRepository.findByTelephone(telephone)
                 .orElseGet(() -> {
                     Utilisateur nouveau = utilisateurRepository.save(

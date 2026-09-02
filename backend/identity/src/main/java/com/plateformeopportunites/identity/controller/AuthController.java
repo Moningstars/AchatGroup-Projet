@@ -44,6 +44,18 @@ public class AuthController {
         return ResponseEntity.ok(authService.verifierFirebaseToken(req));
     }
 
+    // ── Connexion locale / démonstration ────────────────────────────────────────
+
+    @Operation(
+        summary = "[DEV] Connexion par téléphone sans vérification Firebase",
+        description = "Endpoint désactivé par défaut. À activer explicitement via app.auth.dev-login-enabled=true uniquement en local ou démonstration."
+    )
+    @SecurityRequirement(name = "")
+    @PostMapping("/dev/connexion")
+    public ResponseEntity<AuthResponse> connecterDev(@Valid @RequestBody ConnexionDevRequest req) {
+        return ResponseEntity.ok(authService.connecterDev(req.getTelephone()));
+    }
+
     // ── Déconnexion ──────────────────────────────────────────────────────────────
 
     @Operation(summary = "Déconnexion — révoque le token JWT côté serveur")
