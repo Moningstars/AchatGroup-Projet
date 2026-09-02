@@ -115,6 +115,28 @@ public class OpportuniteService {
     }
 
     @Transactional(readOnly = true)
+    public List<OpportuniteResponse> rechercherActives(String q, List<String> categories) {
+        List<String> categoriesNettoyees = categories == null ? List.of() : categories.stream()
+                .filter(c -> c != null && !c.isBlank() && !"Tout".equalsIgnoreCase(c.trim()))
+                .map(String::trim)
+                .distinct()
+                .toList();
+        String query = q == null ? "" : q.trim();
+        List<String> categoriesPourRequete = categoriesNettoyees.isEmpty()
+                ? List.of("__AUCUNE_CATEGORIE__")
+                : categoriesNettoyees;
+        return opportuniteRepository.rechercherActives(
+                        StatutOpportunite.ACTIVE,
+                        query,
+                        categoriesPourRequete,
+                        categoriesNettoyees.isEmpty()
+                )
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<OpportuniteResponse> listerToutes() {
         return opportuniteRepository.findAll()
                 .stream().map(this::toResponse).toList();
@@ -343,13 +365,12 @@ public class OpportuniteService {
         if (quantite == null || quantite <= 0) {
             throw new IllegalArgumentException("La quantité doit être supérieure ou égale à 1");
         }
-        if (participationRepository.existsByUtilisateurIdAndOpportuniteId(participantId, opportuniteId)) {
-            throw new IllegalArgumentException("Déjà souscrit à cette opportunité");
-        }
-
         Opportunite opp = getOpportunite(opportuniteId);
         if (opp.getStatut() != StatutOpportunite.ACTIVE) {
             throw new IllegalArgumentException("Cette opportunité n'est pas active");
+        }
+        if (opp.getDateExpiration().isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("Cette opportunité est expirée");
         }
         if (opp.getSeuilMaximal() != null && opp.getParticipantsActuels() + quantite > opp.getSeuilMaximal()) {
             int restantes = opp.getSeuilMaximal() - opp.getParticipantsActuels();
@@ -361,17 +382,27 @@ public class OpportuniteService {
         Utilisateur utilisateur = utilisateurRepository.findById(participantId)
                 .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable"));
 
+        Participation participationExistante = participationRepository.findByUtilisateurIdAndOpportuniteId(participantId, opportuniteId)
+                .orElse(null);
+        if (participationExistante != null && participationExistante.getStatut() != StatutParticipation.EN_ATTENTE) {
+            throw new IllegalStateException("Cette commande est déjà validée ou clôturée : elle ne peut plus être augmentée");
+        }
+
         BigDecimal prixActuel = calculerPrixActuel(opp);
         BigDecimal montantTotal = prixActuel.multiply(BigDecimal.valueOf(quantite));
 
         walletService.gelerFonds(participantId, montantTotal, null);
 
-        Participation participation = Participation.builder()
-                .utilisateur(utilisateur)
-                .opportunite(opp)
-                .quantite(quantite)
-                .montantGele(montantTotal)
-                .build();
+        Participation participation = participationExistante != null
+                ? participationExistante
+                : Participation.builder()
+                        .utilisateur(utilisateur)
+                        .opportunite(opp)
+                        .quantite(0)
+                        .montantGele(BigDecimal.ZERO)
+                        .build();
+        participation.setQuantite(participation.getQuantite() + quantite);
+        participation.setMontantGele(participation.getMontantGele().add(montantTotal));
         participationRepository.save(participation);
 
         opp.setParticipantsActuels(opp.getParticipantsActuels() + quantite);
@@ -784,6 +815,18 @@ public class OpportuniteService {
             compteurRedis = opp.getParticipantsActuels();
         }
 
+        boolean expiree = opp.getDateExpiration().isBefore(LocalDateTime.now());
+        boolean plafondAtteint = opp.getSeuilMaximal() != null && compteurRedis >= opp.getSeuilMaximal();
+        boolean souscriptionOuverte = opp.getStatut() == StatutOpportunite.ACTIVE && !expiree && !plafondAtteint;
+        String raisonIndisponibilite = null;
+        if (opp.getStatut() != StatutOpportunite.ACTIVE) {
+            raisonIndisponibilite = "Cette opportunité n'est pas active";
+        } else if (expiree) {
+            raisonIndisponibilite = "Cette opportunité est expirée";
+        } else if (plafondAtteint) {
+            raisonIndisponibilite = "Le stock disponible est déjà réservé";
+        }
+
         return OpportuniteResponse.builder()
                 .id(opp.getId())
                 .titre(opp.getTitre())
@@ -796,6 +839,10 @@ public class OpportuniteService {
                 .seuilMinimum(opp.getSeuilMinimum())
                 .seuilMaximal(opp.getSeuilMaximal())
                 .participantsActuels(compteurRedis)
+                .placesRestantes(opp.getSeuilMaximal() == null ? null : Math.max(opp.getSeuilMaximal() - compteurRedis, 0))
+                .souscriptionOuverte(souscriptionOuverte)
+                .activationAtteinte(compteurRedis >= opp.getSeuilMinimum())
+                .raisonIndisponibilite(raisonIndisponibilite)
                 .dateExpiration(opp.getDateExpiration())
                 .statut(opp.getStatut())
                 .createdAt(opp.getCreatedAt())

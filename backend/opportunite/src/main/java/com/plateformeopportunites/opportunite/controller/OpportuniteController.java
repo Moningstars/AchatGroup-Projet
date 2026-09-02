@@ -26,8 +26,10 @@ public class OpportuniteController {
     private final OpportuniteService opportuniteService;
 
     @GetMapping
-    public ResponseEntity<List<OpportuniteResponse>> lister() {
-        return ResponseEntity.ok(opportuniteService.listerActives());
+    public ResponseEntity<List<OpportuniteResponse>> lister(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) List<String> categories) {
+        return ResponseEntity.ok(opportuniteService.rechercherActives(q, categories));
     }
 
     @GetMapping("/{id}")

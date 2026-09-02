@@ -22,6 +22,10 @@ public class OpportuniteResponse {
     private Integer seuilMinimum;
     private Integer seuilMaximal;
     private Integer participantsActuels;
+    private Integer placesRestantes;
+    private Boolean souscriptionOuverte;
+    private Boolean activationAtteinte;
+    private String raisonIndisponibilite;
     private LocalDateTime dateExpiration;
     private StatutOpportunite statut;
     private LocalDateTime createdAt;
