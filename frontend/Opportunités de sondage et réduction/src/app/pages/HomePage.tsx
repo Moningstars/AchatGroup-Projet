@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { Clock, Users, TrendingDown, Award, ChevronLeft, ChevronRight, Flame, Zap, BarChart3, Tag } from 'lucide-react';
+import { Clock, Users, TrendingDown, Award, ChevronLeft, ChevronRight, Flame, Zap, BarChart3, Tag, CheckCircle2, PackageCheck } from 'lucide-react';
 import type { Opportunity, Survey } from '../App';
 
 interface HomePageProps {
@@ -73,14 +73,53 @@ function formatTime(deadline: Date) {
   return `${h}h ${m}m`;
 }
 
+function participationLabel(status?: string) {
+  switch (status) {
+    case 'CONFIRMEE':
+      return 'Confirmée';
+    case 'REMBOURSEE':
+      return 'Remboursée';
+    case 'EN_ATTENTE':
+      return 'En attente quota';
+    default:
+      return status ? status.replaceAll('_', ' ') : 'Déjà participé';
+  }
+}
+
+function deliveryLabel(status?: string) {
+  switch (status) {
+    case 'EN_ATTENTE_QUOTA':
+      return 'En attente du quota';
+    case 'A_PREPARER':
+      return 'À préparer';
+    case 'EN_PREPARATION':
+      return 'En préparation';
+    case 'EN_LIVRAISON':
+      return 'En livraison';
+    case 'LIVRE_A_CONFIRMER':
+      return 'À confirmer';
+    case 'LIVRE_CONFIRME':
+      return 'Livré';
+    case 'LITIGE':
+      return 'Litige';
+    case 'ANNULE':
+      return 'Annulé';
+    default:
+      return status ? status.replaceAll('_', ' ') : '';
+  }
+}
+
 function OpportunityCard({ opp, onClick }: { opp: Opportunity; onClick: () => void }) {
   const progress = Math.min((opp.currentParticipants / opp.targetParticipants) * 100, 100);
   const discount = Math.round(((opp.originalPrice - opp.currentPrice) / opp.originalPrice) * 100);
+  const hasParticipated = Boolean(opp.participationId);
 
   return (
     <motion.button
       onClick={onClick}
-      className="bg-card border border-border rounded-2xl overflow-hidden text-left group w-full"
+      className={`bg-card border rounded-2xl overflow-hidden text-left group w-full ${
+        hasParticipated ? 'border-secondary/50 ring-2 ring-secondary/10' : 'border-border'
+      }`}
       whileHover={{ y: -4, boxShadow: '0 12px 40px oklch(0.48 0.24 275 / 0.12)' }}
       transition={{ duration: 0.2 }}
     >
@@ -91,6 +130,12 @@ function OpportunityCard({ opp, onClick }: { opp: Opportunity; onClick: () => vo
           <div className="absolute top-3 left-3 flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-xs font-bold shadow-lg"
             style={{ background: 'oklch(0.55 0.22 25)' }}>
             <Flame className="w-3 h-3" /> -{discount}%
+          </div>
+        )}
+        {hasParticipated && (
+          <div className="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-secondary text-xs font-bold shadow-lg">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Déjà participé
           </div>
         )}
         <div className="absolute bottom-3 left-3 right-3">
@@ -110,6 +155,36 @@ function OpportunityCard({ opp, onClick }: { opp: Opportunity; onClick: () => vo
           <h3 className="font-bold text-foreground leading-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>{opp.title}</h3>
           <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{opp.description}</p>
         </div>
+
+        {hasParticipated && (
+          <div className="rounded-xl border border-secondary/20 bg-secondary/10 p-3 text-sm text-secondary">
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 font-semibold">
+                <CheckCircle2 className="w-4 h-4" />
+                {participationLabel(opp.participationStatus)}
+              </span>
+              {opp.participationQuantity && (
+                <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs">
+                  Qté {opp.participationQuantity}
+                </span>
+              )}
+            </div>
+            {opp.participationAmount ? (
+              <p className="mt-1 text-xs text-secondary/80">
+                {opp.participationAmount.toLocaleString()} FCFA gelés pour cette participation.
+              </p>
+            ) : null}
+            {opp.deliveryStatus && (
+              <div className="mt-2 flex items-center justify-between gap-3 text-xs text-secondary/90">
+                <span className="flex items-center gap-1.5">
+                  <PackageCheck className="w-3.5 h-3.5" />
+                  {deliveryLabel(opp.deliveryStatus)}
+                </span>
+                <span className="font-mono">{opp.deliveryProgress || 0}%</span>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex items-baseline gap-2">
           <span className="text-xl font-bold text-primary" style={{ fontFamily: 'JetBrains Mono, monospace' }}>

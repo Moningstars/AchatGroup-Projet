@@ -92,6 +92,9 @@ export type ApiWallet = {
 export type ApiParticipationOpportunite = {
   id: string;
   opportuniteId: string;
+  montantGele?: number;
+  quantite?: number;
+  statut?: string;
   statutLivraison?: string;
   progressionLivraison?: number;
 };

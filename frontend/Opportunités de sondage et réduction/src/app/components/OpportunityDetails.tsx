@@ -5,7 +5,7 @@ import type { Opportunity, User } from '../App';
 interface OpportunityDetailsProps {
   opportunity: Opportunity;
   user: User;
-  onParticipate: (opportunityId: string) => void;
+  onParticipate: (opportunityId: string) => Promise<void>;
   onConfirmReception?: (participationId: string, recu: boolean, commentaire?: string) => void;
   onBack: () => void;
 }
@@ -14,6 +14,7 @@ export function OpportunityDetails({ opportunity, user, onParticipate, onConfirm
   const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
   const [participated, setParticipated] = useState(Boolean(opportunity.participationId));
   const [deliveryComment, setDeliveryComment] = useState('');
+  const [subscribing, setSubscribing] = useState(false);
 
   useEffect(() => {
     setParticipated(Boolean(opportunity.participationId));
@@ -49,10 +50,14 @@ export function OpportunityDetails({ opportunity, user, onParticipate, onConfirm
     .filter(bp => bp.participants > opportunity.currentParticipants)
     .sort((a, b) => a.participants - b.participants)[0];
 
-  const handleParticipate = () => {
-    if (canAfford && !participated) {
-      onParticipate(opportunity.id);
-      setParticipated(true);
+  const handleParticipate = async () => {
+    if (canAfford && !participated && !subscribing) {
+      setSubscribing(true);
+      try {
+        await onParticipate(opportunity.id);
+      } finally {
+        setSubscribing(false);
+      }
     }
   };
 
@@ -201,7 +206,7 @@ export function OpportunityDetails({ opportunity, user, onParticipate, onConfirm
 
           <button
             onClick={handleParticipate}
-            disabled={!canAfford || participated}
+            disabled={!canAfford || participated || subscribing}
             className={`w-full py-4 rounded-xl text-lg transition-colors ${
               participated
                 ? 'bg-success text-success-foreground cursor-not-allowed'
@@ -215,10 +220,28 @@ export function OpportunityDetails({ opportunity, user, onParticipate, onConfirm
                 <CheckCircle2 className="w-5 h-5" />
                 Participation confirmée
               </span>
+            ) : subscribing ? (
+              'Participation en cours…'
             ) : (
               `Participer pour ${opportunity.currentPrice.toLocaleString()} FCFA`
             )}
           </button>
+
+          {participated && (
+            <div className="rounded-xl border border-success/20 bg-success/10 p-4 text-sm text-success">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold">Vous participez déjà à cette opportunité.</p>
+                  <p className="mt-1 text-success/80">
+                    Statut : {(opportunity.participationStatus || 'EN_ATTENTE').replaceAll('_', ' ')}
+                    {opportunity.participationQuantity ? ` · Quantité : ${opportunity.participationQuantity}` : ''}
+                    {opportunity.participationAmount ? ` · Fonds gelés : ${opportunity.participationAmount.toLocaleString()} FCFA` : ''}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {!participated && (
             <div className="bg-accent/50 rounded-lg p-4 space-y-2 text-sm">

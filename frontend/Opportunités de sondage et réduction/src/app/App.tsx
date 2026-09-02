@@ -43,6 +43,9 @@ export interface Opportunity {
   imageUrl: string;
   category: string;
   participationId?: string;
+  participationStatus?: string;
+  participationQuantity?: number;
+  participationAmount?: number;
   deliveryStatus?: string;
   deliveryProgress?: number;
 }
@@ -95,7 +98,14 @@ function mapQuestion(q: any): SurveyQuestion {
   };
 }
 
-function mapOpportunity(op: ApiOpportunite, participation?: { id: string; progressionLivraison?: number; statutLivraison?: string }): Opportunity {
+function mapOpportunity(op: ApiOpportunite, participation?: {
+  id: string;
+  montantGele?: number;
+  quantite?: number;
+  statut?: string;
+  progressionLivraison?: number;
+  statutLivraison?: string;
+}): Opportunity {
   const paliers = (op.paliers || []).slice().sort((a, b) => a.seuilMin - b.seuilMin);
   const last = paliers[paliers.length - 1];
   return {
@@ -112,6 +122,9 @@ function mapOpportunity(op: ApiOpportunite, participation?: { id: string; progre
     imageUrl: assetUrl(op.images?.[0]?.url),
     category: op.categorie || 'Opportunité',
     participationId: participation?.id,
+    participationStatus: participation?.statut,
+    participationQuantity: participation?.quantite,
+    participationAmount: Number(participation?.montantGele || 0),
     deliveryStatus: participation?.statutLivraison,
     deliveryProgress: participation?.progressionLivraison,
   };
