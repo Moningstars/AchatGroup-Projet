@@ -106,6 +106,7 @@ public class PusherNotificationService {
                     "Vous avez reçu " + data.get("montant") + ("POINTS".equals(data.get("type")) ? " points." : " FCFA.")};
             case "OPPORTUNITE_VALIDEE" -> new String[]{"Achat groupé validé", "\"" + data.get("titre") + "\" a atteint son seuil minimum."};
             case "OPPORTUNITE_ECHEC" -> new String[]{"Opportunité annulée", "\"" + data.get("titre") + "\" n'a pas atteint son seuil."};
+            case "OPPORTUNITE_EXPIRATION_PROCHE" -> new String[]{"Expire bientôt", "\"" + data.get("titre") + "\" expire sous 24h."};
             case "KYC_SOUMIS" -> new String[]{"Nouvelle demande KYC", "Une vérification d'identité est à traiter."};
             case "RETRAIT_DEMANDE" -> new String[]{"Nouvelle demande de retrait", data.get("montant") + " FCFA à traiter."};
             case "OPPORTUNITE_PRESQUE_COMPLETE" -> new String[]{"Opportunité presque complète", "\"" + data.get("titre") + "\" approche son plafond."};

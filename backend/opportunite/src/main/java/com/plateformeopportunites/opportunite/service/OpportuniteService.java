@@ -527,6 +527,47 @@ public class OpportuniteService {
         }
     }
 
+    public void notifierSeuilAtteint(UUID opportuniteId) {
+        Opportunite opp = getOpportunite(opportuniteId);
+        if (opp.getParticipantsActuels() < opp.getSeuilMinimum()) return;
+        if (!redisService.marquerNotificationSiAbsent("opportunite:" + opportuniteId + ":seuil-minimum", 604_800)) return;
+
+        Map<String, Object> payload = Map.of(
+                "id", opp.getId(),
+                "titre", opp.getTitre(),
+                "participantsActuels", opp.getParticipantsActuels(),
+                "seuilMinimum", opp.getSeuilMinimum()
+        );
+        pusherNotificationService.notifierAdmins("OPPORTUNITE_VALIDEE", payload);
+        participationRepository.findByOpportuniteId(opportuniteId).forEach(p ->
+                pusherNotificationService.notifierUtilisateur(p.getUtilisateur().getId(), "OPPORTUNITE_VALIDEE", payload));
+    }
+
+    public void notifierExpirationsProches() {
+        LocalDateTime now = LocalDateTime.now();
+        List<Opportunite> bientotExpirees = opportuniteRepository.findByStatutAndDateExpirationBetween(
+                StatutOpportunite.ACTIVE,
+                now,
+                now.plusHours(24)
+        );
+        for (Opportunite opp : bientotExpirees) {
+            if (!redisService.marquerNotificationSiAbsent("opportunite:" + opp.getId() + ":expiration-24h", 172_800)) {
+                continue;
+            }
+            Map<String, Object> payload = Map.of(
+                    "id", opp.getId(),
+                    "titre", opp.getTitre(),
+                    "participantsActuels", opp.getParticipantsActuels(),
+                    "seuilMinimum", opp.getSeuilMinimum()
+            );
+            participationRepository.findByOpportuniteId(opp.getId()).forEach(p ->
+                    pusherNotificationService.notifierUtilisateur(p.getUtilisateur().getId(), "OPPORTUNITE_EXPIRATION_PROCHE", payload));
+            if (opp.getParticipantsActuels() < opp.getSeuilMinimum()) {
+                pusherNotificationService.notifierAdmins("OPPORTUNITE_RISQUE_ECHEC", payload);
+            }
+        }
+    }
+
     // ── Image management ─────────────────────────────────────────────────────
 
     @Transactional

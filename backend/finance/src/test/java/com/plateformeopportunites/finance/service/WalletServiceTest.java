@@ -3,11 +3,13 @@ package com.plateformeopportunites.finance.service;
 import com.plateformeopportunites.common.enums.StatutTransaction;
 import com.plateformeopportunites.common.enums.TypeTransaction;
 import com.plateformeopportunites.common.event.RetraitDemandeEvent;
+import com.plateformeopportunites.common.service.PusherNotificationService;
 import com.plateformeopportunites.finance.dto.RechargeRequest;
 import com.plateformeopportunites.finance.dto.RetraitRequest;
 import com.plateformeopportunites.finance.entity.Portefeuille;
 import com.plateformeopportunites.finance.repository.PortefeuilleRepository;
 import com.plateformeopportunites.finance.repository.TransactionRepository;
+import com.plateformeopportunites.identity.repository.UtilisateurRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -29,6 +31,8 @@ class WalletServiceTest {
     @Mock private PortefeuilleRepository portefeuilleRepository;
     @Mock private TransactionRepository transactionRepository;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private UtilisateurRepository utilisateurRepository;
+    @Mock private PusherNotificationService pusherNotificationService;
     @InjectMocks private WalletService walletService;
 
     private static final UUID PID = UUID.randomUUID();

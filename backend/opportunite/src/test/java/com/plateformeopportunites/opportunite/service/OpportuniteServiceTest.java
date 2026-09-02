@@ -4,6 +4,8 @@ import com.plateformeopportunites.common.enums.StatutOpportunite;
 import com.plateformeopportunites.common.enums.StatutParticipation;
 import com.plateformeopportunites.common.event.QuotaAtteintEvent;
 import com.plateformeopportunites.common.event.RemboursementEvent;
+import com.plateformeopportunites.common.redis.RedisService;
+import com.plateformeopportunites.common.service.PusherNotificationService;
 import com.plateformeopportunites.finance.service.WalletService;
 import com.plateformeopportunites.identity.entity.Utilisateur;
 import com.plateformeopportunites.identity.repository.AdministrateurRepository;
@@ -40,6 +42,8 @@ class OpportuniteServiceTest {
     @Mock private UtilisateurRepository utilisateurRepository;
     @Mock private AdministrateurRepository administrateurRepository;
     @Mock private WalletService walletService;
+    @Mock private RedisService redisService;
+    @Mock private PusherNotificationService pusherNotificationService;
     @Mock private ApplicationEventPublisher eventPublisher;
     @InjectMocks private OpportuniteService opportuniteService;
 
@@ -66,12 +70,30 @@ class OpportuniteServiceTest {
     // ── souscrire ────────────────────────────────────────────────────────────
 
     @Test
-    void souscrire_dejaInscrit_leveException() {
-        when(participationRepository.existsByUtilisateurIdAndOpportuniteId(PID, OPP_ID)).thenReturn(true);
+    void souscrire_dejaInscrit_augmenteQuantiteExistante() {
+        Opportunite opp = opportuniteActive(4, 10);
+        Participation existante = Participation.builder()
+                .id(UUID.randomUUID())
+                .utilisateur(utilisateur())
+                .opportunite(opp)
+                .quantite(2)
+                .montantGele(new BigDecimal("10000"))
+                .statut(StatutParticipation.EN_ATTENTE)
+                .build();
+        when(opportuniteRepository.findById(OPP_ID)).thenReturn(Optional.of(opp));
+        when(participationRepository.findByUtilisateurIdAndOpportuniteId(PID, OPP_ID)).thenReturn(Optional.of(existante));
+        when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
+        when(palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(OPP_ID)).thenReturn(List.of());
+        when(opportuniteRepository.save(any())).thenReturn(opp);
+        when(participationRepository.save(any())).thenReturn(existante);
 
-        assertThrows(IllegalArgumentException.class,
-                () -> opportuniteService.souscrire(PID, OPP_ID, 1));
-        verify(walletService, never()).gelerFonds(any(), any(), any());
+        opportuniteService.souscrire(PID, OPP_ID, 3);
+
+        // prix des unités ajoutées = prixNormal (5000) × quantite ajoutée (3) = 15000
+        verify(walletService).gelerFonds(PID, new BigDecimal("15000"), null);
+        assertEquals(5, existante.getQuantite()); // 2 + 3
+        assertEquals(new BigDecimal("25000"), existante.getMontantGele()); // 10000 + 15000
+        assertEquals(7, opp.getParticipantsActuels()); // 4 + 3
     }
 
     @Test
@@ -79,7 +101,6 @@ class OpportuniteServiceTest {
         Opportunite opp = opportuniteActive(0, 10);
         opp.setStatut(StatutOpportunite.BROUILLON);
         when(opportuniteRepository.findById(OPP_ID)).thenReturn(Optional.of(opp));
-        when(participationRepository.existsByUtilisateurIdAndOpportuniteId(PID, OPP_ID)).thenReturn(false);
 
         assertThrows(IllegalArgumentException.class,
                 () -> opportuniteService.souscrire(PID, OPP_ID, 1));
@@ -90,7 +111,6 @@ class OpportuniteServiceTest {
     void souscrire_geleLeFondsEtIncrementeParticipants() {
         Opportunite opp = opportuniteActive(4, 10);
         when(opportuniteRepository.findById(OPP_ID)).thenReturn(Optional.of(opp));
-        when(participationRepository.existsByUtilisateurIdAndOpportuniteId(PID, OPP_ID)).thenReturn(false);
         when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
         when(palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(OPP_ID)).thenReturn(List.of());
         when(participationRepository.save(any())).thenReturn(new Participation());
@@ -108,11 +128,11 @@ class OpportuniteServiceTest {
     void souscrire_seuilAtteint_publieQuotaAtteintEvent() {
         Opportunite opp = opportuniteActive(9, 10); // 9 participants, seuil 10
         when(opportuniteRepository.findById(OPP_ID)).thenReturn(Optional.of(opp));
-        when(participationRepository.existsByUtilisateurIdAndOpportuniteId(PID, OPP_ID)).thenReturn(false);
         when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
         when(palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(OPP_ID)).thenReturn(List.of());
         when(participationRepository.save(any())).thenReturn(new Participation());
         when(opportuniteRepository.save(any())).thenReturn(opp);
+        when(redisService.incrementerParticipants(any(UUID.class), anyInt())).thenReturn(10L);
 
         opportuniteService.souscrire(PID, OPP_ID, 1); // porte à 10 >= seuil
 
@@ -123,7 +143,6 @@ class OpportuniteServiceTest {
     void souscrire_seuilNonAtteint_nePasPublierEvenement() {
         Opportunite opp = opportuniteActive(3, 10); // 3 + 1 = 4, seuil 10
         when(opportuniteRepository.findById(OPP_ID)).thenReturn(Optional.of(opp));
-        when(participationRepository.existsByUtilisateurIdAndOpportuniteId(PID, OPP_ID)).thenReturn(false);
         when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
         when(palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(OPP_ID)).thenReturn(List.of());
         when(participationRepository.save(any())).thenReturn(new Participation());

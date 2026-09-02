@@ -2,7 +2,9 @@ package com.plateformeopportunites.sondage.service;
 
 import com.plateformeopportunites.common.enums.*;
 import com.plateformeopportunites.common.redis.RedisService;
+import com.plateformeopportunites.common.service.PusherNotificationService;
 import com.plateformeopportunites.finance.service.WalletService;
+import com.plateformeopportunites.identity.entity.Administrateur;
 import com.plateformeopportunites.identity.entity.Utilisateur;
 import com.plateformeopportunites.identity.repository.AdministrateurRepository;
 import com.plateformeopportunites.identity.repository.UtilisateurRepository;
@@ -42,6 +44,7 @@ class SondageServiceTest {
     @Mock private WalletService walletService;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private RedisService redisService;
+    @Mock private PusherNotificationService pusherNotificationService;
     @InjectMocks private SondageService sondageService;
 
     private static final UUID SONDAGE_ID = UUID.randomUUID();
@@ -84,6 +87,7 @@ class SondageServiceTest {
 
         sondageAvecSeuil70 = Sondage.builder()
                 .id(SONDAGE_ID)
+                .admin(Administrateur.builder().id(UUID.randomUUID()).build())
                 .titre("Sondage test")
                 .quotaVise(100)
                 .repondantsActuels(0)
@@ -226,6 +230,8 @@ class SondageServiceTest {
     @Test
     void repondre_dejaRepondu_leveException() {
         // Redis indique déjà voté
+                when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
+                when(sondageRepository.findById(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
         when(redisService.aDejaVote(SONDAGE_ID, PID)).thenReturn(true);
 
         assertThrows(IllegalArgumentException.class,
@@ -234,8 +240,7 @@ class SondageServiceTest {
 
     @Test
     void repondre_sansResultatEligibilite_leveException() {
-        stubRedisLibre();
-        when(sondageReponseRepository.existsBySondageIdAndUtilisateurId(SONDAGE_ID, PID)).thenReturn(false);
+                when(redisService.aDejaVote(SONDAGE_ID, PID)).thenReturn(false);
         when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
         when(sondageRepository.findById(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
         when(resultatEligibiliteRepository.findByUtilisateurIdAndSondageEligibilite_Sondage_Id(PID, SONDAGE_ID))
@@ -249,8 +254,7 @@ class SondageServiceTest {
     void repondre_nonEligible_leveException() {
         ResultatEligibilite nonEligible = ResultatEligibilite.builder()
                 .estEligible(false).tauxObtenu(new BigDecimal("30")).build();
-        stubRedisLibre();
-        when(sondageReponseRepository.existsBySondageIdAndUtilisateurId(SONDAGE_ID, PID)).thenReturn(false);
+        when(redisService.aDejaVote(SONDAGE_ID, PID)).thenReturn(false);
         when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
         when(sondageRepository.findById(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
         when(resultatEligibiliteRepository.findByUtilisateurIdAndSondageEligibilite_Sondage_Id(PID, SONDAGE_ID))
@@ -264,8 +268,7 @@ class SondageServiceTest {
     @Test
     void repondre_kycRequis_utilisateurNonVerifie_leveException() {
         sondageAvecSeuil70.setNiveauVerification(NiveauVerification.VERIFIE);
-        stubRedisLibre();
-        when(sondageReponseRepository.existsBySondageIdAndUtilisateurId(SONDAGE_ID, PID)).thenReturn(false);
+                when(redisService.aDejaVote(SONDAGE_ID, PID)).thenReturn(false);
 
         Utilisateur u = utilisateur();
         u.setNiveauVerification(NiveauVerification.AUCUN); // pas vérifié
@@ -431,12 +434,13 @@ class SondageServiceTest {
 
     private void stubRedisLibre() {
         when(redisService.aDejaVote(SONDAGE_ID, PID)).thenReturn(false);
-        when(redisService.marquerVoteSiAbsent(eq(SONDAGE_ID), eq(PID), anyLong())).thenReturn(true);
+                lenient().when(redisService.marquerVoteSiAbsent(eq(SONDAGE_ID), eq(PID), anyLong())).thenReturn(true);
     }
 
     private Sondage sondageBrouillon() {
         return Sondage.builder()
                 .id(SONDAGE_ID)
+                .admin(Administrateur.builder().id(UUID.randomUUID()).build())
                 .statut(StatutSondage.BROUILLON)
                 .niveauVerification(NiveauVerification.AUCUN)
                 .modeDistribution(ModeDistribution.AUTO)
