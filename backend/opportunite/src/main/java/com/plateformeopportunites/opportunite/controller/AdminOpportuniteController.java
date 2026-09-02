@@ -64,7 +64,7 @@ public class AdminOpportuniteController {
 
     @PatchMapping("/{id}/cloturer")
     public ResponseEntity<Void> cloturer(@PathVariable UUID id) {
-        opportuniteService.cloturerAvecSucces(id);
+        opportuniteService.cloturerManuellement(id);
         return ResponseEntity.ok().build();
     }
 

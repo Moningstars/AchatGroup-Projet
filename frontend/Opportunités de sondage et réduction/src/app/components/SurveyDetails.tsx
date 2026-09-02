@@ -1,39 +1,47 @@
 import { useState } from 'react';
-import { ArrowLeft, Award, Clock, Users, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, Award, Clock, Users, AlertCircle, CheckCircle2 } from 'lucide-react';
 import type { Survey, User, SurveyQuestion } from '../App';
 
 interface SurveyDetailsProps {
   survey: Survey;
   user: User;
-  onComplete: (surveyId: string) => void;
+  onLoadEligibility: (surveyId: string) => Promise<void>;
+  onComplete: (
+    surveyId: string,
+    eligibilityAnswers: Record<string, string[]>,
+    surveyAnswers: Record<string, string[]>,
+  ) => Promise<void>;
   onBack: () => void;
 }
 
-export function SurveyDetails({ survey, user, onComplete, onBack }: SurveyDetailsProps) {
+export function SurveyDetails({ survey, user, onLoadEligibility, onComplete, onBack }: SurveyDetailsProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
+  const [eligibilityAnswers, setEligibilityAnswers] = useState<Record<string, string[]>>({});
   const [showEligibilityCheck, setShowEligibilityCheck] = useState(true);
   const [isEligible, setIsEligible] = useState<boolean | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const eligibilityLabels: Record<string, string> = {
-    'canalbox_fibre': 'Abonné Canalbox Fibre',
-    'haojue_moto': 'Propriétaire Moto Haojue',
-    'mtn_mobile': 'Abonné MTN',
-    'moov_mobile': 'Abonné Moov'
-  };
-
-  const checkEligibility = () => {
-    const eligible = survey.eligibilityCriteria.every(criteria =>
-      user.eligibilities.includes(criteria)
-    );
-    setIsEligible(eligible);
-    if (eligible) {
-      setShowEligibilityCheck(false);
+  const checkEligibility = async () => {
+    if (survey.eligibilityCriteria.length > 0 && survey.eligibilityQuestions.length === 0) {
+      await onLoadEligibility(survey.id);
+      return;
     }
+    const missingRequired = survey.eligibilityQuestions.some(q =>
+      q.required !== false && !(eligibilityAnswers[q.id]?.length > 0)
+    );
+    if (missingRequired) {
+      setIsEligible(false);
+      return;
+    }
+    await onLoadEligibility(survey.id);
+    setIsEligible(true);
+    setShowEligibilityCheck(false);
   };
 
-  const handleAnswer = (questionId: string, value: string, isMultiple: boolean) => {
-    setAnswers(prev => {
+  const handleAnswer = (questionId: string, value: string, isMultiple: boolean, eligibility = false) => {
+    const setter = eligibility ? setEligibilityAnswers : setAnswers;
+    setter(prev => {
       if (isMultiple) {
         const current = prev[questionId] || [];
         if (current.includes(value)) {
@@ -51,9 +59,14 @@ export function SurveyDetails({ survey, user, onComplete, onBack }: SurveyDetail
   const isLastQuestion = currentQuestionIndex === survey.questions.length - 1;
   const hasAnswered = answers[currentQuestion?.id]?.length > 0;
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (isLastQuestion) {
-      onComplete(survey.id);
+      setSubmitting(true);
+      try {
+        await onComplete(survey.id, eligibilityAnswers, answers);
+      } finally {
+        setSubmitting(false);
+      }
     } else {
       setCurrentQuestionIndex(prev => prev + 1);
     }
@@ -121,31 +134,43 @@ export function SurveyDetails({ survey, user, onComplete, onBack }: SurveyDetail
               <CheckCircle2 className="w-5 h-5 text-primary" />
               Vérification d'éligibilité
             </h3>
-            <p className="text-sm text-muted-foreground">
-              Pour participer à ce sondage, vous devez répondre aux critères suivants :
-            </p>
-            <div className="space-y-2">
-              {survey.eligibilityCriteria.map((criteria, idx) => {
-                const userHasCriteria = user.eligibilities.includes(criteria);
-                return (
-                  <div
-                    key={idx}
-                    className={`flex items-center gap-3 p-3 rounded-lg ${
-                      userHasCriteria
-                        ? 'bg-success/10 text-success'
-                        : 'bg-destructive/10 text-destructive'
-                    }`}
-                  >
-                    {userHasCriteria ? (
-                      <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+            {survey.eligibilityQuestions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Cliquez pour charger ou valider le test d’éligibilité avant de répondre.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {survey.eligibilityQuestions.map(question => (
+                  <div key={question.id} className="rounded-xl border border-border bg-muted/20 p-4">
+                    <p className="font-medium">{question.question}</p>
+                    {question.type === 'text' ? (
+                      <textarea
+                        value={eligibilityAnswers[question.id]?.[0] || ''}
+                        onChange={(e) => handleAnswer(question.id, e.target.value, false, true)}
+                        placeholder="Votre réponse..."
+                        className="mt-3 w-full min-h-20 p-3 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                      />
                     ) : (
-                      <XCircle className="w-5 h-5 flex-shrink-0" />
+                      <div className="mt-3 space-y-2">
+                        {question.options?.map(option => {
+                          const selected = eligibilityAnswers[question.id]?.includes(option.id);
+                          const multiple = question.type === 'multiple';
+                          return (
+                            <button
+                              key={option.id}
+                              onClick={() => handleAnswer(question.id, option.id, multiple, true)}
+                              className={`w-full rounded-lg border p-3 text-left transition ${selected ? 'border-secondary bg-secondary/10' : 'border-border bg-card hover:bg-muted/50'}`}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     )}
-                    <span>{eligibilityLabels[criteria] || criteria}</span>
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {isEligible === false && (
@@ -162,14 +187,16 @@ export function SurveyDetails({ survey, user, onComplete, onBack }: SurveyDetail
 
           <button
             onClick={checkEligibility}
-            disabled={isEligible === false}
+            disabled={false}
             className={`w-full py-4 rounded-xl text-lg transition-colors ${
-              isEligible === false
-                ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                : 'bg-primary text-primary-foreground hover:bg-primary/90'
+              'bg-primary text-primary-foreground hover:bg-primary/90'
             }`}
           >
-            {isEligible === false ? 'Non éligible' : 'Vérifier et commencer'}
+            {survey.eligibilityCriteria.length > 0 && survey.eligibilityQuestions.length === 0
+              ? 'Charger le test'
+              : isEligible === false
+                ? 'Réponses manquantes'
+                : 'Valider et commencer'}
           </button>
 
           <div className="flex items-center justify-between text-sm text-muted-foreground">
@@ -225,14 +252,14 @@ export function SurveyDetails({ survey, user, onComplete, onBack }: SurveyDetail
             />
           ) : (
             <div className="space-y-3">
-              {currentQuestion.options?.map((option, idx) => {
-                const isSelected = answers[currentQuestion.id]?.includes(option);
+              {currentQuestion.options?.map((option) => {
+                const isSelected = answers[currentQuestion.id]?.includes(option.id);
                 const isMultiple = currentQuestion.type === 'multiple';
 
                 return (
                   <button
-                    key={idx}
-                    onClick={() => handleAnswer(currentQuestion.id, option, isMultiple)}
+                    key={option.id}
+                    onClick={() => handleAnswer(currentQuestion.id, option.id, isMultiple)}
                     className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
                       isSelected
                         ? 'border-secondary bg-secondary/10'
@@ -251,7 +278,7 @@ export function SurveyDetails({ survey, user, onComplete, onBack }: SurveyDetail
                           <CheckCircle2 className="w-4 h-4 text-secondary-foreground" />
                         )}
                       </div>
-                      <span>{option}</span>
+                      <span>{option.label}</span>
                     </div>
                   </button>
                 );
@@ -277,14 +304,14 @@ export function SurveyDetails({ survey, user, onComplete, onBack }: SurveyDetail
           )}
           <button
             onClick={handleNext}
-            disabled={!hasAnswered}
+            disabled={!hasAnswered || submitting}
             className={`flex-1 py-3 rounded-lg transition-colors ${
               hasAnswered
                 ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                 : 'bg-muted text-muted-foreground cursor-not-allowed'
             }`}
           >
-            {isLastQuestion ? 'Terminer et recevoir la récompense' : 'Suivant'}
+            {submitting ? 'Envoi en cours…' : isLastQuestion ? 'Terminer et recevoir la récompense' : 'Suivant'}
           </button>
         </div>
       </div>

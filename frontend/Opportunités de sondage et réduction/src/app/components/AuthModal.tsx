@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Eye, EyeOff, Star, ArrowRight, Zap, X } from 'lucide-react';
+import { Star, ArrowRight, Zap, X } from 'lucide-react';
 import type { User } from '../App';
 
-const DEMO_ACCOUNTS: (User & { email: string; password: string; tagline: string })[] = [
+const DEMO_ACCOUNTS: (User & { telephone: string; tagline: string })[] = [
   {
     id: '1',
     name: 'Kofi Mensah',
-    email: 'kofi@demo.com',
-    password: 'demo123',
+    telephone: '+22890000001',
     balance: 50000,
     points: 1500,
     eligibilities: ['canalbox_fibre', 'haojue_moto'],
@@ -17,8 +16,7 @@ const DEMO_ACCOUNTS: (User & { email: string; password: string; tagline: string 
   {
     id: '2',
     name: 'Ama Adjei',
-    email: 'ama@demo.com',
-    password: 'demo123',
+    telephone: '+22890000002',
     balance: 25000,
     points: 320,
     eligibilities: ['canalbox_fibre'],
@@ -27,8 +25,7 @@ const DEMO_ACCOUNTS: (User & { email: string; password: string; tagline: string 
   {
     id: '3',
     name: 'Kwame Boateng',
-    email: 'kwame@demo.com',
-    password: 'demo123',
+    telephone: '+22890000003',
     balance: 10000,
     points: 0,
     eligibilities: [],
@@ -37,14 +34,12 @@ const DEMO_ACCOUNTS: (User & { email: string; password: string; tagline: string 
 ];
 
 interface AuthModalProps {
-  onLogin: (user: User) => void;
+  onLogin: (telephone: string) => Promise<void>;
   onClose: () => void;
 }
 
 export function AuthModal({ onLogin, onClose }: AuthModalProps) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [telephone, setTelephone] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeDemo, setActiveDemo] = useState<string | null>(null);
@@ -53,24 +48,16 @@ export function AuthModal({ onLogin, onClose }: AuthModalProps) {
     e.preventDefault();
     setError('');
     setLoading(true);
-    setTimeout(() => {
-      const account = DEMO_ACCOUNTS.find(a => a.email === email && a.password === password);
-      if (account) {
-        const { email: _e, password: _p, tagline: _t, ...user } = account;
-        onLogin(user);
-      } else {
-        setError('Email ou mot de passe incorrect. Utilisez un compte démo ci-dessous.');
-        setLoading(false);
-      }
-    }, 900);
+    onLogin(telephone.trim())
+      .catch(err => setError(err instanceof Error ? err.message : 'Connexion impossible'))
+      .finally(() => setLoading(false));
   };
 
   const handleDemoLogin = (account: typeof DEMO_ACCOUNTS[0]) => {
     setActiveDemo(account.id);
-    setTimeout(() => {
-      const { email: _e, password: _p, tagline: _t, ...user } = account;
-      onLogin(user);
-    }, 600);
+    onLogin(account.telephone)
+      .catch(err => setError(err instanceof Error ? err.message : 'Connexion impossible'))
+      .finally(() => setActiveDemo(null));
   };
 
   return (
@@ -170,36 +157,15 @@ export function AuthModal({ onLogin, onClose }: AuthModalProps) {
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-3.5">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Adresse email</label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Téléphone</label>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="votre@email.com"
+                  type="tel"
+                  value={telephone}
+                  onChange={e => setTelephone(e.target.value)}
+                  placeholder="+22890000001"
                   className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all text-sm"
                   required
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Mot de passe</label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all pr-11 text-sm"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
               </div>
 
               {error && (

@@ -38,14 +38,14 @@ public class SecurityConfig {
                         // Routes protégées qui correspondent sinon aux patterns publics ci-dessous
                         .requestMatchers(
                                 new AntPathRequestMatcher("/api/opportunites/mes-participations", HttpMethod.GET.name()),
+                                new AntPathRequestMatcher("/api/opportunites/*/souscrire", HttpMethod.POST.name()),
+                                new AntPathRequestMatcher("/api/opportunites/mes-participations/*/reception", HttpMethod.PATCH.name()),
                                 new AntPathRequestMatcher("/api/sondages/mes-participations", HttpMethod.GET.name())
                         ).hasRole("PARTICIPANT")
                         .requestMatchers(
                                 AntPathRequestMatcher.antMatcher("/api/auth/verifier-token"),
                                 AntPathRequestMatcher.antMatcher("/api/auth/dev/**"),
                                 AntPathRequestMatcher.antMatcher("/api/admin/auth/**"),
-                                AntPathRequestMatcher.antMatcher("/api/opportunites"),
-                                AntPathRequestMatcher.antMatcher("/api/opportunites/**"),
                                 AntPathRequestMatcher.antMatcher("/api/stats"),
                                 AntPathRequestMatcher.antMatcher("/api/bannieres"),
                                 AntPathRequestMatcher.antMatcher("/api/events/opportunite/**"),
@@ -60,6 +60,8 @@ public class SecurityConfig {
                                 AntPathRequestMatcher.antMatcher("/api/wallet/recharger/paygate/mode")
                         ).permitAll()
                         .requestMatchers(
+                                new AntPathRequestMatcher("/api/opportunites", HttpMethod.GET.name()),
+                                new AntPathRequestMatcher("/api/opportunites/*", HttpMethod.GET.name()),
                                 new AntPathRequestMatcher("/api/sondages", HttpMethod.GET.name()),
                                 new AntPathRequestMatcher("/api/sondages/*", HttpMethod.GET.name()),
                                 // Questions d'éligibilité publiques — /mon-eligibilite reste protégé (PARTICIPANT)

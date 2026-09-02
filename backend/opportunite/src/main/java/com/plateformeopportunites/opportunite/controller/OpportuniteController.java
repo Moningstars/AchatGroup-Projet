@@ -9,7 +9,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.constraints.Min;
 
 import java.util.List;
 import java.util.UUID;
@@ -17,6 +19,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/opportunites")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Opportunités", description = "Consultation et souscription aux opportunités d'achat groupé")
 public class OpportuniteController {
 
@@ -40,7 +43,7 @@ public class OpportuniteController {
     @PostMapping("/{id}/souscrire")
     public ResponseEntity<Void> souscrire(Authentication auth,
                                           @PathVariable UUID id,
-                                          @RequestParam(defaultValue = "1") Integer quantite) {
+                                          @RequestParam(defaultValue = "1") @Min(1) Integer quantite) {
         opportuniteService.souscrire(UUID.fromString(auth.getName()), id, quantite);
         return ResponseEntity.ok().build();
     }

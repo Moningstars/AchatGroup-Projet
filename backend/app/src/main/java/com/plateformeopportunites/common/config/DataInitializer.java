@@ -85,6 +85,22 @@ public class DataInitializer implements CommandLineRunner {
             "ALTER TABLE utilisateurs DROP CONSTRAINT IF EXISTS utilisateurs_niveau_verification_check",
             "ALTER TABLE transactions_plateforme DROP CONSTRAINT IF EXISTS transactions_plateforme_type_check",
             "ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_type_check",
+            "ALTER TABLE participations DROP CONSTRAINT IF EXISTS participations_statut_livraison_check",
+            "ALTER TABLE participations ADD COLUMN IF NOT EXISTS creneau_traitement TIMESTAMP",
+            "ALTER TABLE participations ADD COLUMN IF NOT EXISTS date_preparation TIMESTAMP",
+            "ALTER TABLE participations ADD COLUMN IF NOT EXISTS date_expedition TIMESTAMP",
+            "ALTER TABLE participations ADD COLUMN IF NOT EXISTS date_livraison_prevue TIMESTAMP",
+            "ALTER TABLE participations ADD COLUMN IF NOT EXISTS date_remise TIMESTAMP",
+            "ALTER TABLE participations ADD COLUMN IF NOT EXISTS date_confirmation_participant TIMESTAMP",
+            "ALTER TABLE participations ADD COLUMN IF NOT EXISTS priorite_traitement BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE participations ADD COLUMN IF NOT EXISTS statut_livraison VARCHAR(255) DEFAULT 'EN_ATTENTE_QUOTA'",
+            "ALTER TABLE participations ADD COLUMN IF NOT EXISTS transporteur VARCHAR(120)",
+            "ALTER TABLE participations ADD COLUMN IF NOT EXISTS reference_livraison VARCHAR(120)",
+            "ALTER TABLE participations ADD COLUMN IF NOT EXISTS adresse_livraison VARCHAR(255)",
+            "ALTER TABLE participations ADD COLUMN IF NOT EXISTS note_traitement VARCHAR(500)",
+            "ALTER TABLE participations ADD COLUMN IF NOT EXISTS note_livraison VARCHAR(500)",
+            "ALTER TABLE participations ADD COLUMN IF NOT EXISTS commentaire_participant_livraison VARCHAR(500)",
+            "ALTER TABLE sondages ADD COLUMN IF NOT EXISTS budget_libere BOOLEAN DEFAULT FALSE",
             "UPDATE sondages SET budget_libere = FALSE WHERE budget_libere IS NULL",
         };
         String[] recreate = {
@@ -92,6 +108,8 @@ public class DataInitializer implements CommandLineRunner {
                 "CHECK (type IN ('ALIMENTATION','DISTRIBUTION_AUTO','DISTRIBUTION_MANUELLE','RESERVATION_BUDGET','LIBERATION_BUDGET'))",
             "ALTER TABLE transactions ADD CONSTRAINT transactions_type_check " +
                 "CHECK (type IN ('DEPOT','GEL','DEBIT','REMBOURSEMENT','RECOMPENSE','RETRAIT','CONVERSION_POINTS'))",
+            "ALTER TABLE participations ADD CONSTRAINT participations_statut_livraison_check " +
+                "CHECK (statut_livraison IN ('EN_ATTENTE_QUOTA','A_PREPARER','PREPARATION','PRET_LIVRAISON','EN_LIVRAISON','LIVRE_A_CONFIRMER','LIVRE_CONFIRME','ECHEC_LIVRAISON','LITIGE','ANNULE'))",
         };
         for (String sql : drop) {
             try { jdbcTemplate.execute(sql); }

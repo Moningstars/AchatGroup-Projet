@@ -255,7 +255,22 @@ CREATE TABLE public.participations (
     opportunite_id uuid NOT NULL,
     transaction_id uuid,
     utilisateur_id uuid NOT NULL,
+    creneau_traitement timestamp(6) without time zone,
+    date_confirmation_participant timestamp(6) without time zone,
+    date_expedition timestamp(6) without time zone,
+    date_livraison_prevue timestamp(6) without time zone,
+    date_preparation timestamp(6) without time zone,
+    date_remise timestamp(6) without time zone,
+    priorite_traitement boolean DEFAULT false,
+    adresse_livraison character varying(255),
+    commentaire_participant_livraison character varying(500),
+    note_livraison character varying(500),
+    note_traitement character varying(500),
+    reference_livraison character varying(120),
+    statut_livraison character varying(255) DEFAULT 'EN_ATTENTE_QUOTA'::character varying,
+    transporteur character varying(120),
     statut character varying(255) NOT NULL,
+    CONSTRAINT participations_statut_livraison_check CHECK (((statut_livraison)::text = ANY ((ARRAY['EN_ATTENTE_QUOTA'::character varying, 'A_PREPARER'::character varying, 'PREPARATION'::character varying, 'PRET_LIVRAISON'::character varying, 'EN_LIVRAISON'::character varying, 'LIVRE_A_CONFIRMER'::character varying, 'LIVRE_CONFIRME'::character varying, 'ECHEC_LIVRAISON'::character varying, 'LITIGE'::character varying, 'ANNULE'::character varying])::text[]))),
     CONSTRAINT participations_statut_check CHECK (((statut)::text = ANY ((ARRAY['EN_ATTENTE'::character varying, 'CONFIRMEE'::character varying, 'REMBOURSEE'::character varying])::text[])))
 );
 
@@ -338,6 +353,7 @@ CREATE TABLE public.resultats_eligibilite (
 --
 
 CREATE TABLE public.sondages (
+    budget_libere boolean DEFAULT false,
     budget_distribue numeric(15,2),
     budget_reserve numeric(15,2),
     quota_vise integer NOT NULL,
@@ -966,4 +982,3 @@ ALTER TABLE ONLY public.resultats_eligibilite
 --
 
 \unrestrict LjA0RHyYy24etWYT5YOAxIucdppGa4lmAHv5ggQTWlGA7VBSen9f5QtiSB4iXeQ
-

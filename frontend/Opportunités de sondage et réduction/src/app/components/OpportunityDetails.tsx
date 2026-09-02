@@ -6,12 +6,18 @@ interface OpportunityDetailsProps {
   opportunity: Opportunity;
   user: User;
   onParticipate: (opportunityId: string) => void;
+  onConfirmReception?: (participationId: string, recu: boolean, commentaire?: string) => void;
   onBack: () => void;
 }
 
-export function OpportunityDetails({ opportunity, user, onParticipate, onBack }: OpportunityDetailsProps) {
+export function OpportunityDetails({ opportunity, user, onParticipate, onConfirmReception, onBack }: OpportunityDetailsProps) {
   const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
-  const [participated, setParticipated] = useState(false);
+  const [participated, setParticipated] = useState(Boolean(opportunity.participationId));
+  const [deliveryComment, setDeliveryComment] = useState('');
+
+  useEffect(() => {
+    setParticipated(Boolean(opportunity.participationId));
+  }, [opportunity.participationId]);
 
   const formatTimeRemaining = (deadline: Date) => {
     const now = new Date();
@@ -49,6 +55,11 @@ export function OpportunityDetails({ opportunity, user, onParticipate, onBack }:
       setParticipated(true);
     }
   };
+
+  const canConfirmReception = Boolean(
+    opportunity.participationId &&
+    (opportunity.deliveryStatus === 'EN_LIVRAISON' || opportunity.deliveryStatus === 'LIVRE_A_CONFIRMER')
+  );
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -218,6 +229,48 @@ export function OpportunityDetails({ opportunity, user, onParticipate, onBack }:
                 <li>• Si l'objectif est atteint, vous recevez l'article au prix réduit</li>
                 <li>• Si l'objectif n'est pas atteint avant la fin, vous êtes remboursé intégralement</li>
               </ul>
+            </div>
+          )}
+
+          {participated && opportunity.deliveryStatus && (
+            <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h4>Suivi de votre livraison</h4>
+                  <p className="text-muted-foreground">Statut : {opportunity.deliveryStatus.replaceAll('_', ' ')}</p>
+                </div>
+                <span className="font-mono text-primary">{opportunity.deliveryProgress || 0}%</span>
+              </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-secondary transition-all"
+                  style={{ width: `${Math.min(opportunity.deliveryProgress || 0, 100)}%` }}
+                />
+              </div>
+              {canConfirmReception && opportunity.participationId && onConfirmReception && (
+                <div className="space-y-2">
+                  <textarea
+                    value={deliveryComment}
+                    onChange={e => setDeliveryComment(e.target.value)}
+                    placeholder="Commentaire optionnel sur la livraison..."
+                    className="w-full min-h-20 p-3 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                  />
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <button
+                      onClick={() => onConfirmReception(opportunity.participationId!, true, deliveryComment)}
+                      className="rounded-lg bg-success px-4 py-3 font-semibold text-success-foreground"
+                    >
+                      Confirmer la réception
+                    </button>
+                    <button
+                      onClick={() => onConfirmReception(opportunity.participationId!, false, deliveryComment)}
+                      className="rounded-lg bg-destructive/10 px-4 py-3 font-semibold text-destructive"
+                    >
+                      Signaler un problème
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

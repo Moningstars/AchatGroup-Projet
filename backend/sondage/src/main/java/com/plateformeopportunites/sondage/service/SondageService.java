@@ -37,7 +37,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -326,6 +330,7 @@ public class SondageService {
                 .orElseThrow(() -> new IllegalArgumentException("Pas de test d'éligibilité pour ce sondage"));
 
         List<QuestionEligibilite> questions = eligibilite.getQuestions();
+        validerReponsesEligibilite(questions, req);
         long correctes = req.getReponses().stream()
                 .filter(r -> questions.stream()
                         .filter(q -> q.getId().equals(r.getQuestionId()))
@@ -379,6 +384,9 @@ public class SondageService {
         if (!resultat.getEstEligible()) {
             throw new IllegalArgumentException("Non éligible à ce sondage");
         }
+
+        List<Question> questions = questionRepository.findBySondageIdOrderByOrdre(sondageId);
+        validerReponsesSondage(questions, req);
 
         // Vérification Redis — atomique, évite les race conditions une fois les règles métier validées.
         if (redisService.aDejaVote(sondageId, participantId)) {
@@ -705,6 +713,112 @@ public class SondageService {
         if (Boolean.TRUE.equals(sondage.getBudgetLibere())) return BigDecimal.ZERO;
         BigDecimal restant = zero(sondage.getBudgetReserve()).subtract(zero(sondage.getBudgetDistribue()));
         return restant.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : restant;
+    }
+
+    private void validerReponsesEligibilite(List<QuestionEligibilite> questions, EligibiliteRequest req) {
+        Map<UUID, QuestionEligibilite> questionsParId = questions.stream()
+                .collect(Collectors.toMap(QuestionEligibilite::getId, q -> q));
+        Map<UUID, Set<UUID>> optionsParQuestion = new HashMap<>();
+        for (QuestionEligibilite q : questions) {
+            Set<UUID> optionIds = q.getOptions() == null ? Set.of() : q.getOptions().stream()
+                    .map(OptionEligibilite::getId)
+                    .collect(Collectors.toSet());
+            optionsParQuestion.put(q.getId(), optionIds);
+        }
+
+        Set<UUID> questionsRepondues = new HashSet<>();
+        Set<String> couples = new HashSet<>();
+        for (EligibiliteRequest.ReponseEligibiliteRequest reponse : req.getReponses()) {
+            QuestionEligibilite question = questionsParId.get(reponse.getQuestionId());
+            if (question == null) {
+                throw new IllegalArgumentException("Une réponse d'éligibilité cible une question qui n'appartient pas à ce sondage");
+            }
+            boolean hasOption = reponse.getOptionId() != null;
+            boolean hasTexte = reponse.getValeurTexte() != null && !reponse.getValeurTexte().isBlank();
+            if (question.getTypeQuestion() == TypeQuestion.TEXTE_LIBRE) {
+                if (!hasTexte) throw new IllegalArgumentException("Une question texte obligatoire doit recevoir une réponse texte");
+                if (hasOption) throw new IllegalArgumentException("Une question texte ne doit pas recevoir d'option");
+            } else if (question.getTypeQuestion() == TypeQuestion.OUI_NON) {
+                String valeur = reponse.getValeurTexte() == null ? "" : reponse.getValeurTexte().trim().toLowerCase();
+                if (!hasTexte || !Set.of("oui", "non", "true", "false").contains(valeur)) {
+                    throw new IllegalArgumentException("Une question OUI/NON doit recevoir une réponse oui/non");
+                }
+                if (hasOption) throw new IllegalArgumentException("Une question OUI/NON ne doit pas recevoir d'option");
+                if (!questionsRepondues.add(question.getId())) {
+                    throw new IllegalArgumentException("Une question OUI/NON ne peut recevoir qu'une seule réponse");
+                }
+            } else {
+                if (!hasOption) throw new IllegalArgumentException("Une question à choix doit recevoir une option");
+                if (!optionsParQuestion.getOrDefault(question.getId(), Set.of()).contains(reponse.getOptionId())) {
+                    throw new IllegalArgumentException("Une réponse d'éligibilité utilise une option qui n'appartient pas à sa question");
+                }
+                if (question.getTypeQuestion() != TypeQuestion.CHOIX_MULTIPLE && !questionsRepondues.add(question.getId())) {
+                    throw new IllegalArgumentException("Une question à choix unique ne peut recevoir qu'une seule réponse");
+                }
+                String couple = question.getId() + ":" + reponse.getOptionId();
+                if (!couples.add(couple)) {
+                    throw new IllegalArgumentException("Une même option d'éligibilité ne peut pas être envoyée plusieurs fois");
+                }
+            }
+        }
+        for (QuestionEligibilite q : questions) {
+            if (Boolean.TRUE.equals(q.getObligatoire()) && !req.getReponses().stream().anyMatch(r -> q.getId().equals(r.getQuestionId()))) {
+                throw new IllegalArgumentException("Toutes les questions obligatoires d'éligibilité doivent être renseignées");
+            }
+        }
+    }
+
+    private void validerReponsesSondage(List<Question> questions, RepondreRequest req) {
+        Map<UUID, Question> questionsParId = questions.stream()
+                .collect(Collectors.toMap(Question::getId, q -> q));
+        Map<UUID, Set<UUID>> optionsParQuestion = new HashMap<>();
+        for (Question q : questions) {
+            Set<UUID> optionIds = q.getOptions() == null ? Set.of() : q.getOptions().stream()
+                    .map(OptionReponse::getId)
+                    .collect(Collectors.toSet());
+            optionsParQuestion.put(q.getId(), optionIds);
+        }
+
+        Set<UUID> questionsChoixUnique = new HashSet<>();
+        Set<String> couples = new HashSet<>();
+        for (RepondreRequest.ReponseDetailRequest reponse : req.getReponses()) {
+            Question question = questionsParId.get(reponse.getQuestionId());
+            if (question == null) {
+                throw new IllegalArgumentException("Une réponse cible une question qui n'appartient pas à ce sondage");
+            }
+            boolean hasOption = reponse.getOptionReponseId() != null;
+            boolean hasTexte = reponse.getValeurTexte() != null && !reponse.getValeurTexte().isBlank();
+            if (question.getTypeQuestion() == TypeQuestion.TEXTE_LIBRE) {
+                if (!hasTexte) throw new IllegalArgumentException("Une question texte obligatoire doit recevoir une réponse texte");
+                if (hasOption) throw new IllegalArgumentException("Une question texte ne doit pas recevoir d'option");
+            } else if (question.getTypeQuestion() == TypeQuestion.OUI_NON) {
+                String valeur = reponse.getValeurTexte() == null ? "" : reponse.getValeurTexte().trim().toLowerCase();
+                if (!hasTexte || !Set.of("oui", "non", "true", "false").contains(valeur)) {
+                    throw new IllegalArgumentException("Une question OUI/NON doit recevoir une réponse oui/non");
+                }
+                if (hasOption) throw new IllegalArgumentException("Une question OUI/NON ne doit pas recevoir d'option");
+                if (!questionsChoixUnique.add(question.getId())) {
+                    throw new IllegalArgumentException("Une question OUI/NON ne peut recevoir qu'une seule réponse");
+                }
+            } else {
+                if (!hasOption) throw new IllegalArgumentException("Une question à choix doit recevoir une option");
+                if (!optionsParQuestion.getOrDefault(question.getId(), Set.of()).contains(reponse.getOptionReponseId())) {
+                    throw new IllegalArgumentException("Une réponse utilise une option qui n'appartient pas à sa question");
+                }
+                if (question.getTypeQuestion() == TypeQuestion.CHOIX_UNIQUE && !questionsChoixUnique.add(question.getId())) {
+                    throw new IllegalArgumentException("Une question à choix unique ne peut recevoir qu'une seule réponse");
+                }
+                String couple = question.getId() + ":" + reponse.getOptionReponseId();
+                if (!couples.add(couple)) {
+                    throw new IllegalArgumentException("Une même option ne peut pas être envoyée plusieurs fois");
+                }
+            }
+        }
+        for (Question q : questions) {
+            if (Boolean.TRUE.equals(q.getObligatoire()) && !req.getReponses().stream().anyMatch(r -> q.getId().equals(r.getQuestionId()))) {
+                throw new IllegalArgumentException("Toutes les questions obligatoires du sondage doivent être renseignées");
+            }
+        }
     }
 
     private void libererReliquatSiNecessaire(Sondage sondage) {

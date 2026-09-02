@@ -185,6 +185,9 @@ public class WalletService {
 
     @Transactional
     public void gelerFonds(UUID participantId, BigDecimal montant, UUID walletId) {
+        if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Le montant à geler doit être strictement positif");
+        }
         Portefeuille portefeuille = getPortefeuille(participantId);
         if (portefeuille.getSoldeDisponible().compareTo(montant) < 0) {
             throw new IllegalArgumentException("Solde insuffisant pour participer");
@@ -197,14 +200,26 @@ public class WalletService {
 
     @Transactional
     public void debiterFinal(UUID participantId, BigDecimal montant) {
+        if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Le montant à débiter doit être strictement positif");
+        }
         Portefeuille portefeuille = getPortefeuille(participantId);
+        if (portefeuille.getSoldeGele().compareTo(montant) < 0) {
+            throw new IllegalStateException("Solde gelé insuffisant pour finaliser le débit");
+        }
         portefeuille.setSoldeGele(portefeuille.getSoldeGele().subtract(montant));
         portefeuilleRepository.save(portefeuille);
     }
 
     @Transactional
     public void rembourser(UUID participantId, BigDecimal montant) {
+        if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Le montant à rembourser doit être strictement positif");
+        }
         Portefeuille portefeuille = getPortefeuille(participantId);
+        if (portefeuille.getSoldeGele().compareTo(montant) < 0) {
+            throw new IllegalStateException("Solde gelé insuffisant pour rembourser");
+        }
         portefeuille.setSoldeGele(portefeuille.getSoldeGele().subtract(montant));
         portefeuille.setSoldeDisponible(portefeuille.getSoldeDisponible().add(montant));
         portefeuilleRepository.save(portefeuille);

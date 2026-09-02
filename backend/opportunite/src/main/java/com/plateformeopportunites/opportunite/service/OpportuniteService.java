@@ -192,6 +192,9 @@ public class OpportuniteService {
     @Transactional
     public List<ParticipantOpportuniteResponse> planifierParticipants(UUID opportuniteId, PlanifierParticipantsRequest req) {
         List<Participation> participations = participationRepository.findAllById(req.getParticipationIds());
+        if (participations.size() != req.getParticipationIds().size()) {
+            throw new IllegalArgumentException("Une ou plusieurs participations sont introuvables");
+        }
         for (Participation p : participations) {
             if (!p.getOpportunite().getId().equals(opportuniteId)) {
                 throw new IllegalArgumentException("Une participation ne correspond pas à cette opportunité");
@@ -217,6 +220,7 @@ public class OpportuniteService {
             }
 
             if (req.getStatutLivraison() != null) {
+                validerTransitionLivraisonAdmin(p, req.getStatutLivraison());
                 appliquerStatutLivraison(p, req.getStatutLivraison(), now);
             }
             if (req.getPrioriteTraitement() != null) {
@@ -324,12 +328,18 @@ public class OpportuniteService {
     @Transactional
     public void activer(UUID adminId, UUID opportuniteId) {
         Opportunite opp = getOpportunite(opportuniteId);
+        if (opp.getStatut() != StatutOpportunite.BROUILLON) {
+            throw new IllegalStateException("Seule une opportunité en brouillon peut être activée");
+        }
         opp.setStatut(StatutOpportunite.ACTIVE);
         opportuniteRepository.save(opp);
     }
 
     @Transactional
     public void souscrire(UUID participantId, UUID opportuniteId, Integer quantite) {
+        if (quantite == null || quantite <= 0) {
+            throw new IllegalArgumentException("La quantité doit être supérieure ou égale à 1");
+        }
         if (participationRepository.existsByUtilisateurIdAndOpportuniteId(participantId, opportuniteId)) {
             throw new IllegalArgumentException("Déjà souscrit à cette opportunité");
         }
@@ -400,8 +410,26 @@ public class OpportuniteService {
     }
 
     @Transactional
+    public void cloturerManuellement(UUID opportuniteId) {
+        Opportunite opp = getOpportunite(opportuniteId);
+        if (opp.getStatut() != StatutOpportunite.ACTIVE) {
+            throw new IllegalStateException("Seule une opportunité active peut être clôturée");
+        }
+        if (opp.getParticipantsActuels() >= opp.getSeuilMinimum()) {
+            cloturerAvecSucces(opportuniteId);
+        } else {
+            cloturerAvecEchec(opportuniteId);
+        }
+    }
+
+    @Transactional
     public void cloturerAvecSucces(UUID opportuniteId) {
         Opportunite opp = getOpportunite(opportuniteId);
+        if (opp.getStatut() == StatutOpportunite.CLOTUREE) return;
+        if (opp.getParticipantsActuels() < opp.getSeuilMinimum()) {
+            throw new IllegalStateException("Impossible de clôturer avec succès : quota minimum non atteint");
+        }
+        BigDecimal prixFinal = calculerPrixActuel(opp);
         opp.setStatut(StatutOpportunite.CLOTUREE);
         opportuniteRepository.save(opp);
         redisService.supprimerCompteur(opportuniteId);
@@ -414,7 +442,20 @@ public class OpportuniteService {
         List<Participation> participations = participationRepository
                 .findByOpportuniteIdAndStatut(opportuniteId, StatutParticipation.EN_ATTENTE);
         for (Participation p : participations) {
-            walletService.debiterFinal(p.getUtilisateur().getId(), p.getMontantGele());
+            BigDecimal montantFinal = prixFinal.multiply(BigDecimal.valueOf(p.getQuantite()));
+            BigDecimal montantGele = p.getMontantGele();
+            if (montantFinal.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalStateException("Prix final invalide pour cette opportunité");
+            }
+            if (montantFinal.compareTo(montantGele) > 0) {
+                throw new IllegalStateException("Le montant gelé est insuffisant pour finaliser cette participation");
+            }
+            BigDecimal difference = montantGele.subtract(montantFinal);
+            if (difference.compareTo(BigDecimal.ZERO) > 0) {
+                walletService.rembourser(p.getUtilisateur().getId(), difference);
+                p.setMontantGele(montantFinal);
+            }
+            walletService.debiterFinal(p.getUtilisateur().getId(), montantFinal);
             p.setStatut(StatutParticipation.CONFIRMEE);
             if (statutLivraisonOuDefaut(p) == StatutLivraison.EN_ATTENTE_QUOTA) {
                 p.setStatutLivraison(StatutLivraison.A_PREPARER);
@@ -426,6 +467,7 @@ public class OpportuniteService {
     @Transactional
     public void cloturerAvecEchec(UUID opportuniteId) {
         Opportunite opp = getOpportunite(opportuniteId);
+        if (opp.getStatut() == StatutOpportunite.ANNULEE) return;
         opp.setStatut(StatutOpportunite.ANNULEE);
         opportuniteRepository.save(opp);
         redisService.supprimerCompteur(opportuniteId);
@@ -606,6 +648,20 @@ public class OpportuniteService {
             case ECHEC_LIVRAISON, LITIGE -> 70;
             case ANNULE -> 0;
         };
+    }
+
+    private void validerTransitionLivraisonAdmin(Participation p, StatutLivraison statutCible) {
+        if (statutCible == StatutLivraison.LIVRE_CONFIRME) {
+            throw new IllegalStateException("La réception finale doit être confirmée par le participant, pas par l'administration");
+        }
+        if (p.getStatut() != StatutParticipation.CONFIRMEE
+                && statutCible != StatutLivraison.EN_ATTENTE_QUOTA
+                && statutCible != StatutLivraison.ANNULE) {
+            throw new IllegalStateException("La livraison ne peut démarrer qu'après validation financière de la participation");
+        }
+        if (p.getStatut() == StatutParticipation.REMBOURSEE && statutCible != StatutLivraison.ANNULE) {
+            throw new IllegalStateException("Une participation remboursée ne peut pas être remise en livraison");
+        }
     }
 
     private void appliquerStatutLivraison(Participation p, StatutLivraison statut, LocalDateTime now) {

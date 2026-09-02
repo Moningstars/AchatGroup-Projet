@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { Zap, Menu, X } from 'lucide-react';
-import type { Screen } from '../App';
+import { LogOut, Menu, User, X, Zap } from 'lucide-react';
+import type { Screen, User as ParticipantUser } from '../App';
 
 interface AppHeaderProps {
   currentScreen: Screen;
   onNavigate: (screen: Screen) => void;
+  user?: ParticipantUser | null;
+  onLoginClick: () => void;
+  onLogout: () => void;
 }
 
 const NAV_ITEMS: { label: string; screen: Screen }[] = [
@@ -14,7 +17,7 @@ const NAV_ITEMS: { label: string; screen: Screen }[] = [
   { label: 'Contact', screen: 'contact' },
 ];
 
-export function AppHeader({ currentScreen, onNavigate }: AppHeaderProps) {
+export function AppHeader({ currentScreen, onNavigate, user, onLoginClick, onLogout }: AppHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const isActive = (screen: Screen) =>
@@ -68,14 +71,35 @@ export function AppHeader({ currentScreen, onNavigate }: AppHeaderProps) {
             ))}
           </nav>
 
-          {/* CTA desktop */}
-          <button
-            className="hidden md:flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-sm transition-all hover:shadow-md hover:opacity-90"
-            style={{ background: 'linear-gradient(135deg, oklch(0.48 0.24 275), oklch(0.42 0.22 195))', fontFamily: 'Outfit, sans-serif' }}
-            onClick={() => onNavigate('opportunities')}
-          >
-            Voir les offres
-          </button>
+          <div className="hidden md:flex items-center gap-2">
+            {user ? (
+              <>
+                <button
+                  className="flex items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-semibold text-foreground"
+                  onClick={() => onNavigate('opportunities')}
+                >
+                  <User className="h-4 w-4 text-primary" />
+                  <span>{user.name}</span>
+                  <span className="font-mono text-xs text-muted-foreground">{user.balance.toLocaleString()} FCFA</span>
+                </button>
+                <button
+                  className="rounded-xl border border-border p-2.5 text-muted-foreground hover:bg-muted"
+                  onClick={onLogout}
+                  title="Se déconnecter"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </>
+            ) : (
+              <button
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-sm transition-all hover:shadow-md hover:opacity-90"
+                style={{ background: 'linear-gradient(135deg, oklch(0.48 0.24 275), oklch(0.42 0.22 195))', fontFamily: 'Outfit, sans-serif' }}
+                onClick={onLoginClick}
+              >
+                Connexion
+              </button>
+            )}
+          </div>
 
           {/* Mobile burger */}
           <button
@@ -105,13 +129,22 @@ export function AppHeader({ currentScreen, onNavigate }: AppHeaderProps) {
             </button>
           ))}
           <div className="pt-2 pb-1">
-            <button
-              className="w-full py-3 rounded-xl text-sm font-semibold text-white"
-              style={{ background: 'linear-gradient(135deg, oklch(0.48 0.24 275), oklch(0.42 0.22 195))' }}
-              onClick={() => { onNavigate('opportunities'); setMobileOpen(false); }}
-            >
-              Voir les offres
-            </button>
+            {user ? (
+              <button
+                className="w-full py-3 rounded-xl text-sm font-semibold text-destructive border border-border"
+                onClick={() => { onLogout(); setMobileOpen(false); }}
+              >
+                Déconnexion
+              </button>
+            ) : (
+              <button
+                className="w-full py-3 rounded-xl text-sm font-semibold text-white"
+                style={{ background: 'linear-gradient(135deg, oklch(0.48 0.24 275), oklch(0.42 0.22 195))' }}
+                onClick={() => { onLoginClick(); setMobileOpen(false); }}
+              >
+                Connexion
+              </button>
+            )}
           </div>
         </div>
       )}
