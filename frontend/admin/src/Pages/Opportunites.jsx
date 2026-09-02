@@ -7,6 +7,7 @@ import {
   creerOpportunite, modifierOpportunite, uploadOpportuniteImage, deleteOpportuniteImage,
   genererSpecsOpportunite, getParticipantsOpportunite, planifierParticipantsOpportunite, mettreAJourLivraisonParticipants,
 } from '../services/api'
+import { calculerProgression } from '../utils/progression'
 
 const BACKEND = `http://${window.location.hostname}:8080`
 const imgUrl = (url) => url ? (url.startsWith('http') ? url : BACKEND + url) : null
@@ -205,8 +206,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
   }, [item?.id])
 
   if (!item) return null
-  const pct = item.seuilMinimum > 0
-    ? Math.min(100, Math.round((item.participantsActuels / item.seuilMinimum) * 100)) : 0
+  const { pct, valide: seuilValide, phase: phaseProgression, placesRestantes: placesRestantesCalc } = calculerProgression(item)
   const paliers = [...(item.paliers || [])].sort((a, b) => a.seuilMin - b.seuilMin)
   const images  = item.images || []
   const palierActif = paliers.find(p => item.participantsActuels >= p.seuilMin && item.participantsActuels <= p.seuilMax) || paliers.at(-1)
@@ -225,7 +225,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
   const livraisonsConfirmees = livraisonCounts.LIVRE_CONFIRME || 0
   const livraisonsProblemes = (livraisonCounts.ECHEC_LIVRAISON || 0) + (livraisonCounts.LITIGE || 0)
   const livraisonEnAttenteConfirmation = livraisonCounts.LIVRE_A_CONFIRMER || 0
-  const placesRestantes = item.seuilMaximal != null ? Math.max(0, item.seuilMaximal - item.participantsActuels) : null
+  const placesRestantes = phaseProgression === 'plafond' ? placesRestantesCalc : null
   const joursRestants = item.dateExpiration ? Math.ceil((new Date(item.dateExpiration) - new Date()) / 86400000) : null
   const prochaineAction = livraisonsProblemes > 0
     ? { icon: AlertTriangle, title: 'Traiter les problèmes', text: `${livraisonsProblemes} livraison(s) en échec ou litige demandent une action humaine.`, color: 'rose' }
@@ -482,7 +482,11 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Participants</p>
-                  <p className="mt-2 text-lg font-black text-slate-950 tabular-nums">{item.participantsActuels} / {item.seuilMinimum}</p>
+                  <p className="mt-2 text-lg font-black text-slate-950 tabular-nums">
+                    {seuilValide
+                      ? phaseProgression === 'plafond' ? `${item.participantsActuels} / ${item.seuilMaximal}` : `${item.participantsActuels} — validé`
+                      : `${item.participantsActuels} / ${item.seuilMinimum}`}
+                  </p>
                   <ProgressBar value={pct} color="indigo" className="mt-2" />
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -930,6 +934,11 @@ function PaliersEditor({ paliers, setPaliers }) {
           </div>
         ))}
       </div>
+      <p className="mt-2 text-[10px] text-slate-400">
+        Au-delà du seuil max du dernier palier, le prix reste à ce dernier tarif — il ne remonte jamais.
+        Pas besoin de couvrir tout le seuil maximal (ni une valeur énorme pour une offre illimitée) : les paliers
+        peuvent s'arrêter avant, le dernier prix défini continue de s'appliquer pour le reste.
+      </p>
     </div>
   )
 }
@@ -1092,6 +1101,9 @@ function NouvelleOpportuniteModal({ onClose, onSaved }) {
               <label className={labelCls}>Seuil maximal <span className="font-normal normal-case text-slate-400 tracking-normal">(optionnel — stock limité)</span></label>
               <input type="number" min="1" value={form.seuilMaximal}
                 onChange={e => setField('seuilMaximal', e.target.value)} className={inputCls} />
+              <p className="mt-1 text-[10px] text-slate-400">
+                Laisser vide = pas de plafond, l'offre reste ouverte sans limite de participants.
+              </p>
             </div>
             <div className="sm:col-span-2">
               <label className={labelCls}>Date d'expiration *</label>
@@ -1277,6 +1289,9 @@ function ModifierOpportuniteModal({ item, onClose, onSaved }) {
               <label className={labelCls}>Seuil maximal <span className="font-normal normal-case text-slate-400 tracking-normal">(optionnel — stock limité)</span></label>
               <input type="number" min="1" value={form.seuilMaximal}
                 onChange={e => setField('seuilMaximal', e.target.value)} className={inputCls} />
+              <p className="mt-1 text-[10px] text-slate-400">
+                Laisser vide = pas de plafond, l'offre reste ouverte sans limite de participants.
+              </p>
             </div>
             <div>
               <label className={labelCls}>Date d'expiration</label>
@@ -1435,9 +1450,7 @@ export default function Opportunites() {
             </thead>
             <tbody>
               {opportunitesFiltrees.map(item => {
-                const pct = item.seuilMinimum > 0
-                  ? Math.min(100, Math.round((item.participantsActuels / item.seuilMinimum) * 100))
-                  : 0
+                const { pct, valide: seuilValide, phase: phaseProgression, placesRestantes } = calculerProgression(item)
                 return (
                   <Tr key={item.id}>
                     <Td>
@@ -1451,13 +1464,15 @@ export default function Opportunites() {
                     <Td className="w-44">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[11px] text-slate-500 tabular-nums">{item.participantsActuels}</span>
-                        <span className="text-[10px] text-slate-400">/{item.seuilMinimum}</span>
+                        <span className="text-[10px] text-slate-400">
+                          {seuilValide ? (phaseProgression === 'plafond' ? `/${item.seuilMaximal}` : 'validé') : `/${item.seuilMinimum}`}
+                        </span>
                       </div>
                       <ProgressBar value={pct} color="indigo" />
                       <div className="text-[10px] text-slate-400 mt-0.5 tabular-nums">{pct}%</div>
-                      {item.seuilMaximal != null && (
+                      {phaseProgression === 'plafond' && (
                         <div className="text-[10px] text-amber-600 font-semibold mt-0.5 tabular-nums">
-                          {Math.max(0, item.seuilMaximal - item.participantsActuels)} place{Math.max(0, item.seuilMaximal - item.participantsActuels) > 1 ? 's' : ''} restante{Math.max(0, item.seuilMaximal - item.participantsActuels) > 1 ? 's' : ''} (max {item.seuilMaximal})
+                          {placesRestantes} place{placesRestantes > 1 ? 's' : ''} restante{placesRestantes > 1 ? 's' : ''} (max {item.seuilMaximal})
                         </div>
                       )}
                     </Td>

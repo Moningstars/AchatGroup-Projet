@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { imgUrl } from '../services/api'
+import { calculerProgression } from '../utils/progression'
 
 function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
 
@@ -19,13 +20,12 @@ function CountdownBadge({ dateExpiration }) {
 
 const ProductCard = ({ opportunity }) => {
   if (!opportunity) return null
-  const { id, titre, prixActuel, prixNormal, participantsActuels, seuilMinimum, images, dateExpiration } = opportunity
+  const { id, titre, prixActuel, prixNormal, participantsActuels, seuilMinimum, seuilMaximal, images, dateExpiration } = opportunity
 
   const discount = prixNormal && Number(prixNormal) > Number(prixActuel)
     ? Math.round((1 - Number(prixActuel) / Number(prixNormal)) * 100) : null
 
-  const progress = seuilMinimum > 0
-    ? Math.min(100, Math.round((participantsActuels / seuilMinimum) * 100)) : 0
+  const { pct: progress, valide } = calculerProgression({ participantsActuels, seuilMinimum, seuilMaximal })
 
   const heroImg = images?.[0]?.url
     ? imgUrl(images[0].url)
@@ -90,7 +90,11 @@ const ProductCard = ({ opportunity }) => {
             )}
           </div>
           <p className="text-[9px] text-gray-400 font-bold mt-0.5">
-            {participantsActuels} / {seuilMinimum} participants
+            {valide
+              ? seuilMaximal != null
+                ? `${participantsActuels} / ${seuilMaximal} places`
+                : 'Offre validée'
+              : `${participantsActuels} / ${seuilMinimum} participants`}
           </p>
 
           {/* Barre de progression inline — mobile seulement */}

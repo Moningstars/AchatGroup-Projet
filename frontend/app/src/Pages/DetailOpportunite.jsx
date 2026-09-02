@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext'
 import { useCountdown } from '../hooks/useCountdown'
 import { useSSE } from '../hooks/useSSE'
 import ProductCard from '../components/ProductCard'
+import { calculerProgression } from '../utils/progression'
 
 function fmt(val) { return Number(val || 0).toLocaleString('fr-FR') }
 function pad(n) { return String(n).padStart(2, '0') }
@@ -128,14 +129,11 @@ export default function DetailOpportunite() {
     </div>
   )
 
-  const progress = opportunite.seuilMinimum > 0
-    ? Math.min(100, Math.round((opportunite.participantsActuels / opportunite.seuilMinimum) * 100)) : 0
+  const { pct: progress, valide, phase, placesRestantes = Infinity } = calculerProgression(opportunite)
   const discount = opportunite.prixNormal && Number(opportunite.prixNormal) > Number(opportunite.prixActuel)
     ? Math.round((1 - Number(opportunite.prixActuel) / Number(opportunite.prixNormal)) * 100) : null
   const paliersTries = [...(opportunite.paliers || [])].sort((a, b) => a.seuilMin - b.seuilMin)
-  const placesRestantes = opportunite.seuilMaximal != null
-    ? Math.max(0, opportunite.seuilMaximal - opportunite.participantsActuels) : Infinity
-  const isComplet = opportunite.seuilMaximal != null && opportunite.participantsActuels >= opportunite.seuilMaximal
+  const isComplet = phase === 'plafond' && placesRestantes <= 0
 
   return (
     <div className="min-h-screen bg-bg-light pb-20">
@@ -277,19 +275,24 @@ export default function DetailOpportunite() {
             <div className="bg-white rounded-2xl border-2 border-gray-100 p-4 space-y-2">
               <div className="flex justify-between items-center text-[11px] font-black uppercase tracking-widest">
                 <span className="text-gray-400 flex items-center gap-1.5">
-                  <Users size={12} /> {opportunite.participantsActuels} / {opportunite.seuilMinimum} participants
+                  <Users size={12} />
+                  {valide
+                    ? phase === 'plafond'
+                      ? `${opportunite.participantsActuels} / ${opportunite.seuilMaximal} places`
+                      : 'Offre validée'
+                    : `${opportunite.participantsActuels} / ${opportunite.seuilMinimum} participants`}
                 </span>
                 <span className="text-success">{progress}%</span>
               </div>
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div className="h-full bg-success rounded-full transition-all duration-700" style={{ width: `${progress}%` }} />
               </div>
-              {opportunite.seuilMinimum > opportunite.participantsActuels && (
+              {!valide && (
                 <p className="text-[10px] text-gray-400 font-bold">
                   Plus que {opportunite.seuilMinimum - opportunite.participantsActuels} participant{opportunite.seuilMinimum - opportunite.participantsActuels > 1 ? 's' : ''} pour activer l'offre
                 </p>
               )}
-              {opportunite.seuilMaximal != null && (
+              {phase === 'plafond' && (
                 <p className={`text-[10px] font-bold ${isComplet ? 'text-urgency' : 'text-accent'}`}>
                   {isComplet ? 'Stock épuisé' : `Plus que ${placesRestantes} place${placesRestantes > 1 ? 's' : ''} disponible${placesRestantes > 1 ? 's' : ''}`}
                 </p>
@@ -308,8 +311,10 @@ export default function DetailOpportunite() {
                     .map((palier, i) => {
                       const dernier = i === paliersTries.length - 1
                       const atteint = opportunite.participantsActuels >= palier.seuilMin
+                      // Le dernier palier reste actif au-delà de son seuilMax (voir calculerPrixActuel côté backend :
+                      // le prix ne remonte jamais une fois le dernier palier atteint).
                       const actif = opportunite.participantsActuels >= palier.seuilMin &&
-                        (!palier.seuilMax || opportunite.participantsActuels <= palier.seuilMax)
+                        (dernier || opportunite.participantsActuels <= palier.seuilMax)
                       return (
                         <div key={i} className={`flex items-center justify-between px-4 py-3 transition-colors ${actif ? 'bg-success/5' : ''}`}>
                           <div className="flex items-center gap-3">

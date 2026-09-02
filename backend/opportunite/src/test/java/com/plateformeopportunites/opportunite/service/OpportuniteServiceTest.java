@@ -113,6 +113,7 @@ class OpportuniteServiceTest {
         when(opportuniteRepository.findById(OPP_ID)).thenReturn(Optional.of(opp));
         when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
         when(palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(OPP_ID)).thenReturn(List.of());
+        when(participationRepository.findByUtilisateurIdAndOpportuniteId(PID, OPP_ID)).thenReturn(Optional.empty());
         when(participationRepository.save(any())).thenReturn(new Participation());
         when(opportuniteRepository.save(any())).thenReturn(opp);
 
@@ -130,6 +131,7 @@ class OpportuniteServiceTest {
         when(opportuniteRepository.findById(OPP_ID)).thenReturn(Optional.of(opp));
         when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
         when(palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(OPP_ID)).thenReturn(List.of());
+        when(participationRepository.findByUtilisateurIdAndOpportuniteId(PID, OPP_ID)).thenReturn(Optional.empty());
         when(participationRepository.save(any())).thenReturn(new Participation());
         when(opportuniteRepository.save(any())).thenReturn(opp);
         when(redisService.incrementerParticipants(any(UUID.class), anyInt())).thenReturn(10L);
@@ -145,6 +147,7 @@ class OpportuniteServiceTest {
         when(opportuniteRepository.findById(OPP_ID)).thenReturn(Optional.of(opp));
         when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
         when(palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(OPP_ID)).thenReturn(List.of());
+        when(participationRepository.findByUtilisateurIdAndOpportuniteId(PID, OPP_ID)).thenReturn(Optional.empty());
         when(participationRepository.save(any())).thenReturn(new Participation());
         when(opportuniteRepository.save(any())).thenReturn(opp);
 
@@ -161,6 +164,7 @@ class OpportuniteServiceTest {
         Participation p1 = Participation.builder()
                 .id(UUID.randomUUID())
                 .utilisateur(utilisateur())
+                .quantite(1)
                 .montantGele(new BigDecimal("5000"))
                 .statut(StatutParticipation.EN_ATTENTE)
                 .build();
