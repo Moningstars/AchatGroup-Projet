@@ -164,6 +164,7 @@ class OpportuniteServiceTest {
         Participation p1 = Participation.builder()
                 .id(UUID.randomUUID())
                 .utilisateur(utilisateur())
+                .quantite(1)
                 .montantGele(new BigDecimal("5000"))
                 .statut(StatutParticipation.EN_ATTENTE)
                 .build();
