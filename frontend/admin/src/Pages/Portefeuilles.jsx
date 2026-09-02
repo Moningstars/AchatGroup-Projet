@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2, CheckCircle, XCircle, X, Plus, Receipt, Pencil, Check } from 'lucide-react'
 import { Badge, Card, Table, Th, Td, Tr, Spinner, EmptyState, Tabs } from '../components/ui'
-import { useSSE } from '../hooks/useSSE'
-import { useAuth } from '../context/AuthContext'
+import { usePusher } from '../context/PusherContext'
 import {
   getAdminTransactions, getRetraitsEnAttente, approuverRetrait, rejeterRetrait,
   getAdminWallet, alimenterWallet, modifierTauxConversion,
@@ -101,7 +100,7 @@ function AlimenterModal({ onClose, onSaved }) {
 }
 
 export default function Portefeuilles() {
-  const { token } = useAuth()
+  const { on, off } = usePusher()
   const [wallet, setWallet]           = useState(null)
   const [transactions, setTransactions] = useState([])
   const [retraits, setRetraits]       = useState([])
@@ -130,9 +129,11 @@ export default function Portefeuilles() {
   }, [])
 
   // Nouvelle demande de retrait — apparaît sans refresh
-  useSSE('admin/events/global', {
-    RETRAIT_DEMANDE: () => { fetchRetraits(); fetchTransactions() },
-  }, token)
+  useEffect(() => {
+    const onRetraitDemande = () => { fetchRetraits(); fetchTransactions() }
+    on('RETRAIT_DEMANDE', onRetraitDemande)
+    return () => off('RETRAIT_DEMANDE', onRetraitDemande)
+  }, [])
 
   const openEditTaux = () => {
     setTauxInput(wallet?.tauxConversionPoints ?? '')

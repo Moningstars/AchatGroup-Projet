@@ -65,6 +65,8 @@ public class SecurityConfig {
                                 // Questions d'éligibilité publiques — /mon-eligibilite reste protégé (PARTICIPANT)
                                 new AntPathRequestMatcher("/api/sondages/*/eligibilite", HttpMethod.GET.name())
                         ).permitAll()
+                        // Accessible aux participants ET aux admins — le contrôleur distingue le canal autorisé selon le rôle
+                        .requestMatchers(AntPathRequestMatcher.antMatcher("/api/pusher/auth")).authenticated()
                         .requestMatchers(AntPathRequestMatcher.antMatcher("/api/admin/**")).hasRole("ADMIN")
                         .anyRequest().hasRole("PARTICIPANT")
                 )

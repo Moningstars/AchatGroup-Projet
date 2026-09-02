@@ -6,8 +6,7 @@ import {
 } from 'lucide-react'
 import { Badge, Spinner, EmptyState, SearchInput } from '../components/ui'
 import { getKycEnAttente, approuverKyc, rejeterKyc } from '../services/api'
-import { useSSE } from '../hooks/useSSE'
-import { useAuth } from '../context/AuthContext'
+import { usePusher } from '../context/PusherContext'
 
 const NIVEAU_COLOR = { EN_ATTENTE: 'amber', VERIFIE: 'emerald', REJETE: 'rose', AUCUN: 'gray' }
 const NIVEAU_LABEL = { EN_ATTENTE: 'En attente', VERIFIE: 'Vérifié', REJETE: 'Rejeté', AUCUN: 'Aucun' }
@@ -135,7 +134,7 @@ function DetailPanel({ demande, onClose, onApprouver, onRejeter, actionId }) {
 }
 
 export default function Kyc() {
-  const { token } = useAuth()
+  const { on, off } = usePusher()
   const [demandes, setDemandes]   = useState([])
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState(null)
@@ -155,9 +154,11 @@ export default function Kyc() {
   useEffect(() => { fetchData() }, [])
 
   // Nouvelle soumission KYC — apparaît dans la file sans refresh (refetch silencieux, sans spinner plein écran)
-  useSSE('admin/events/global', {
-    KYC_SOUMIS: () => { getKycEnAttente().then(setDemandes).catch(() => {}) },
-  }, token)
+  useEffect(() => {
+    const onKycSoumis = () => { getKycEnAttente().then(setDemandes).catch(() => {}) }
+    on('KYC_SOUMIS', onKycSoumis)
+    return () => off('KYC_SOUMIS', onKycSoumis)
+  }, [])
 
   const handleApprouver = async (userId) => {
     setActionId('approuver')

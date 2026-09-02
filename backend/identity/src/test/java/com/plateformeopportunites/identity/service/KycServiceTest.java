@@ -1,6 +1,8 @@
 package com.plateformeopportunites.identity.service;
 
 import com.plateformeopportunites.common.enums.NiveauVerification;
+import com.plateformeopportunites.common.enums.TypePiece;
+import com.plateformeopportunites.common.service.PusherNotificationService;
 import com.plateformeopportunites.identity.dto.KycRequest;
 import com.plateformeopportunites.identity.dto.KycStatusResponse;
 import com.plateformeopportunites.identity.entity.InfoPersonnelle;
@@ -28,6 +30,7 @@ class KycServiceTest {
 
     @Mock private UtilisateurRepository utilisateurRepository;
     @Mock private InfoPersonnelleRepository infoPersonnelleRepository;
+    @Mock private PusherNotificationService pusherNotificationService;
     @InjectMocks private KycService kycService;
 
     private static final UUID UID = UUID.randomUUID();
@@ -59,9 +62,15 @@ class KycServiceTest {
         req.setNom("Kokou");
         req.setPrenom("Afi");
         req.setDateNaissance(LocalDate.of(1995, 5, 15));
+        req.setLieuNaissance("Lomé");
+        req.setNationalite("Togolaise");
+        req.setTypePiece(TypePiece.CNI);
+        req.setNumeroPiece("TG-2024-001");
+        req.setDateExpirationPiece(LocalDate.now().plusYears(5));
         req.setEmail("afi.kokou@mail.tg");
         req.setAdresse("Quartier Bè, Lomé");
-        req.setNumeroPiece("TG-2024-001");
+        req.setVille("Lomé");
+        req.setPays("Togo");
         req.setProfession("Commerçante");
         return req;
     }

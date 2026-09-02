@@ -9,6 +9,7 @@ import com.plateformeopportunites.common.enums.TypeRecompense;
 import com.plateformeopportunites.common.event.RecompenseEvent;
 import com.plateformeopportunites.common.event.SseNotificationEvent;
 import com.plateformeopportunites.common.redis.RedisService;
+import com.plateformeopportunites.common.service.PusherNotificationService;
 import com.plateformeopportunites.finance.service.WalletService;
 import com.plateformeopportunites.identity.entity.Administrateur;
 import com.plateformeopportunites.identity.entity.Commanditaire;
@@ -38,6 +39,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -57,6 +59,7 @@ public class SondageService {
     private final WalletService walletService;
     private final ApplicationEventPublisher eventPublisher;
     private final RedisService redisService;
+    private final PusherNotificationService pusherNotificationService;
 
     // ─── Création ─────────────────────────────────────────────────────────────
 
@@ -652,9 +655,21 @@ public class SondageService {
         }
 
         // 3. Tracker le budget distribué sur le sondage
-        BigDecimal distribue = sondage.getBudgetDistribue() != null ? sondage.getBudgetDistribue() : BigDecimal.ZERO;
-        sondage.setBudgetDistribue(distribue.add(montantFCFA));
+        BigDecimal distribueAvant = sondage.getBudgetDistribue() != null ? sondage.getBudgetDistribue() : BigDecimal.ZERO;
+        BigDecimal distribueApres = distribueAvant.add(montantFCFA);
+        sondage.setBudgetDistribue(distribueApres);
         sondageRepository.save(sondage);
+
+        // Alerte admin la première fois que 80% du budget réservé est distribué.
+        BigDecimal reserve = sondage.getBudgetReserve();
+        if (reserve != null && reserve.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal seuil80 = reserve.multiply(new BigDecimal("0.8"));
+            if (distribueAvant.compareTo(seuil80) < 0 && distribueApres.compareTo(seuil80) >= 0) {
+                pusherNotificationService.notifierAdmins("SONDAGE_BUDGET_PRESQUE_EPUISE", Map.of(
+                        "id", sondage.getId(), "titre", sondage.getTitre(),
+                        "budgetDistribue", distribueApres, "budgetReserve", reserve));
+            }
+        }
 
         // 4. Marquer la récompense comme versée
         reponse.setRecompenseVersee(true);

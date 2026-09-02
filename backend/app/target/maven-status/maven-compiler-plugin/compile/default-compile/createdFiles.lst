@@ -8,7 +8,6 @@ com\plateformeopportunites\common\dto\AdminStatsResponse.class
 com\plateformeopportunites\common\dto\AdminStatsResponse$PointMensuel$PointMensuelBuilder.class
 com\plateformeopportunites\common\dto\AdminStatsResponse$AdminStatsResponseBuilder.class
 com\plateformeopportunites\common\scheduler\ClotureScheduler.class
-com\plateformeopportunites\common\sse\AdminSseController.class
 com\plateformeopportunites\common\controller\StatsController.class
 com\plateformeopportunites\common\sse\SseController.class
 com\plateformeopportunites\common\sse\SseService.class
