@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Filter, Loader2, Search, X } from 'lucide-react'
+import { Loader2, Search } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { getOpportunites, getSondages, getBannieres, imgUrl } from '../services/api'
 import ProductCard from '../components/ProductCard'
@@ -72,7 +72,6 @@ export default function Opportunites() {
   const [search, setSearch] = useState('')
   const [serverSearch, setServerSearch] = useState('')
   const [selectedCategories, setSelectedCategories] = useState([])
-  const [filtersOpen, setFiltersOpen] = useState(false)
   const [slide, setSlide] = useState(0)
   const [visible, setVisible] = useState(true)
   const navigate = useNavigate()
@@ -173,17 +172,6 @@ export default function Opportunites() {
   })
 
   const filtered = opportunites
-
-  const toggleCategory = (cat) => {
-    if (cat === 'Tout') {
-      setSelectedCategories([])
-      return
-    }
-    setSelectedCategories(prev => prev.includes(cat)
-      ? prev.filter(c => c !== cat)
-      : [...prev, cat]
-    )
-  }
 
   const resetFilters = () => {
     setSearch('')
@@ -405,8 +393,8 @@ export default function Opportunites() {
         )}
 
         {/* ── Recherche e-commerce ── */}
-        <section className="rounded-3xl border border-gray-100 bg-white p-3 sm:p-4 shadow-sm space-y-3 overflow-hidden">
-          <div className="grid gap-3 lg:grid-cols-[1fr_240px_auto] lg:items-center">
+        <section className="rounded-3xl border border-gray-100 bg-white p-3 sm:p-4 shadow-sm overflow-hidden">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-center">
             <div className="relative w-full group">
               <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors" />
               <input
@@ -437,86 +425,7 @@ export default function Opportunites() {
               </select>
               <i className="ti ti-chevron-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400" />
             </label>
-
-            <button
-              type="button"
-              onClick={() => setFiltersOpen(v => !v)}
-              className="inline-flex h-full min-h-12 items-center justify-center gap-2 rounded-2xl border-2 border-gray-100 bg-white px-4 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500 transition-all hover:border-primary/30 hover:text-primary"
-            >
-              <Filter size={15} />
-              Filtres avancés
-              {selectedCategories.length > 0 && (
-                <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] text-primary">
-                  {selectedCategories.length}
-                </span>
-              )}
-            </button>
           </div>
-
-          {filtersOpen && (
-            <div className="border-t border-gray-100 pt-3">
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-widest text-primary">Toutes les catégories</p>
-                  <p className="text-[11px] text-gray-400 font-bold mt-1">
-                    Cochez plusieurs catégories sans encombrer l’accueil.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setFiltersOpen(false)}
-                  className="h-8 w-8 rounded-full bg-bg-light text-gray-400 hover:text-primary flex items-center justify-center"
-                  aria-label="Fermer les filtres"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                {CATS.filter(c => c !== 'Tout').map(cat => {
-                  const checked = selectedCategories.includes(cat)
-                  return (
-                    <label
-                      key={cat}
-                      className={`flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-xs font-black uppercase tracking-wide cursor-pointer transition-all ${
-                        checked
-                          ? 'border-primary bg-primary text-white'
-                          : 'border-gray-100 bg-bg-light text-gray-500 hover:border-primary/30 hover:text-primary'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleCategory(cat)}
-                        className="sr-only"
-                      />
-                      <span className={`h-4 w-4 rounded border-2 flex items-center justify-center ${
-                        checked ? 'border-white bg-white text-primary' : 'border-gray-300'
-                      }`}>
-                        {checked && <i className="ti ti-check text-[11px]" />}
-                      </span>
-                      {cat}
-                    </label>
-                  )
-                })}
-              </div>
-
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <span className="text-[11px] font-bold text-gray-400">
-                  {selectedCategories.length === 0
-                    ? 'Toutes les catégories sont incluses.'
-                    : `${selectedCategories.length} catégorie${selectedCategories.length > 1 ? 's' : ''} active${selectedCategories.length > 1 ? 's' : ''}.`}
-                </span>
-                <button
-                  type="button"
-                  onClick={resetFilters}
-                  className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-primary"
-                >
-                  Réinitialiser
-                </button>
-              </div>
-            </div>
-          )}
         </section>
 
         {/* ── Product Grid ── */}
