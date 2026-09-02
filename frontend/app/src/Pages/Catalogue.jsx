@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
-import { Filter, Loader2, Search, X } from 'lucide-react'
+import { ChevronDown, Filter, Loader2, Search, SlidersHorizontal, X } from 'lucide-react'
 import { getOpportunites, getBannieres, imgUrl } from '../services/api'
 import ProductCard from '../components/ProductCard'
 import PageCarousel from '../components/PageCarousel'
@@ -10,8 +10,6 @@ const CATS = [
   'Tout', 'Mode', 'Électronique', 'Alimentaire', 'Maison',
   'Beauté', 'Informatique', 'Véhicules', 'Mobilier', 'Sport'
 ]
-
-const QUICK_CATS = ['Tout', 'Mode', 'Électronique', 'Véhicules', 'Maison']
 
 const TRIS = [
   { label: 'Les plus récentes', value: 'recent' },
@@ -109,7 +107,7 @@ export default function Catalogue() {
   const visibleItems = filtered.slice(0, page * PAGE_SIZE)
   const hasMore = filtered.length > page * PAGE_SIZE
   const actives = opportunites.filter(o => o.statut === 'ACTIVE').length
-  const triActif = TRIS.find(t => t.value === tri)?.label ?? 'Les plus récentes'
+  const selectedCategoryValue = selectedCategories.length > 1 ? '__MULTI__' : selectedCategories[0] || 'Tout'
 
   const toggleCategory = (cat) => {
     if (cat === 'Tout') {
@@ -127,6 +125,10 @@ export default function Catalogue() {
     setServerSearch('')
     setSelectedCategories([])
     setTri('recent')
+  }
+
+  const selectMainCategory = (cat) => {
+    setSelectedCategories(cat === 'Tout' ? [] : [cat])
   }
 
   // Scroll infini : charge le lot suivant dès que la sentinelle approche du viewport
@@ -174,7 +176,7 @@ export default function Catalogue() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-0 pt-6 space-y-6 pb-8">
+      <div className="max-w-7xl mx-auto px-4 lg:px-0 pt-6 space-y-6 pb-8">
 
         {/* ── Carousel promo ── */}
         {slides.length > 0 && <PageCarousel slides={slides} />}
@@ -191,44 +193,57 @@ export default function Catalogue() {
           />
         </div>
 
-        {/* Filtres catégories */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {QUICK_CATS.map(cat => {
-              const active = cat === 'Tout' ? selectedCategories.length === 0 : selectedCategories.includes(cat)
-              return (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => toggleCategory(cat)}
-                  className={`flex-shrink-0 rounded-full px-4 py-2 text-[11px] font-black uppercase tracking-widest transition-all ${
-                    active
-                      ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                      : 'bg-white text-gray-500 border border-gray-100 hover:border-primary/30 hover:text-primary'
-                  }`}
-                >
-                  {cat}
-                </button>
-              )
-            })}
+        {/* Barre catalogue e-commerce */}
+        <div className="rounded-3xl border border-gray-100 bg-white p-3 sm:p-4 shadow-sm space-y-3 overflow-hidden">
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:grid-cols-[280px_auto_280px] md:items-center md:justify-between">
+            <label className="relative block">
+              <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">Catégorie</span>
+              <select
+                value={selectedCategoryValue}
+                onChange={e => selectMainCategory(e.target.value)}
+                className="w-full appearance-none rounded-2xl border-2 border-gray-100 bg-bg-light px-4 py-3 pr-10 text-xs font-black uppercase tracking-widest text-primary outline-none transition-all focus:border-primary"
+              >
+                {selectedCategories.length > 1 && (
+                  <option value="__MULTI__" disabled>{selectedCategories.length} catégories</option>
+                )}
+                {CATS.map(cat => (
+                  <option key={cat} value={cat}>{cat === 'Tout' ? 'Toutes catégories' : cat}</option>
+                ))}
+              </select>
+              <ChevronDown size={16} className="pointer-events-none absolute bottom-3.5 right-4 text-gray-400" />
+            </label>
 
             <button
               type="button"
               onClick={() => setFiltersOpen(v => !v)}
-              className={`flex-shrink-0 inline-flex items-center gap-2 rounded-full px-4 py-2 text-[11px] font-black uppercase tracking-widest transition-all ${
+              className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border-2 px-4 py-3 text-[11px] font-black uppercase tracking-widest transition-all md:mt-5 ${
                 filtersOpen || selectedCategories.length > 0
-                  ? 'bg-accent text-primary border border-primary/10'
-                  : 'bg-white text-gray-500 border border-gray-100 hover:border-primary/30 hover:text-primary'
+                  ? 'border-accent bg-accent text-primary'
+                  : 'border-gray-100 bg-bg-light text-gray-500 hover:border-primary/30 hover:text-primary'
               }`}
             >
-              <Filter size={14} />
-              Filtres
+              <Filter size={15} />
+              Filtres avancés
               {selectedCategories.length > 0 && (
-                <span className="rounded-full bg-primary text-white px-1.5 py-0.5 text-[9px]">
+                <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] text-white">
                   {selectedCategories.length}
                 </span>
               )}
             </button>
+
+            <label className="relative block">
+              <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">Trier par</span>
+              <select
+                value={tri}
+                onChange={e => setTri(e.target.value)}
+                className="w-full appearance-none rounded-2xl border-2 border-gray-100 bg-bg-light px-4 py-3 pr-10 text-xs font-black uppercase tracking-widest text-primary outline-none transition-all focus:border-primary"
+              >
+                {TRIS.map(t => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+              <SlidersHorizontal size={16} className="pointer-events-none absolute bottom-3.5 right-4 text-gray-400" />
+            </label>
           </div>
 
           {filtersOpen && (
@@ -295,23 +310,6 @@ export default function Catalogue() {
               </div>
             </div>
           )}
-        </div>
-
-        {/* Tri */}
-        <div className="flex flex-col gap-2 rounded-3xl border border-gray-100 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Trier les offres</p>
-            <p className="text-sm font-heading font-extrabold text-primary">{triActif}</p>
-          </div>
-          <select
-            value={tri}
-            onChange={e => setTri(e.target.value)}
-            className="w-full rounded-2xl border-2 border-gray-100 bg-bg-light px-4 py-3 text-xs font-black uppercase tracking-widest text-primary outline-none transition-all focus:border-primary sm:w-64"
-          >
-            {TRIS.map(t => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
-          </select>
         </div>
 
         {/* Grille */}
