@@ -11,5 +11,4 @@ public interface OpportuniteRepository extends JpaRepository<Opportunite, UUID> 
     List<Opportunite> findByStatut(StatutOpportunite statut);
     long countByStatut(StatutOpportunite statut);
     List<Opportunite> findByStatutAndDateExpirationBefore(StatutOpportunite statut, LocalDateTime date);
-    List<Opportunite> findByStatutAndDateExpirationBetween(StatutOpportunite statut, LocalDateTime debut, LocalDateTime fin);
 }

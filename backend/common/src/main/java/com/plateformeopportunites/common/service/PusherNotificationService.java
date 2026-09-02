@@ -25,11 +25,6 @@ public class PusherNotificationService {
         }
     }
 
-    /** Notifie tous les admins connectés (canal partagé, pas de destinataire précis). */
-    public void notifierAdmins(String event, Map<String, Object> data) {
-        notifierTous("private-admin-global", event, data);
-    }
-
     public void notifierTous(String channel, String event, Map<String, Object> data) {
         try {
             pusher.trigger(channel, event, data);

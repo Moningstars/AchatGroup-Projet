@@ -2,7 +2,6 @@ package com.plateformeopportunites.sondage.service;
 
 import com.plateformeopportunites.common.enums.*;
 import com.plateformeopportunites.common.redis.RedisService;
-import com.plateformeopportunites.common.service.PusherNotificationService;
 import com.plateformeopportunites.finance.service.WalletService;
 import com.plateformeopportunites.identity.entity.Utilisateur;
 import com.plateformeopportunites.identity.repository.AdministrateurRepository;
@@ -43,7 +42,6 @@ class SondageServiceTest {
     @Mock private WalletService walletService;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private RedisService redisService;
-    @Mock private PusherNotificationService pusherNotificationService;
     @InjectMocks private SondageService sondageService;
 
     private static final UUID SONDAGE_ID = UUID.randomUUID();

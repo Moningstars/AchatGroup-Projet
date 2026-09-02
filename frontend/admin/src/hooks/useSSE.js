@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-const SSE_BASE = `http://${window.location.hostname}:8080/api`
+const SSE_BASE = import.meta.env.VITE_API_BASE_URL || `http://${window.location.hostname}:8080/api`
 
 /**
  * Subscribe to an SSE channel.

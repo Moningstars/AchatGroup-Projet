@@ -3,9 +3,11 @@ package com.plateformeopportunites.opportunite.controller;
 import com.plateformeopportunites.opportunite.dto.CreerOpportuniteRequest;
 import com.plateformeopportunites.opportunite.dto.GenererSpecsRequest;
 import com.plateformeopportunites.opportunite.dto.GenererSpecsResponse;
+import com.plateformeopportunites.opportunite.dto.MettreAJourLivraisonRequest;
 import com.plateformeopportunites.opportunite.dto.ModifierOpportuniteRequest;
 import com.plateformeopportunites.opportunite.dto.OpportuniteResponse;
 import com.plateformeopportunites.opportunite.dto.ParticipantOpportuniteResponse;
+import com.plateformeopportunites.opportunite.dto.PlanifierParticipantsRequest;
 import com.plateformeopportunites.opportunite.service.AiSpecService;
 import com.plateformeopportunites.opportunite.service.ImageStorageService;
 import com.plateformeopportunites.opportunite.service.OpportuniteService;
@@ -69,6 +71,20 @@ public class AdminOpportuniteController {
     @GetMapping("/{id}/participants")
     public ResponseEntity<List<ParticipantOpportuniteResponse>> listerParticipants(@PathVariable UUID id) {
         return ResponseEntity.ok(opportuniteService.listerParticipants(id));
+    }
+
+    @PatchMapping("/{id}/participants/planification")
+    public ResponseEntity<List<ParticipantOpportuniteResponse>> planifierParticipants(
+            @PathVariable UUID id,
+            @Valid @RequestBody PlanifierParticipantsRequest req) {
+        return ResponseEntity.ok(opportuniteService.planifierParticipants(id, req));
+    }
+
+    @PatchMapping("/{id}/participants/livraison")
+    public ResponseEntity<List<ParticipantOpportuniteResponse>> mettreAJourLivraison(
+            @PathVariable UUID id,
+            @Valid @RequestBody MettreAJourLivraisonRequest req) {
+        return ResponseEntity.ok(opportuniteService.mettreAJourLivraison(id, req));
     }
 
     // ── Image management ────────────────────────────────────────────────────

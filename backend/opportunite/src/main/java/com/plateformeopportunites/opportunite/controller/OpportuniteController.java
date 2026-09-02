@@ -1,5 +1,6 @@
 package com.plateformeopportunites.opportunite.controller;
 
+import com.plateformeopportunites.opportunite.dto.ConfirmerReceptionRequest;
 import com.plateformeopportunites.opportunite.dto.MaParticipationOpportuniteResponse;
 import com.plateformeopportunites.opportunite.dto.OpportuniteResponse;
 import com.plateformeopportunites.opportunite.service.OpportuniteService;
@@ -42,5 +43,14 @@ public class OpportuniteController {
                                           @RequestParam(defaultValue = "1") Integer quantite) {
         opportuniteService.souscrire(UUID.fromString(auth.getName()), id, quantite);
         return ResponseEntity.ok().build();
+    }
+
+    @PatchMapping("/mes-participations/{participationId}/reception")
+    public ResponseEntity<MaParticipationOpportuniteResponse> confirmerReception(
+            Authentication auth,
+            @PathVariable UUID participationId,
+            @RequestBody(required = false) ConfirmerReceptionRequest req) {
+        ConfirmerReceptionRequest request = req != null ? req : new ConfirmerReceptionRequest();
+        return ResponseEntity.ok(opportuniteService.confirmerReception(UUID.fromString(auth.getName()), participationId, request));
     }
 }

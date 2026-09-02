@@ -1,6 +1,7 @@
 package com.plateformeopportunites.opportunite.dto;
 
 import com.plateformeopportunites.common.enums.StatutParticipation;
+import com.plateformeopportunites.common.enums.StatutLivraison;
 import lombok.Builder;
 import lombok.Data;
 
@@ -18,5 +19,20 @@ public class ParticipantOpportuniteResponse {
     private Integer quantite;
     private BigDecimal montantGele;
     private StatutParticipation statut;
+    private LocalDateTime creneauTraitement;
+    private String noteTraitement;
+    private StatutLivraison statutLivraison;
+    private Integer progressionLivraison;
+    private Boolean prioriteTraitement;
+    private LocalDateTime datePreparation;
+    private LocalDateTime dateExpedition;
+    private LocalDateTime dateLivraisonPrevue;
+    private LocalDateTime dateRemise;
+    private LocalDateTime dateConfirmationParticipant;
+    private String transporteur;
+    private String referenceLivraison;
+    private String adresseLivraison;
+    private String noteLivraison;
+    private String commentaireParticipantLivraison;
     private LocalDateTime createdAt;
 }

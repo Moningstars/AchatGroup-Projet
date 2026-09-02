@@ -942,6 +942,11 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
           <span className="flex items-center gap-1 font-semibold text-violet-600">
             {fmt(survey.recompense)} FCFA / répondant
           </span>
+          {survey.budgetReserve != null && (
+            <span className="flex items-center gap-1 font-semibold text-emerald-700">
+              Budget : {fmt(survey.budgetDistribue || 0)} distribués · {fmt(survey.budgetRestant || 0)} restants
+            </span>
+          )}
           <span className="flex items-center gap-1">
             <Clock size={12} className="text-slate-400" />
             Expire {formatDate(survey.dateExpiration)}

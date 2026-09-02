@@ -1,7 +1,7 @@
 package com.plateformeopportunites.identity.service;
 
 import com.plateformeopportunites.common.enums.NiveauVerification;
-import com.plateformeopportunites.common.service.PusherNotificationService;
+import com.plateformeopportunites.common.event.SseNotificationEvent;
 import com.plateformeopportunites.identity.dto.KycDemandeResponse;
 import com.plateformeopportunites.identity.dto.KycRequest;
 import com.plateformeopportunites.identity.dto.KycStatusResponse;
@@ -10,12 +10,12 @@ import com.plateformeopportunites.identity.entity.Utilisateur;
 import com.plateformeopportunites.identity.repository.InfoPersonnelleRepository;
 import com.plateformeopportunites.identity.repository.UtilisateurRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -24,7 +24,7 @@ public class KycService {
 
     private final UtilisateurRepository utilisateurRepository;
     private final InfoPersonnelleRepository infoPersonnelleRepository;
-    private final PusherNotificationService pusherNotificationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public KycStatusResponse getStatut(UUID utilisateurId) {
         Utilisateur u = getUtilisateur(utilisateurId);
@@ -117,7 +117,8 @@ public class KycService {
         u.setNiveauVerification(NiveauVerification.EN_ATTENTE);
         utilisateurRepository.save(u);
 
-        pusherNotificationService.notifierAdmins("KYC_SOUMIS", Map.of("utilisateurId", utilisateurId));
+        eventPublisher.publishEvent(new SseNotificationEvent(this,
+                "admin:global", "KYC_SOUMIS", "{\"utilisateurId\":\"" + utilisateurId + "\"}"));
 
         return getStatut(utilisateurId);
     }
@@ -140,7 +141,8 @@ public class KycService {
         }
         u.setNiveauVerification(NiveauVerification.VERIFIE);
         utilisateurRepository.save(u);
-        pusherNotificationService.notifierUtilisateur(utilisateurId, "KYC", Map.of("statut", "VERIFIE"));
+        eventPublisher.publishEvent(new SseNotificationEvent(this,
+                "user:" + utilisateurId, "KYC", "{\"statut\":\"VERIFIE\"}"));
     }
 
     @Transactional
@@ -151,7 +153,8 @@ public class KycService {
         }
         u.setNiveauVerification(NiveauVerification.REJETE);
         utilisateurRepository.save(u);
-        pusherNotificationService.notifierUtilisateur(utilisateurId, "KYC", Map.of("statut", "REJETE"));
+        eventPublisher.publishEvent(new SseNotificationEvent(this,
+                "user:" + utilisateurId, "KYC", "{\"statut\":\"REJETE\"}"));
     }
 
     private Utilisateur getUtilisateur(UUID id) {

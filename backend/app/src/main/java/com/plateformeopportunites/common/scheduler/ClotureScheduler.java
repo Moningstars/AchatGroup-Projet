@@ -32,18 +32,6 @@ public class ClotureScheduler {
         }
     }
 
-    // Prévient les participants (et l'admin si le seuil minimum n'est pas atteint) des
-    // opportunités qui expirent sous 24h — une seule fois par opportunité (marqueur Redis).
-    @Scheduled(fixedDelay = 3_600_000)
-    public void notifierOpportunitesExpirationProche() {
-        log.debug("Job notification expirations proches — début");
-        try {
-            opportuniteService.notifierExpirationsProches();
-        } catch (Exception e) {
-            log.error("Erreur notification expirations proches", e);
-        }
-    }
-
     @Scheduled(fixedDelay = 60_000)
     public void cloturerSondagesExpires() {
         log.debug("Job clôture sondages — début");

@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // Dérivé de l'hôte utilisé pour charger la page (PC ou téléphone sur le même
 // réseau) au lieu de 'localhost' en dur, qui ne désignerait que l'appareil lui-même.
-const BASE_URL = `http://${window.location.hostname}:8080/api`
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || `http://${window.location.hostname}:8080/api`
 export const TOKEN_KEY = 'opportunihub-admin-token'
 
 const api = axios.create({ baseURL: BASE_URL })
@@ -60,6 +60,12 @@ export const deleteOpportuniteImage = (id, imageId) =>
 
 export const getParticipantsOpportunite = (id) =>
   api.get(`/admin/opportunites/${id}/participants`).then(r => r.data)
+
+export const planifierParticipantsOpportunite = (id, data) =>
+  api.patch(`/admin/opportunites/${id}/participants/planification`, data).then(r => r.data)
+
+export const mettreAJourLivraisonParticipants = (id, data) =>
+  api.patch(`/admin/opportunites/${id}/participants/livraison`, data).then(r => r.data)
 
 // Sondages (admin)
 export const getAdminSondages = () =>

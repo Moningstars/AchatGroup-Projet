@@ -9,7 +9,6 @@ import com.plateformeopportunites.common.enums.TypeRecompense;
 import com.plateformeopportunites.common.event.RecompenseEvent;
 import com.plateformeopportunites.common.event.SseNotificationEvent;
 import com.plateformeopportunites.common.redis.RedisService;
-import com.plateformeopportunites.common.service.PusherNotificationService;
 import com.plateformeopportunites.finance.service.WalletService;
 import com.plateformeopportunites.identity.entity.Administrateur;
 import com.plateformeopportunites.identity.entity.Commanditaire;
@@ -39,7 +38,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -59,7 +57,6 @@ public class SondageService {
     private final WalletService walletService;
     private final ApplicationEventPublisher eventPublisher;
     private final RedisService redisService;
-    private final PusherNotificationService pusherNotificationService;
 
     // ─── Création ─────────────────────────────────────────────────────────────
 
@@ -152,17 +149,20 @@ public class SondageService {
     @Transactional
     public void activer(UUID sondageId) {
         Sondage sondage = getSondage(sondageId);
+        if (sondage.getStatut() != StatutSondage.BROUILLON) {
+            throw new IllegalStateException("Seul un sondage en brouillon peut être activé");
+        }
         if (sondageEligibiliteRepository.findBySondageId(sondageId).isEmpty()) {
             throw new IllegalStateException("Impossible d'activer : aucun test d'éligibilité configuré pour ce sondage");
         }
 
         // Réserve le budget nécessaire depuis le wallet plateforme
-        BigDecimal budgetNecessaire = sondage.getRecompense()
-                .multiply(BigDecimal.valueOf(sondage.getQuotaVise()));
-        walletService.reserverBudgetSondage(sondageId, budgetNecessaire);
+        BigDecimal budgetNecessaire = calculerBudgetNecessaire(sondage);
+        walletService.reserverBudgetSondage(sondageId, sondage.getAdmin().getId(), budgetNecessaire);
 
         sondage.setBudgetReserve(budgetNecessaire);
         sondage.setBudgetDistribue(BigDecimal.ZERO);
+        sondage.setBudgetLibere(false);
         sondage.setStatut(StatutSondage.ACTIF);
         sondageRepository.save(sondage);
 
@@ -177,18 +177,13 @@ public class SondageService {
     public void cloturerManuellement(UUID sondageId) {
         Sondage sondage = getSondage(sondageId);
 
-        // Libère le reliquat non distribué vers soldePlateforme
-        BigDecimal reserve   = sondage.getBudgetReserve()   != null ? sondage.getBudgetReserve()   : BigDecimal.ZERO;
-        BigDecimal distribue = sondage.getBudgetDistribue() != null ? sondage.getBudgetDistribue() : BigDecimal.ZERO;
-        BigDecimal reliquat  = reserve.subtract(distribue);
-        if (reliquat.compareTo(BigDecimal.ZERO) > 0) {
-            walletService.libererBudgetSondage(sondageId, reliquat);
-        }
+        distribuerManuel(sondageId);
+        libererReliquatSiNecessaire(sondage);
 
-        sondage.setStatut(StatutSondage.EN_ATTENTE_DISTRIBUTION);
+        sondage.setStatut(StatutSondage.CLOTURE);
         sondageRepository.save(sondage);
 
-        String payloadDistribution = "{\"id\":\"" + sondageId + "\",\"statut\":\"EN_ATTENTE_DISTRIBUTION\"}";
+        String payloadDistribution = "{\"id\":\"" + sondageId + "\",\"statut\":\"CLOTURE\"}";
         eventPublisher.publishEvent(new SseNotificationEvent(this,
                 "sondage:" + sondageId, "STATUT", payloadDistribution));
         eventPublisher.publishEvent(new SseNotificationEvent(this,
@@ -198,6 +193,10 @@ public class SondageService {
     @Transactional
     public SondageResponse modifier(UUID sondageId, ModifierSondageRequest req) {
         Sondage sondage = getSondage(sondageId);
+        boolean modifieBudget = req.getQuotaVise() != null || req.getRecompense() != null;
+        if (modifieBudget && sondage.getStatut() != StatutSondage.BROUILLON) {
+            throw new IllegalStateException("Le quota et la récompense ne peuvent plus être modifiés après réservation du budget");
+        }
         if (req.getTitre() != null && !req.getTitre().isBlank()) sondage.setTitre(req.getTitre());
         if (req.getDescription() != null) sondage.setDescription(req.getDescription());
         if (req.getQuotaVise() != null) sondage.setQuotaVise(req.getQuotaVise());
@@ -356,21 +355,14 @@ public class SondageService {
 
     @Transactional
     public SondageReponse repondre(UUID participantId, UUID sondageId, RepondreRequest req) {
-        // Vérification Redis — atomique, évite les race conditions
-        if (redisService.aDejaVote(sondageId, participantId)) {
-            throw new IllegalArgumentException("Déjà répondu à ce sondage");
-        }
-        boolean reserve = redisService.marquerVoteSiAbsent(sondageId, participantId, 90L * 24 * 3600);
-        if (!reserve) {
-            throw new IllegalArgumentException("Déjà répondu à ce sondage");
-        }
-        if (sondageReponseRepository.existsBySondageIdAndUtilisateurId(sondageId, participantId)) {
-            throw new IllegalArgumentException("Déjà répondu à ce sondage");
-        }
-
         Utilisateur utilisateur = utilisateurRepository.findById(participantId)
                 .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable"));
         Sondage sondage = getSondage(sondageId);
+        verifierSondageOuvert(sondage);
+
+        if (sondageReponseRepository.existsBySondageIdAndUtilisateurId(sondageId, participantId)) {
+            throw new IllegalArgumentException("Déjà répondu à ce sondage");
+        }
 
         // Vérification du niveau KYC requis par le sondage
         if (sondage.getNiveauVerification() != NiveauVerification.AUCUN) {
@@ -386,6 +378,15 @@ public class SondageService {
                 .orElseThrow(() -> new IllegalArgumentException("Test d'éligibilité requis avant de répondre"));
         if (!resultat.getEstEligible()) {
             throw new IllegalArgumentException("Non éligible à ce sondage");
+        }
+
+        // Vérification Redis — atomique, évite les race conditions une fois les règles métier validées.
+        if (redisService.aDejaVote(sondageId, participantId)) {
+            throw new IllegalArgumentException("Déjà répondu à ce sondage");
+        }
+        boolean reserve = redisService.marquerVoteSiAbsent(sondageId, participantId, 90L * 24 * 3600);
+        if (!reserve) {
+            throw new IllegalArgumentException("Déjà répondu à ce sondage");
         }
 
         SondageReponse sondageReponse = SondageReponse.builder()
@@ -463,6 +464,9 @@ public class SondageService {
         if (approuve) {
             // repondantsActuels ne compte que les réponses VALIDES
             Sondage sondage = reponse.getSondage();
+            if (sondage.getRepondantsActuels() >= sondage.getQuotaVise()) {
+                throw new IllegalStateException("Quota déjà atteint : cette réponse ne peut plus être récompensée");
+            }
             sondage.setRepondantsActuels(sondage.getRepondantsActuels() + 1);
             sondageRepository.save(sondage);
             eventPublisher.publishEvent(new SseNotificationEvent(this,
@@ -621,11 +625,14 @@ public class SondageService {
 
     // ─── Scheduler ───────────────────────────────────────────────────────────
 
+    @Transactional
     public void cloturerExpires() {
         List<Sondage> expires = sondageRepository
                 .findByStatutAndDateExpirationBefore(StatutSondage.ACTIF, LocalDateTime.now());
         for (Sondage s : expires) {
-            s.setStatut(StatutSondage.EN_ATTENTE_DISTRIBUTION);
+            distribuerManuel(s.getId());
+            libererReliquatSiNecessaire(s);
+            s.setStatut(StatutSondage.CLOTURE);
             sondageRepository.save(s);
         }
     }
@@ -637,12 +644,18 @@ public class SondageService {
 
         Sondage sondage = reponse.getSondage();
         UUID participantId = reponse.getUtilisateur().getId();
+        if (Boolean.TRUE.equals(sondage.getBudgetLibere())) {
+            throw new IllegalStateException("Le budget de ce sondage a déjà été libéré");
+        }
 
         // montantFCFA = valeur FCFA de la récompense (toujours en FCFA dans budgetReserve)
         BigDecimal montantFCFA = sondage.getRecompense();
+        if (budgetRestant(sondage).compareTo(montantFCFA) < 0) {
+            throw new IllegalStateException("Budget du sondage insuffisant pour distribuer cette récompense");
+        }
 
         // 1. Débiter soldeReserve du wallet plateforme
-        walletService.debiterPourDistribution(sondage.getId(), montantFCFA, sondage.getTypeRecompense(), mode);
+        walletService.debiterPourDistribution(sondage.getId(), sondage.getAdmin().getId(), montantFCFA, sondage.getTypeRecompense(), mode);
 
         // 2. Créditer le participant
         if (sondage.getTypeRecompense() == TypeRecompense.POINTS) {
@@ -655,27 +668,56 @@ public class SondageService {
         }
 
         // 3. Tracker le budget distribué sur le sondage
-        BigDecimal distribueAvant = sondage.getBudgetDistribue() != null ? sondage.getBudgetDistribue() : BigDecimal.ZERO;
-        BigDecimal distribueApres = distribueAvant.add(montantFCFA);
-        sondage.setBudgetDistribue(distribueApres);
+        BigDecimal distribue = sondage.getBudgetDistribue() != null ? sondage.getBudgetDistribue() : BigDecimal.ZERO;
+        sondage.setBudgetDistribue(distribue.add(montantFCFA));
         sondageRepository.save(sondage);
-
-        // Alerte admin la première fois que 80% du budget réservé est distribué.
-        BigDecimal reserve = sondage.getBudgetReserve();
-        if (reserve != null && reserve.compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal seuil80 = reserve.multiply(new BigDecimal("0.8"));
-            if (distribueAvant.compareTo(seuil80) < 0 && distribueApres.compareTo(seuil80) >= 0) {
-                pusherNotificationService.notifierAdmins("SONDAGE_BUDGET_PRESQUE_EPUISE", Map.of(
-                        "id", sondage.getId(), "titre", sondage.getTitre(),
-                        "budgetDistribue", distribueApres, "budgetReserve", reserve));
-            }
-        }
 
         // 4. Marquer la récompense comme versée
         reponse.setRecompenseVersee(true);
         sondageReponseRepository.save(reponse);
 
         eventPublisher.publishEvent(new RecompenseEvent(this, sondage.getId(), participantId));
+    }
+
+    private void verifierSondageOuvert(Sondage sondage) {
+        if (sondage.getStatut() != StatutSondage.ACTIF) {
+            throw new IllegalStateException("Ce sondage n'est pas ouvert aux réponses");
+        }
+        if (sondage.getDateExpiration().isBefore(LocalDateTime.now())) {
+            throw new IllegalStateException("Ce sondage est expiré");
+        }
+        if (sondage.getRepondantsActuels() >= sondage.getQuotaVise()) {
+            throw new IllegalStateException("Quota atteint : ce sondage n'accepte plus de réponses");
+        }
+        if (Boolean.TRUE.equals(sondage.getBudgetLibere())) {
+            throw new IllegalStateException("Le budget de ce sondage a déjà été libéré");
+        }
+        if (budgetRestant(sondage).compareTo(sondage.getRecompense()) < 0) {
+            throw new IllegalStateException("Budget restant insuffisant pour accepter une nouvelle réponse récompensée");
+        }
+    }
+
+    private BigDecimal calculerBudgetNecessaire(Sondage sondage) {
+        return zero(sondage.getRecompense()).multiply(BigDecimal.valueOf(sondage.getQuotaVise()));
+    }
+
+    private BigDecimal budgetRestant(Sondage sondage) {
+        if (Boolean.TRUE.equals(sondage.getBudgetLibere())) return BigDecimal.ZERO;
+        BigDecimal restant = zero(sondage.getBudgetReserve()).subtract(zero(sondage.getBudgetDistribue()));
+        return restant.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : restant;
+    }
+
+    private void libererReliquatSiNecessaire(Sondage sondage) {
+        if (Boolean.TRUE.equals(sondage.getBudgetLibere())) return;
+        BigDecimal reliquat = budgetRestant(sondage);
+        if (reliquat.compareTo(BigDecimal.ZERO) > 0) {
+            walletService.libererBudgetSondage(sondage.getId(), sondage.getAdmin().getId(), reliquat);
+        }
+        sondage.setBudgetLibere(true);
+    }
+
+    private BigDecimal zero(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 
     private Sondage getSondage(UUID id) {
@@ -731,6 +773,8 @@ public class SondageService {
                 .statut(s.getStatut())
                 .budgetReserve(s.getBudgetReserve())
                 .budgetDistribue(s.getBudgetDistribue())
+                .budgetRestant(budgetRestant(s))
+                .budgetLibere(Boolean.TRUE.equals(s.getBudgetLibere()))
                 .createdAt(s.getCreatedAt())
                 .questions(questions)
                 .hasEligibilite(sondageEligibiliteRepository.existsBySondageId(s.getId()))

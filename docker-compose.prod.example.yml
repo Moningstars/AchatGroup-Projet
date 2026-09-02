@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: plateforme_opportunites
+      POSTGRES_USER: opportunihub
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - opportunihub_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opportunihub -d plateforme_opportunites"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - opportunihub_redis_data:/data
+    restart: unless-stopped
+
+  backend:
+    image: eclipse-temurin:21-jre
+    working_dir: /app
+    command: ["java", "-jar", "/app/app-1.0.0-SNAPSHOT.jar"]
+    environment:
+      DB_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/plateforme_opportunites
+      SPRING_DATASOURCE_USERNAME: opportunihub
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+    volumes:
+      - ./backend/app/target/app-1.0.0-SNAPSHOT.jar:/app/app-1.0.0-SNAPSHOT.jar:ro
+      - ./backend/secrets.properties:/app/secrets.properties:ro
+      - ./.runtime/uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend/admin/dist:/srv/admin:ro
+      - ./frontend/Opportunités de sondage et réduction/dist:/srv/app:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  opportunihub_postgres_data:
+  opportunihub_redis_data:
+  caddy_data:
+  caddy_config:

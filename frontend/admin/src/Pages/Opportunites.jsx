@@ -1,11 +1,11 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { Loader2, Plus, Trash2, X, Upload, Package, Eye, Users, CalendarClock, Layers, Image, Edit2, Sparkles } from 'lucide-react'
+import { Loader2, Plus, Trash2, X, Upload, Package, Eye, Users, CalendarClock, Layers, Image, Edit2, Sparkles, Search, Download, Clock, CheckSquare, CalendarDays, UserCheck, ArrowLeft, ClipboardList, Truck, PackageCheck, AlertTriangle, Flag, Route } from 'lucide-react'
 import { Badge, Card, Table, Th, Td, Tr, Spinner, EmptyState, ProgressBar, FilterPill } from '../components/ui'
 import { useSSE } from '../hooks/useSSE'
 import {
   getAdminOpportunites, activerOpportunite, cloturerOpportunite,
   creerOpportunite, modifierOpportunite, uploadOpportuniteImage, deleteOpportuniteImage,
-  genererSpecsOpportunite, getParticipantsOpportunite,
+  genererSpecsOpportunite, getParticipantsOpportunite, planifierParticipantsOpportunite, mettreAJourLivraisonParticipants,
 } from '../services/api'
 
 const BACKEND = `http://${window.location.hostname}:8080`
@@ -18,11 +18,86 @@ function formatDate(dt) {
   if (!dt) return '—'
   return new Date(dt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
 }
+function formatDateTime(dt) {
+  if (!dt) return '—'
+  return new Date(dt).toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+function todaySlot() {
+  const d = new Date()
+  d.setMinutes(0, 0, 0)
+  d.setHours(Math.max(9, d.getHours()))
+  return d.toISOString().slice(0, 16)
+}
+function tomorrowSlot() {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  d.setHours(9, 0, 0, 0)
+  return d.toISOString().slice(0, 16)
+}
+function escapeCsv(value) {
+  const text = String(value ?? '')
+  return /[",\n;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+function downloadCsv(filename, rows) {
+  const csv = rows.map(row => row.map(escapeCsv).join(';')).join('\n')
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
 
 const STATUT_COLOR = { BROUILLON: 'gray', ACTIVE: 'sky', CLOTUREE: 'emerald', ANNULEE: 'rose' }
 const STATUT_LABEL = { BROUILLON: 'Brouillon', ACTIVE: 'Active', CLOTUREE: 'Clôturée', ANNULEE: 'Annulée' }
 const STATUT_PARTICIPATION_COLOR = { EN_ATTENTE: 'gray', CONFIRMEE: 'emerald', REMBOURSEE: 'sky' }
 const STATUT_PARTICIPATION_LABEL = { EN_ATTENTE: 'En attente', CONFIRMEE: 'Confirmée', REMBOURSEE: 'Remboursée' }
+const STATUT_LIVRAISON_COLOR = {
+  EN_ATTENTE_QUOTA: 'gray',
+  A_PREPARER: 'amber',
+  PREPARATION: 'indigo',
+  PRET_LIVRAISON: 'violet',
+  EN_LIVRAISON: 'sky',
+  LIVRE_A_CONFIRMER: 'amber',
+  LIVRE_CONFIRME: 'emerald',
+  ECHEC_LIVRAISON: 'rose',
+  LITIGE: 'rose',
+  ANNULE: 'gray',
+}
+const STATUT_LIVRAISON_LABEL = {
+  EN_ATTENTE_QUOTA: 'Quota non validé',
+  A_PREPARER: 'À préparer',
+  PREPARATION: 'Préparation',
+  PRET_LIVRAISON: 'Prêt',
+  EN_LIVRAISON: 'En livraison',
+  LIVRE_A_CONFIRMER: 'Remis — à confirmer',
+  LIVRE_CONFIRME: 'Reçu confirmé',
+  ECHEC_LIVRAISON: 'Échec livraison',
+  LITIGE: 'Litige',
+  ANNULE: 'Annulé',
+}
+const STATUT_LIVRAISON_OPTIONS = [
+  'A_PREPARER',
+  'PREPARATION',
+  'PRET_LIVRAISON',
+  'EN_LIVRAISON',
+  'LIVRE_A_CONFIRMER',
+  'LIVRE_CONFIRME',
+  'ECHEC_LIVRAISON',
+  'LITIGE',
+  'ANNULE',
+]
+const ETAPES_LIVRAISON = [
+  { key: 'A_PREPARER', label: 'À préparer', hint: 'Créer le lot' },
+  { key: 'PREPARATION', label: 'Préparation', hint: 'Colis en cours' },
+  { key: 'PRET_LIVRAISON', label: 'Prêt', hint: 'Remise livreur' },
+  { key: 'EN_LIVRAISON', label: 'En route', hint: 'Suivi terrain' },
+  { key: 'LIVRE_A_CONFIRMER', label: 'À confirmer', hint: 'Attente client' },
+  { key: 'LIVRE_CONFIRME', label: 'Terminé', hint: 'Reçu confirmé' },
+]
 
 const PALIER_VIDE = { seuilMin: '', seuilMax: '', prix: '' }
 
@@ -94,12 +169,37 @@ function ImagePicker({ images, onChange }) {
 function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, actionId }) {
   const [participants, setParticipants] = useState([])
   const [loadingParticipants, setLoadingParticipants] = useState(false)
+  const [searchParticipant, setSearchParticipant] = useState('')
+  const [statutFiltre, setStatutFiltre] = useState('TOUS')
+  const [planningFiltre, setPlanningFiltre] = useState('TOUS')
+  const [selectedIds, setSelectedIds] = useState([])
+  const [plan, setPlan] = useState({})
+  const [bulkSlot, setBulkSlot] = useState(todaySlot())
+  const [livraisonFiltre, setLivraisonFiltre] = useState('TOUS')
+  const [bulkLivraison, setBulkLivraison] = useState('PREPARATION')
+  const [bulkDeliveryInfo, setBulkDeliveryInfo] = useState({ transporteur: '', referenceLivraison: '', dateLivraisonPrevue: '', noteLivraison: '' })
+  const [savingLivraison, setSavingLivraison] = useState(false)
 
   useEffect(() => {
     if (!item) return
+    setSelectedIds([])
+    setSearchParticipant('')
+    setStatutFiltre('TOUS')
+    setPlanningFiltre('TOUS')
+    setLivraisonFiltre('TOUS')
+    setBulkSlot(todaySlot())
+    setBulkLivraison('PREPARATION')
+    setBulkDeliveryInfo({ transporteur: '', referenceLivraison: '', dateLivraisonPrevue: '', noteLivraison: '' })
     setLoadingParticipants(true)
     getParticipantsOpportunite(item.id)
-      .then(setParticipants)
+      .then(data => {
+        setParticipants(data)
+        setPlan(Object.fromEntries(
+          data
+            .filter(p => p.creneauTraitement || p.noteTraitement)
+            .map(p => [p.id, { slot: p.creneauTraitement ? p.creneauTraitement.slice(0, 16) : '', note: p.noteTraitement || '' }])
+        ))
+      })
       .catch(() => setParticipants([]))
       .finally(() => setLoadingParticipants(false))
   }, [item?.id])
@@ -109,192 +209,671 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
     ? Math.min(100, Math.round((item.participantsActuels / item.seuilMinimum) * 100)) : 0
   const paliers = [...(item.paliers || [])].sort((a, b) => a.seuilMin - b.seuilMin)
   const images  = item.images || []
+  const palierActif = paliers.find(p => item.participantsActuels >= p.seuilMin && item.participantsActuels <= p.seuilMax) || paliers.at(-1)
+  const prixActuel = item.prixActuel ?? palierActif?.prix ?? item.prixNormal
+  const economies = Math.max(0, Number(item.prixNormal || 0) - Number(prixActuel || 0))
+  const totalQuantites = participants.reduce((sum, p) => sum + Number(p.quantite || 0), 0)
+  const totalMontantGele = participants.reduce((sum, p) => sum + Number(p.montantGele || 0), 0)
+  const livraisonCounts = participants.reduce((acc, p) => {
+    const s = p.statutLivraison || 'EN_ATTENTE_QUOTA'
+    acc[s] = (acc[s] || 0) + 1
+    return acc
+  }, {})
+  const livraisonMoyenne = participants.length
+    ? Math.round(participants.reduce((sum, p) => sum + Number(p.progressionLivraison || 0), 0) / participants.length)
+    : 0
+  const livraisonsConfirmees = livraisonCounts.LIVRE_CONFIRME || 0
+  const livraisonsProblemes = (livraisonCounts.ECHEC_LIVRAISON || 0) + (livraisonCounts.LITIGE || 0)
+  const livraisonEnAttenteConfirmation = livraisonCounts.LIVRE_A_CONFIRMER || 0
+  const placesRestantes = item.seuilMaximal != null ? Math.max(0, item.seuilMaximal - item.participantsActuels) : null
+  const joursRestants = item.dateExpiration ? Math.ceil((new Date(item.dateExpiration) - new Date()) / 86400000) : null
+  const prochaineAction = livraisonsProblemes > 0
+    ? { icon: AlertTriangle, title: 'Traiter les problèmes', text: `${livraisonsProblemes} livraison(s) en échec ou litige demandent une action humaine.`, color: 'rose' }
+    : livraisonEnAttenteConfirmation > 0
+      ? { icon: PackageCheck, title: 'Relancer les confirmations', text: `${livraisonEnAttenteConfirmation} participant(s) doivent confirmer la réception.`, color: 'amber' }
+      : (livraisonCounts.EN_LIVRAISON || 0) > 0
+        ? { icon: Truck, title: 'Suivre les livreurs', text: `${livraisonCounts.EN_LIVRAISON} livraison(s) sont actuellement en route.`, color: 'sky' }
+        : (livraisonCounts.A_PREPARER || 0) + (livraisonCounts.PREPARATION || 0) + (livraisonCounts.PRET_LIVRAISON || 0) > 0
+          ? { icon: ClipboardList, title: 'Préparer le prochain lot', text: 'Sélectionnez les participants à traiter aujourd’hui puis avancez le statut du lot.', color: 'violet' }
+          : { icon: CheckSquare, title: 'Suivi à jour', text: 'Aucune action urgente détectée sur cette opportunité.', color: 'emerald' }
+
+  const savePlan = (nextPlan) => {
+    setPlan(nextPlan)
+  }
+
+  const participantPlan = (id) => plan[id] || {}
+  const setParticipantPlan = (id, patch) => {
+    const next = { ...participantPlan(id), ...patch, updatedAt: new Date().toISOString() }
+    savePlan({ ...plan, [id]: next })
+    planifierParticipantsOpportunite(item.id, {
+      participationIds: [id],
+      creneauTraitement: next.slot ? new Date(next.slot).toISOString() : null,
+      noteTraitement: next.note || '',
+    }).then(setParticipants).catch(() => {})
+  }
+
+  const filteredParticipants = (() => {
+    const q = searchParticipant.trim().toLowerCase()
+    return participants.filter(p => {
+      const matchesSearch = !q || [p.nom, p.telephone, p.utilisateurId].some(v => String(v || '').toLowerCase().includes(q))
+      const matchesStatut = statutFiltre === 'TOUS' || p.statut === statutFiltre
+      const matchesLivraison = livraisonFiltre === 'TOUS' || p.statutLivraison === livraisonFiltre || (livraisonFiltre === 'PRIORITAIRES' && p.prioriteTraitement)
+      const slot = participantPlan(p.id).slot
+      const hasSlot = Boolean(slot)
+      const slotDay = hasSlot ? slot.slice(0, 10) : ''
+      const today = todaySlot().slice(0, 10)
+      const tomorrow = tomorrowSlot().slice(0, 10)
+      const matchesPlanning =
+        planningFiltre === 'TOUS' ||
+        (planningFiltre === 'NON_PLANIFIES' && !hasSlot) ||
+        (planningFiltre === 'AUJOURDHUI' && slotDay === today) ||
+        (planningFiltre === 'DEMAIN' && slotDay === tomorrow) ||
+        (planningFiltre === 'PLANIFIES' && hasSlot)
+      return matchesSearch && matchesStatut && matchesLivraison && matchesPlanning
+    })
+  })()
+
+  const selectedParticipants = filteredParticipants.filter(p => selectedIds.includes(p.id))
+  const allVisibleSelected = filteredParticipants.length > 0 && filteredParticipants.every(p => selectedIds.includes(p.id))
+  const toggleAllVisible = () => {
+    if (allVisibleSelected) {
+      setSelectedIds(ids => ids.filter(id => !filteredParticipants.some(p => p.id === id)))
+    } else {
+      setSelectedIds(ids => Array.from(new Set([...ids, ...filteredParticipants.map(p => p.id)])))
+    }
+  }
+  const toggleSelected = (id) => {
+    setSelectedIds(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id])
+  }
+  const planSelected = (slot) => {
+    if (selectedParticipants.length === 0) return
+    const nextPlan = { ...plan }
+    selectedParticipants.forEach(p => {
+      nextPlan[p.id] = { ...nextPlan[p.id], slot, updatedAt: new Date().toISOString() }
+    })
+    savePlan(nextPlan)
+    planifierParticipantsOpportunite(item.id, {
+      participationIds: selectedParticipants.map(p => p.id),
+      creneauTraitement: slot ? new Date(slot).toISOString() : null,
+      noteTraitement: undefined,
+    }).then(setParticipants).catch(() => {})
+  }
+  const clearSelectedPlan = () => {
+    if (selectedParticipants.length === 0) return
+    const nextPlan = { ...plan }
+    selectedParticipants.forEach(p => {
+      delete nextPlan[p.id]
+    })
+    savePlan(nextPlan)
+    planifierParticipantsOpportunite(item.id, {
+      participationIds: selectedParticipants.map(p => p.id),
+      creneauTraitement: null,
+      noteTraitement: '',
+    }).then(setParticipants).catch(() => {})
+  }
+  const updateLivraison = async (participationIds, patch) => {
+    if (!participationIds.length) return
+    setSavingLivraison(true)
+    try {
+      const next = await mettreAJourLivraisonParticipants(item.id, {
+        participationIds,
+        ...patch,
+      })
+      setParticipants(next)
+      setPlan(Object.fromEntries(
+        next
+          .filter(p => p.creneauTraitement || p.noteTraitement)
+          .map(p => [p.id, { slot: p.creneauTraitement ? p.creneauTraitement.slice(0, 16) : '', note: p.noteTraitement || '' }])
+      ))
+    } finally {
+      setSavingLivraison(false)
+    }
+  }
+  const updateSelectedLivraison = (patch) => updateLivraison(selectedParticipants.map(p => p.id), patch)
+  const applyBulkLivraison = () => {
+    updateSelectedLivraison({
+      statutLivraison: bulkLivraison,
+      transporteur: bulkDeliveryInfo.transporteur || undefined,
+      referenceLivraison: bulkDeliveryInfo.referenceLivraison || undefined,
+      dateLivraisonPrevue: bulkDeliveryInfo.dateLivraisonPrevue ? new Date(bulkDeliveryInfo.dateLivraisonPrevue).toISOString() : undefined,
+      noteLivraison: bulkDeliveryInfo.noteLivraison || undefined,
+    })
+  }
+  const exportRows = (rows) => {
+    const header = ['Nom', 'Téléphone', 'Quantité', 'Montant gelé', 'Statut paiement', 'Statut livraison', 'Progression livraison', 'Priorité', 'Inscription', 'Créneau traitement', 'Livraison prévue', 'Transporteur', 'Référence', 'Note admin', 'Note livraison', 'Commentaire participant', 'ID participant', 'ID utilisateur']
+    const body = rows.map(p => {
+      const pPlan = participantPlan(p.id)
+      return [
+        p.nom || '',
+        p.telephone || '',
+        p.quantite || 0,
+        p.montantGele || 0,
+        STATUT_PARTICIPATION_LABEL[p.statut] || p.statut || '',
+        STATUT_LIVRAISON_LABEL[p.statutLivraison] || p.statutLivraison || '',
+        `${p.progressionLivraison || 0}%`,
+        p.prioriteTraitement ? 'Oui' : 'Non',
+        formatDateTime(p.createdAt),
+        pPlan.slot ? formatDateTime(pPlan.slot) : '',
+        formatDateTime(p.dateLivraisonPrevue),
+        p.transporteur || '',
+        p.referenceLivraison || '',
+        pPlan.note || '',
+        p.noteLivraison || '',
+        p.commentaireParticipantLivraison || '',
+        p.id,
+        p.utilisateurId,
+      ]
+    })
+    downloadCsv(`participants-${item.titre.replace(/[^\w-]+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...body])
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-
-      {/* Panneau */}
-      <div className="relative z-10 w-full max-w-lg bg-white h-full overflow-y-auto shadow-2xl flex flex-col">
-
-        {/* En-tête */}
-        <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-bold text-slate-900 text-sm leading-tight">{item.titre}</p>
-            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+    <div className="fixed inset-0 z-50 bg-slate-950/55 p-3 sm:p-5">
+      <div className="mx-auto flex h-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-2xl">
+        <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <button onClick={onClose} className="mb-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-400 hover:text-slate-700">
+                <ArrowLeft size={14} /> Retour aux opportunités
+              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-xl font-black tracking-tight text-slate-950">{item.titre}</h2>
+                <Badge color={STATUT_COLOR[item.statut] || 'gray'}>{STATUT_LABEL[item.statut] || item.statut}</Badge>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
               {item.categorie && (
-                <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">{item.categorie}</span>
+                  <span className="rounded-full bg-violet-50 px-2.5 py-1 font-bold text-violet-700">{item.categorie}</span>
               )}
-              <Badge color={STATUT_COLOR[item.statut] || 'gray'}>{STATUT_LABEL[item.statut] || item.statut}</Badge>
+                <span>Créée le {formatDate(item.createdAt)}</span>
+                <span>Expire le {formatDate(item.dateExpiration)}</span>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => exportRows(filteredParticipants)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                <Download size={15} /> Exporter filtrés
+              </button>
+              <button onClick={() => onModifier(item)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                <Edit2 size={15} /> Modifier
+              </button>
+              {item.statut === 'BROUILLON' && (
+                <button onClick={() => onActiver(item.id)} disabled={actionId === item.id}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
+                  {actionId === item.id ? <Loader2 size={15} className="animate-spin" /> : null}
+                  Activer
+                </button>
+              )}
+              {item.statut === 'ACTIVE' && (
+                <button onClick={() => onCloturer(item.id)} disabled={actionId === item.id}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-50">
+                  {actionId === item.id ? <Loader2 size={15} className="animate-spin" /> : null}
+                  Clôturer
+                </button>
+              )}
+              <button onClick={onClose} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-700">
+                <X size={17} />
+              </button>
             </div>
           </div>
-          <button onClick={onClose} className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 transition">
-            <X size={16} />
-          </button>
         </div>
 
-        <div className="flex-1 px-5 py-5 space-y-6">
-
-          {/* Stats clés */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-slate-50 rounded-xl p-3 text-center">
-              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1">Prix normal</p>
-              <p className="text-sm font-bold text-slate-900 tabular-nums">{formatMontant(item.prixNormal)}</p>
-              <p className="text-[10px] text-slate-400">FCFA</p>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                  prochaineAction.color === 'rose' ? 'bg-rose-50 text-rose-600'
+                    : prochaineAction.color === 'amber' ? 'bg-amber-50 text-amber-600'
+                    : prochaineAction.color === 'sky' ? 'bg-sky-50 text-sky-600'
+                    : prochaineAction.color === 'violet' ? 'bg-violet-50 text-violet-700'
+                    : 'bg-emerald-50 text-emerald-700'
+                }`}>
+                  <prochaineAction.icon size={18} />
+                </div>
+                <div>
+                  <p className="text-sm font-black text-slate-950">{prochaineAction.title}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{prochaineAction.text}</p>
+                </div>
+              </div>
+              <div className="min-w-[220px]">
+                <div className="mb-1 flex items-center justify-between text-xs font-bold text-slate-500">
+                  <span>Complétion livraison</span>
+                  <span>{livraisonMoyenne}%</span>
+                </div>
+                <ProgressBar value={livraisonMoyenne} color={livraisonMoyenne >= 90 ? 'emerald' : livraisonMoyenne >= 50 ? 'sky' : 'amber'} />
+              </div>
             </div>
-            <div className="bg-slate-50 rounded-xl p-3 text-center">
-              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1">Participants</p>
-              <p className="text-sm font-bold text-slate-900 tabular-nums">{item.participantsActuels} / {item.seuilMinimum}</p>
-              <p className="text-[10px] text-slate-400">{pct}%</p>
-            </div>
-            <div className="bg-slate-50 rounded-xl p-3 text-center">
-              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1">Expire</p>
-              <p className="text-sm font-bold text-slate-900">{formatDate(item.dateExpiration)}</p>
+            <div className="mt-4 grid gap-2 md:grid-cols-6">
+              {ETAPES_LIVRAISON.map((step, index) => {
+                const count = livraisonCounts[step.key] || 0
+                const active = count > 0
+                return (
+                  <button key={step.key} onClick={() => setLivraisonFiltre(step.key)}
+                    className={`rounded-xl border px-3 py-2 text-left transition ${
+                      active ? 'border-violet-200 bg-violet-50' : 'border-slate-100 bg-slate-50 hover:bg-slate-100'
+                    }`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black ${
+                        active ? 'bg-violet-700 text-white' : 'bg-white text-slate-400'
+                      }`}>{index + 1}</span>
+                      <span className={`text-xs font-black tabular-nums ${active ? 'text-violet-800' : 'text-slate-400'}`}>{count}</span>
+                    </div>
+                    <p className={`mt-2 text-xs font-black ${active ? 'text-violet-900' : 'text-slate-600'}`}>{step.label}</p>
+                    <p className="text-[10px] text-slate-400">{step.hint}</p>
+                  </button>
+                )
+              })}
             </div>
           </div>
 
-          {/* Barre de progression */}
-          <div>
-            <div className="flex justify-between text-[10px] text-slate-400 mb-1.5">
-              <span className="flex items-center gap-1"><Users size={10} /> Avancement</span>
-              <span>{item.participantsActuels} sur {item.seuilMinimum} requis</span>
-            </div>
-            <ProgressBar value={pct} color="indigo" />
-            {item.seuilMaximal != null && (
-              <p className="text-[11px] text-amber-600 font-semibold mt-1.5">
-                Plafond : {item.participantsActuels} / {item.seuilMaximal} — {Math.max(0, item.seuilMaximal - item.participantsActuels)} place(s) restante(s)
-              </p>
-            )}
-          </div>
+          <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
+            <aside className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Prix de base</p>
+                  <p className="mt-2 text-lg font-black text-slate-950 tabular-nums">{formatMontant(item.prixNormal)}</p>
+                  <p className="text-[10px] text-slate-400">FCFA</p>
+                </div>
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-600">Prix actuel</p>
+                  <p className="mt-2 text-lg font-black text-emerald-800 tabular-nums">{formatMontant(prixActuel)}</p>
+                  <p className="text-[10px] text-emerald-600">-{formatMontant(economies)} FCFA / unité</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Participants</p>
+                  <p className="mt-2 text-lg font-black text-slate-950 tabular-nums">{item.participantsActuels} / {item.seuilMinimum}</p>
+                  <ProgressBar value={pct} color="indigo" className="mt-2" />
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Temps restant</p>
+                  <p className="mt-2 text-lg font-black text-slate-950">{joursRestants == null ? '—' : `${Math.max(0, joursRestants)} j`}</p>
+                  <p className="text-[10px] text-slate-400">{formatDate(item.dateExpiration)}</p>
+                </div>
+              </div>
 
-          {/* Description */}
-          {item.description && (
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Description</p>
-              <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{item.description}</p>
-            </div>
-          )}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">Pilotage rapide</p>
+                  <ClipboardList size={15} className="text-violet-500" />
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Quantités</p>
+                    <p className="font-black text-slate-900 tabular-nums">{totalQuantites}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Montant gelé</p>
+                    <p className="font-black text-slate-900 tabular-nums">{formatMontant(totalMontantGele)} FCFA</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Palier actif</p>
+                    <p className="font-black text-slate-900">{palierActif ? `${palierActif.seuilMin}-${palierActif.seuilMax}` : '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Stock restant</p>
+                    <p className="font-black text-slate-900">{placesRestantes == null ? 'Illimité' : placesRestantes}</p>
+                  </div>
+                </div>
+              </div>
 
-          {/* Fiche produit IA */}
-          {(item.specsPointsForts || item.specsCasUsage || item.specsFinePrint) && (
-            <div className="space-y-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <Sparkles size={11} /> Fiche produit enrichie
-              </p>
-              {item.specsPointsForts && (
-                <ul className="space-y-1">
-                  {item.specsPointsForts.split('\n').filter(Boolean).map((line, i) => (
-                    <li key={i} className="text-sm text-slate-600 flex gap-2">
-                      <span className="text-violet-400">•</span>{line}
-                    </li>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">Suivi livraison</p>
+                  <Truck size={15} className="text-sky-500" />
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Complétion</p>
+                    <p className="mt-1 font-black text-slate-900 tabular-nums">{livraisonMoyenne}%</p>
+                    <ProgressBar value={livraisonMoyenne} color={livraisonMoyenne >= 90 ? 'emerald' : 'sky'} className="mt-2" />
+                  </div>
+                  <div className="rounded-xl bg-emerald-50 p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Reçus confirmés</p>
+                    <p className="mt-1 font-black text-emerald-800 tabular-nums">{livraisonsConfirmees}/{participants.length}</p>
+                  </div>
+                  <div className="rounded-xl bg-violet-50 p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-violet-600">Prioritaires</p>
+                    <p className="mt-1 font-black text-violet-800 tabular-nums">{participants.filter(p => p.prioriteTraitement).length}</p>
+                  </div>
+                  <div className="rounded-xl bg-rose-50 p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600">À résoudre</p>
+                    <p className="mt-1 font-black text-rose-700 tabular-nums">{livraisonsProblemes}</p>
+                  </div>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {['EN_ATTENTE_QUOTA', 'A_PREPARER', 'PREPARATION', 'PRET_LIVRAISON', 'EN_LIVRAISON', 'LIVRE_A_CONFIRMER', 'LIVRE_CONFIRME', 'LITIGE'].map(status => (
+                    <div key={status} className="flex items-center justify-between gap-3 text-xs">
+                      <span className="font-semibold text-slate-500">{STATUT_LIVRAISON_LABEL[status]}</span>
+                      <span className="font-black tabular-nums text-slate-900">{livraisonCounts[status] || 0}</span>
+                    </div>
                   ))}
-                </ul>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="mb-3 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-slate-500">
+                  <Layers size={14} /> Paliers de prix
+                </p>
+                {paliers.length === 0 ? (
+                  <p className="text-sm text-slate-400">Aucun palier défini.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {paliers.map((p, i) => {
+                      const actif = item.participantsActuels >= p.seuilMin && item.participantsActuels <= p.seuilMax
+                      return (
+                        <div key={p.id || i} className={`rounded-xl border px-3 py-2 ${actif ? 'border-emerald-200 bg-emerald-50' : 'border-slate-100 bg-slate-50'}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`text-xs font-bold ${actif ? 'text-emerald-700' : 'text-slate-600'}`}>
+                              {p.seuilMin}–{p.seuilMax} participants
+                            </span>
+                            {actif && <Badge color="emerald">Actuel</Badge>}
+                          </div>
+                          <p className={`mt-1 text-sm font-black tabular-nums ${actif ? 'text-emerald-800' : 'text-slate-900'}`}>{formatMontant(p.prix)} FCFA</p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {(item.description || item.specsPointsForts || images.length > 0) && (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="mb-3 text-[11px] font-black uppercase tracking-wider text-slate-500">Fiche opportunité</p>
+                  {item.description && <p className="text-sm leading-relaxed text-slate-600">{item.description}</p>}
+                  {item.specsPointsForts && (
+                    <ul className="mt-3 space-y-1">
+                      {item.specsPointsForts.split('\n').filter(Boolean).slice(0, 5).map((line, i) => (
+                        <li key={i} className="flex gap-2 text-sm text-slate-600"><span className="text-violet-500">•</span>{line}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {images.length > 0 && (
+                    <div className="mt-4 grid grid-cols-4 gap-2">
+                      {images.slice(0, 4).map((img, i) => (
+                        <div key={img.id || i} className="aspect-square overflow-hidden rounded-xl bg-slate-100">
+                          <img src={imgUrl(img.url)} alt={img.legende || ''} className="h-full w-full object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
-              {item.specsCasUsage && <p className="text-sm text-slate-600 leading-relaxed">{item.specsCasUsage}</p>}
-              {item.specsFinePrint && <p className="text-[11px] text-slate-400 italic">{item.specsFinePrint}</p>}
-            </div>
-          )}
+            </aside>
 
-          {/* Paliers */}
-          {paliers.length > 0 && (
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                <Layers size={11} /> Paliers de prix
-              </p>
-              <div className="rounded-xl border border-slate-100 overflow-hidden">
-                {paliers.map((p, i) => {
-                  const dernier = i === paliers.length - 1
-                  const actif = item.participantsActuels >= p.seuilMin &&
-                    (!p.seuilMax || item.participantsActuels <= p.seuilMax)
-                  return (
-                    <div key={i} className={`flex items-center justify-between px-4 py-2.5 text-sm ${
-                      actif ? 'bg-emerald-50' : i % 2 === 0 ? 'bg-white' : 'bg-slate-50'
-                    } ${i > 0 ? 'border-t border-slate-100' : ''}`}>
-                      <span className={`text-[12px] font-medium ${actif ? 'text-emerald-700' : 'text-slate-600'}`}>
-                        {p.seuilMin}{dernier ? ' et plus' : ` – ${p.seuilMax}`} participants
-                        {actif && <span className="ml-2 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-semibold">Actif</span>}
-                      </span>
-                      <span className={`font-bold tabular-nums text-[12px] ${actif ? 'text-emerald-700' : 'text-slate-900'}`}>
-                        {formatMontant(p.prix)} FCFA
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+            <section className="space-y-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <p className="flex items-center gap-2 text-sm font-black text-slate-950">
+                      <Users size={17} className="text-violet-600" /> Participants à traiter
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Filtrez, cochez les personnes du lot du jour, puis appliquez une action. {filteredParticipants.length} visible(s), {selectedParticipants.length} sélectionné(s).
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => exportRows(selectedParticipants)} disabled={selectedParticipants.length === 0}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40">
+                      <Download size={14} /> Export sélection
+                    </button>
+                    <button onClick={() => planSelected(todaySlot())} disabled={selectedParticipants.length === 0}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-violet-700 px-3 py-2 text-xs font-bold text-white hover:bg-violet-800 disabled:opacity-40">
+                      <UserCheck size={14} /> Traiter aujourd'hui
+                    </button>
+                    <button onClick={() => planSelected(tomorrowSlot())} disabled={selectedParticipants.length === 0}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-40">
+                      <CalendarDays size={14} /> Décaler demain
+                    </button>
+                  </div>
+                </div>
 
-          {/* Participants */}
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-              <Users size={11} /> Participants ({participants.length})
-            </p>
-            {loadingParticipants ? (
-              <div className="flex justify-center py-6">
-                <Loader2 size={18} className="animate-spin text-violet-500" />
+                <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_150px_170px_170px]">
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input value={searchParticipant} onChange={e => setSearchParticipant(e.target.value)}
+                      placeholder="Rechercher nom, téléphone, ID…"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-violet-400 focus:bg-white" />
+                  </div>
+                  <select value={statutFiltre} onChange={e => setStatutFiltre(e.target.value)}
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400">
+                    <option value="TOUS">Tous statuts</option>
+                    <option value="EN_ATTENTE">En attente</option>
+                    <option value="CONFIRMEE">Confirmée</option>
+                    <option value="REMBOURSEE">Remboursée</option>
+                  </select>
+                  <select value={livraisonFiltre} onChange={e => setLivraisonFiltre(e.target.value)}
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400">
+                    <option value="TOUS">Toute livraison</option>
+                    <option value="PRIORITAIRES">Prioritaires</option>
+                    <option value="EN_ATTENTE_QUOTA">Quota non validé</option>
+                    <option value="A_PREPARER">À préparer</option>
+                    <option value="PREPARATION">Préparation</option>
+                    <option value="PRET_LIVRAISON">Prêt</option>
+                    <option value="EN_LIVRAISON">En livraison</option>
+                    <option value="LIVRE_A_CONFIRMER">À confirmer</option>
+                    <option value="LIVRE_CONFIRME">Reçu confirmé</option>
+                    <option value="LITIGE">Litiges</option>
+                  </select>
+                  <select value={planningFiltre} onChange={e => setPlanningFiltre(e.target.value)}
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400">
+                    <option value="TOUS">Tous créneaux</option>
+                    <option value="NON_PLANIFIES">Non planifiés</option>
+                    <option value="AUJOURDHUI">Aujourd'hui</option>
+                    <option value="DEMAIN">Demain</option>
+                    <option value="PLANIFIES">Planifiés</option>
+                  </select>
+                </div>
+
               </div>
-            ) : participants.length === 0 ? (
-              <p className="text-sm text-slate-400">Aucun participant pour l'instant.</p>
-            ) : (
-              <div className="rounded-xl border border-slate-100 divide-y divide-slate-100 max-h-72 overflow-y-auto">
-                {participants.map(p => (
-                  <div key={p.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 truncate">{p.nom || '—'}</p>
-                      <p className="text-xs text-slate-400 truncate">{p.telephone || '—'} · {formatDate(p.createdAt)}</p>
+
+              {selectedParticipants.length > 0 && (
+                <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-black text-violet-950">
+                        {selectedParticipants.length} participant(s) sélectionné(s)
+                      </p>
+                      <p className="mt-0.5 text-xs text-violet-700">
+                        Ce lot est votre sélection de travail. Les autres participants restent en attente pour plus tard.
+                      </p>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-xs font-semibold text-slate-600 tabular-nums">×{p.quantite}</span>
-                      <Badge color={STATUT_PARTICIPATION_COLOR[p.statut] || 'gray'}>{STATUT_PARTICIPATION_LABEL[p.statut] || p.statut}</Badge>
+                    <div className="flex flex-wrap gap-2">
+                      <button onClick={() => planSelected(todaySlot())}
+                        className="inline-flex items-center gap-1 rounded-lg bg-violet-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-800">
+                        <UserCheck size={12} /> Aujourd'hui
+                      </button>
+                      <button onClick={() => planSelected(tomorrowSlot())}
+                        className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-50">
+                        <CalendarDays size={12} /> Demain
+                      </button>
+                      <button onClick={() => updateSelectedLivraison({ prioriteTraitement: true })} disabled={savingLivraison}
+                        className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-50 disabled:opacity-50">
+                        <Flag size={12} /> Prioriser
+                      </button>
+                      <button onClick={() => setSelectedIds([])} className="rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-50">
+                        Désélectionner
+                      </button>
                     </div>
                   </div>
-                ))}
+                  <div className="mt-4 grid gap-3 lg:grid-cols-[180px_180px_1fr_1fr_auto]">
+                    <select value={bulkLivraison} onChange={e => setBulkLivraison(e.target.value)}
+                      className="rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500">
+                      {STATUT_LIVRAISON_OPTIONS.map(status => (
+                        <option key={status} value={status}>{STATUT_LIVRAISON_LABEL[status]}</option>
+                      ))}
+                    </select>
+                    <input type="datetime-local" value={bulkDeliveryInfo.dateLivraisonPrevue}
+                      onChange={e => setBulkDeliveryInfo(v => ({ ...v, dateLivraisonPrevue: e.target.value }))}
+                      title="Date de livraison prévue"
+                      className="rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500" />
+                    <input value={bulkDeliveryInfo.transporteur}
+                      onChange={e => setBulkDeliveryInfo(v => ({ ...v, transporteur: e.target.value }))}
+                      placeholder="Livreur ou transporteur"
+                      className="rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500" />
+                    <input value={bulkDeliveryInfo.referenceLivraison}
+                      onChange={e => setBulkDeliveryInfo(v => ({ ...v, referenceLivraison: e.target.value }))}
+                      placeholder="Référence colis"
+                      className="rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500" />
+                    <button onClick={applyBulkLivraison} disabled={savingLivraison}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-sky-700 px-3 py-2.5 text-xs font-bold text-white hover:bg-sky-800 disabled:opacity-40">
+                      {savingLivraison ? <Loader2 size={13} className="animate-spin" /> : <Route size={13} />}
+                      Appliquer au lot
+                    </button>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <input type="datetime-local" value={bulkSlot} onChange={e => setBulkSlot(e.target.value)}
+                      className="rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs outline-none focus:border-violet-500" />
+                    <button onClick={() => planSelected(bulkSlot)} disabled={!bulkSlot}
+                      className="rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-50 disabled:opacity-40">
+                      Planifier à cette date
+                    </button>
+                    <button onClick={clearSelectedPlan} className="rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-50">
+                      Retirer du planning
+                    </button>
+                    <button onClick={() => updateSelectedLivraison({ prioriteTraitement: false })} disabled={savingLivraison}
+                      className="rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-50 disabled:opacity-50">
+                      Retirer priorité
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                {loadingParticipants ? (
+                  <Spinner py="py-16" />
+                ) : filteredParticipants.length === 0 ? (
+                  <EmptyState icon={Users} title="Aucun participant dans cette vue" sub="Modifiez les filtres ou attendez les nouvelles participations." />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[980px] border-collapse">
+                      <thead>
+                        <tr>
+                          <Th className="w-10">
+                            <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible}
+                              aria-label="Sélectionner tous les participants visibles"
+                              className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                          </Th>
+                          <Th>Participant</Th>
+                          <Th>Commande</Th>
+                          <Th>Suivi</Th>
+                          <Th>Planning</Th>
+                          <Th>Livraison</Th>
+                          <Th>Action rapide</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredParticipants.map(p => {
+                          const pPlan = participantPlan(p.id)
+                          const isSelected = selectedIds.includes(p.id)
+                          return (
+                            <Tr key={p.id} className={isSelected ? 'bg-violet-50/60 hover:bg-violet-50' : ''}>
+                              <Td>
+                                <input type="checkbox" checked={isSelected} onChange={() => toggleSelected(p.id)}
+                                  aria-label={`Sélectionner ${p.nom || p.telephone || p.id}`}
+                                  className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                              </Td>
+                              <Td>
+                                <p className="font-bold text-slate-900">{p.nom || 'Participant sans nom'}</p>
+                                <p className="mt-0.5 text-xs text-slate-400">{p.telephone || 'Téléphone non renseigné'}</p>
+                                <p className="mt-0.5 text-[10px] text-slate-300">Inscrit le {formatDateTime(p.createdAt)}</p>
+                              </Td>
+                              <Td>
+                                <div className="space-y-1">
+                                  <p className="font-black text-slate-900 tabular-nums">×{p.quantite || 0}</p>
+                                  <p className="text-xs font-bold text-slate-600 tabular-nums">{formatMontant(p.montantGele)} FCFA</p>
+                                  <Badge color={STATUT_PARTICIPATION_COLOR[p.statut] || 'gray'}>{STATUT_PARTICIPATION_LABEL[p.statut] || p.statut}</Badge>
+                                </div>
+                              </Td>
+                              <Td>
+                                <div className="min-w-44 space-y-2">
+                                  <Badge color={STATUT_LIVRAISON_COLOR[p.statutLivraison] || 'gray'}>
+                                    {STATUT_LIVRAISON_LABEL[p.statutLivraison] || p.statutLivraison || 'Quota non validé'}
+                                  </Badge>
+                                  {p.prioriteTraitement && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-black text-violet-700">
+                                      <Flag size={10} /> Prioritaire
+                                    </span>
+                                  )}
+                                  {p.commentaireParticipantLivraison && (
+                                    <span className="text-[10px] text-slate-400">Participant : {p.commentaireParticipantLivraison}</span>
+                                  )}
+                                  <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-slate-500">
+                                    <span>{p.progressionLivraison || 0}%</span>
+                                    {p.statutLivraison === 'LIVRE_CONFIRME' && <PackageCheck size={12} className="text-emerald-600" />}
+                                    {(p.statutLivraison === 'LITIGE' || p.statutLivraison === 'ECHEC_LIVRAISON') && <AlertTriangle size={12} className="text-rose-600" />}
+                                  </div>
+                                  <ProgressBar value={p.progressionLivraison || 0} color={p.statutLivraison === 'LIVRE_CONFIRME' ? 'emerald' : p.statutLivraison === 'LITIGE' ? 'rose' : 'sky'} />
+                                </div>
+                              </Td>
+                              <Td>
+                                <div className="space-y-2 text-xs text-slate-600">
+                                  <p className="font-bold text-slate-500">{pPlan.slot ? formatDateTime(pPlan.slot) : 'Non planifié'}</p>
+                                  <div className="flex items-center gap-2">
+                                  <Clock size={13} className={pPlan.slot ? 'text-violet-500' : 'text-slate-300'} />
+                                  <input type="datetime-local" value={pPlan.slot || ''}
+                                    onChange={e => setParticipantPlan(p.id, { slot: e.target.value })}
+                                    className="w-44 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-violet-400 focus:bg-white" />
+                                  </div>
+                                </div>
+                              </Td>
+                              <Td>
+                                <div className="space-y-1 text-[11px] text-slate-500">
+                                  <p><span className="font-bold text-slate-700">Prévue :</span> {formatDateTime(p.dateLivraisonPrevue)}</p>
+                                  <p><span className="font-bold text-slate-700">Livreur :</span> {p.transporteur || '—'}</p>
+                                  <p><span className="font-bold text-slate-700">Réf. :</span> {p.referenceLivraison || '—'}</p>
+                                  {p.noteLivraison && <p className="text-slate-400">{p.noteLivraison}</p>}
+                                  {p.dateConfirmationParticipant && (
+                                    <p className="font-bold text-emerald-700">Confirmé le {formatDateTime(p.dateConfirmationParticipant)}</p>
+                                  )}
+                                </div>
+                              </Td>
+                              <Td>
+                                <div className="flex flex-col gap-1.5">
+                                  <select value={p.statutLivraison || 'EN_ATTENTE_QUOTA'}
+                                    onChange={e => updateLivraison([p.id], { statutLivraison: e.target.value })}
+                                    className="w-40 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-violet-400">
+                                    <option value="EN_ATTENTE_QUOTA">Quota non validé</option>
+                                    {STATUT_LIVRAISON_OPTIONS.map(status => (
+                                      <option key={status} value={status}>{STATUT_LIVRAISON_LABEL[status]}</option>
+                                    ))}
+                                  </select>
+                                  <button onClick={() => updateLivraison([p.id], { prioriteTraitement: !p.prioriteTraitement })}
+                                    disabled={savingLivraison}
+                                    className={`rounded-lg border px-2 py-1.5 text-[11px] font-bold transition disabled:opacity-50 ${
+                                      p.prioriteTraitement
+                                        ? 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'
+                                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                    }`}>
+                                    {p.prioriteTraitement ? 'Retirer priorité' : 'Marquer prioritaire'}
+                                  </button>
+                                </div>
+                              </Td>
+                            </Tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-            )}
+
+              <div className="grid gap-3 lg:grid-cols-3">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="flex items-center gap-2 text-sm font-black text-slate-900"><CheckSquare size={16} className="text-emerald-600" /> Traitement conseillé</p>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-500">Une fois le quota validé, passez les participants en préparation, traitez d'abord les prioritaires, puis avancez les statuts jusqu'à “Remis — à confirmer”.</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="flex items-center gap-2 text-sm font-black text-slate-900"><Truck size={16} className="text-sky-600" /> Livraison suivie</p>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-500">Chaque participant a son statut logistique, une progression, un livreur, une référence et une confirmation finale côté participant.</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="flex items-center gap-2 text-sm font-black text-slate-900"><CalendarClock size={16} className="text-amber-600" /> Décalage</p>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-500">Planifiez aujourd’hui, demain ou un créneau précis ; les autres restent non planifiés pour un autre horaire, sans perdre leur suivi.</p>
+                </div>
+              </div>
+            </section>
           </div>
-
-          {/* Images */}
-          {images.length > 0 && (
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                <Image size={11} /> Images ({images.length})
-              </p>
-              <div className="grid grid-cols-3 gap-2">
-                {images.map((img, i) => (
-                  <div key={i} className="aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
-                    <img src={imgUrl(img.url)} alt={img.legende || ''} className="w-full h-full object-cover" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Actions en bas */}
-        <div className="sticky bottom-0 bg-white border-t border-slate-100 px-5 py-4 flex gap-2">
-          {item.statut === 'BROUILLON' && (
-            <button onClick={() => onActiver(item.id)} disabled={actionId === item.id}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition disabled:opacity-50">
-              {actionId === item.id ? <Loader2 size={14} className="animate-spin" /> : null}
-              Activer l'opportunité
-            </button>
-          )}
-          {item.statut === 'ACTIVE' && (
-            <button onClick={() => onCloturer(item.id)} disabled={actionId === item.id}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-700 transition disabled:opacity-50">
-              {actionId === item.id ? <Loader2 size={14} className="animate-spin" /> : null}
-              Clôturer l'opportunité
-            </button>
-          )}
-          <button onClick={() => onModifier(item)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">
-            <Edit2 size={14} /> Modifier
-          </button>
-          <button onClick={onClose}
-            className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">
-            Fermer
-          </button>
         </div>
       </div>
     </div>

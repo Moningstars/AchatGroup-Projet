@@ -44,18 +44,6 @@ public class AuthController {
         return ResponseEntity.ok(authService.verifierFirebaseToken(req));
     }
 
-    // ── Contournement temporaire (Firebase pas encore configuré, firebase.dev-mode=true) ──
-
-    @Operation(
-        summary = "[DEV] Connexion par téléphone sans vérification Firebase",
-        description = "Actif uniquement tant que firebase.dev-mode=true. À retirer une fois Firebase configuré en production."
-    )
-    @SecurityRequirement(name = "")
-    @PostMapping("/dev/connexion")
-    public ResponseEntity<AuthResponse> connecterDev(@Valid @RequestBody ConnexionDevRequest req) {
-        return ResponseEntity.ok(authService.connecterDev(req.getTelephone()));
-    }
-
     // ── Déconnexion ──────────────────────────────────────────────────────────────
 
     @Operation(summary = "Déconnexion — révoque le token JWT côté serveur")

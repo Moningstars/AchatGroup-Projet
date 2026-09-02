@@ -1,6 +1,7 @@
 package com.plateformeopportunites.opportunite.entity;
 
 import com.plateformeopportunites.common.enums.StatutParticipation;
+import com.plateformeopportunites.common.enums.StatutLivraison;
 import com.plateformeopportunites.identity.entity.Utilisateur;
 import jakarta.persistence.*;
 import lombok.*;
@@ -40,6 +41,41 @@ public class Participation {
     @Column(nullable = false)
     private StatutParticipation statut;
 
+    private LocalDateTime creneauTraitement;
+
+    @Column(length = 500)
+    private String noteTraitement;
+
+    @Enumerated(EnumType.STRING)
+    private StatutLivraison statutLivraison;
+
+    private Boolean prioriteTraitement;
+
+    private LocalDateTime datePreparation;
+
+    private LocalDateTime dateExpedition;
+
+    private LocalDateTime dateLivraisonPrevue;
+
+    private LocalDateTime dateRemise;
+
+    private LocalDateTime dateConfirmationParticipant;
+
+    @Column(length = 120)
+    private String transporteur;
+
+    @Column(length = 120)
+    private String referenceLivraison;
+
+    @Column(length = 255)
+    private String adresseLivraison;
+
+    @Column(length = 500)
+    private String noteLivraison;
+
+    @Column(length = 500)
+    private String commentaireParticipantLivraison;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -47,5 +83,7 @@ public class Participation {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.statut = StatutParticipation.EN_ATTENTE;
+        this.statutLivraison = StatutLivraison.EN_ATTENTE_QUOTA;
+        this.prioriteTraitement = false;
     }
 }

@@ -28,6 +28,8 @@ public class SondageResponse {
     private StatutSondage statut;
     private BigDecimal budgetReserve;
     private BigDecimal budgetDistribue;
+    private BigDecimal budgetRestant;
+    private Boolean budgetLibere;
     private LocalDateTime createdAt;
     private List<QuestionResponse> questions;
     private boolean hasEligibilite;

@@ -3,6 +3,7 @@ target/
 *.class
 *.log
 spring-boot*.log*
+backend/app/uploads/
 
 # Secrets locaux
 secrets.properties
@@ -22,6 +23,7 @@ dist-ssr/
 *.iml
 .vscode/
 .DS_Store
+.runtime/
 
 # Redis
 dump.rdb

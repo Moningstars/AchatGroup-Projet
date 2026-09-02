@@ -71,6 +71,9 @@ public class Sondage {
     @Column(precision = 15, scale = 2)
     private BigDecimal budgetDistribue;
 
+    @Column
+    private Boolean budgetLibere;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -84,5 +87,6 @@ public class Sondage {
         this.repondantsActuels = 0;
         this.budgetReserve = BigDecimal.ZERO;
         this.budgetDistribue = BigDecimal.ZERO;
+        this.budgetLibere = false;
     }
 }

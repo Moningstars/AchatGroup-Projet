@@ -49,12 +49,6 @@ public class RedisService {
         return "opportunite:" + opportuniteId + ":participants";
     }
 
-    // ── Marqueurs de notification one-shot (évite les doublons entre passages du scheduler) ──
-
-    public boolean marquerNotificationSiAbsent(String cle, long ttlSeconds) {
-        return Boolean.TRUE.equals(redis.opsForValue().setIfAbsent("notif:" + cle, "1", ttlSeconds, TimeUnit.SECONDS));
-    }
-
     // ── Anti double-vote sondage ──────────────────────────────────────────────
 
     public boolean marquerVoteSiAbsent(UUID sondageId, UUID participantId, long ttlSeconds) {

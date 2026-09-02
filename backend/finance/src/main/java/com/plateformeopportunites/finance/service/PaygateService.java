@@ -169,8 +169,7 @@ public class PaygateService {
                         "montant", paiement.getMontant(),
                         "nouveauSolde", portefeuille.getSoldeDisponible(),
                         "reference", paymentReference,
-                        "mode", devMode ? "TEST" : paiement.getNetwork(),
-                        "raison", "RECHARGE"
+                        "mode", devMode ? "TEST" : paiement.getNetwork()
                 )
         );
     }

@@ -13,6 +13,9 @@ import com.plateformeopportunites.opportunite.service.OpportuniteService;
 import com.plateformeopportunites.sondage.dto.CreerEligibiliteRequest;
 import com.plateformeopportunites.sondage.dto.CreerSondageRequest;
 import com.plateformeopportunites.sondage.dto.SondageResponse;
+import com.plateformeopportunites.sondage.repository.ResultatEligibiliteRepository;
+import com.plateformeopportunites.sondage.repository.SondageEligibiliteRepository;
+import com.plateformeopportunites.sondage.repository.SondageReponseRepository;
 import com.plateformeopportunites.sondage.repository.SondageRepository;
 import com.plateformeopportunites.sondage.service.SondageService;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +50,9 @@ public class DataInitializer implements CommandLineRunner {
     // ── Sondage ──────────────────────────────────────────────────────────────
     private final SondageService sondageService;
     private final SondageRepository sondageRepository;
+    private final SondageEligibiliteRepository sondageEligibiliteRepository;
+    private final SondageReponseRepository sondageReponseRepository;
+    private final ResultatEligibiliteRepository resultatEligibiliteRepository;
 
     @Override
     @Transactional
@@ -54,6 +60,8 @@ public class DataInitializer implements CommandLineRunner {
         corrigerContraintesSchema();
         Administrateur admin = creerAdminSiAbsent();
         initialiserWalletPlateforme();
+        // Ne pas purger les sondages à chaque démarrage : cela casserait la traçabilité
+        // financière des budgets déjà réservés/distribués.
         if (sondageRepository.count() == 0) {
             seederSondages(admin);
         }
@@ -77,6 +85,7 @@ public class DataInitializer implements CommandLineRunner {
             "ALTER TABLE utilisateurs DROP CONSTRAINT IF EXISTS utilisateurs_niveau_verification_check",
             "ALTER TABLE transactions_plateforme DROP CONSTRAINT IF EXISTS transactions_plateforme_type_check",
             "ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_type_check",
+            "UPDATE sondages SET budget_libere = FALSE WHERE budget_libere IS NULL",
         };
         String[] recreate = {
             "ALTER TABLE transactions_plateforme ADD CONSTRAINT transactions_plateforme_type_check " +
@@ -129,6 +138,14 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     // ── Sondages ──────────────────────────────────────────────────────────────
+
+    private void supprimerTousSondages() {
+        resultatEligibiliteRepository.deleteAll();
+        sondageReponseRepository.deleteAll();
+        sondageEligibiliteRepository.deleteAll();
+        sondageRepository.deleteAll();
+        log.info("=== Anciens sondages purgés ===");
+    }
 
     @Transactional
     protected void seederSondages(Administrateur admin) {
