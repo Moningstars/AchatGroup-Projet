@@ -9,7 +9,6 @@ const CATS = [
   'Tout', 'Mode', 'Électronique', 'Alimentaire', 'Maison',
   'Beauté', 'Informatique', 'Véhicules', 'Mobilier', 'Sport'
 ]
-const QUICK_CATS = ['Tout', 'Mode', 'Électronique', 'Véhicules', 'Maison']
 
 function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
 function formatDate(dt) {
@@ -192,6 +191,10 @@ export default function Opportunites() {
     setSelectedCategories([])
   }
 
+  const selectMainCategory = (cat) => {
+    setSelectedCategories(cat === 'Tout' ? [] : [cat])
+  }
+
   const catalogueState = {
     search,
     categories: selectedCategories,
@@ -299,7 +302,7 @@ export default function Opportunites() {
             </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-0 pt-8 space-y-10">
+      <main className="max-w-7xl mx-auto px-4 lg:px-0 pt-8 space-y-10">
 
         {/* ── Expire bientôt ── */}
         {expirantBientot.length > 0 && (
@@ -401,48 +404,10 @@ export default function Opportunites() {
           </section>
         )}
 
-        {/* ── Catégories + Recherche ── */}
-        <section className="rounded-3xl border border-gray-100 bg-white p-3 shadow-sm space-y-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-              {QUICK_CATS.map(cat => {
-                const active = cat === 'Tout' ? selectedCategories.length === 0 : selectedCategories.includes(cat)
-                return (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => toggleCategory(cat)}
-                    className={`flex-shrink-0 rounded-full px-4 py-2.5 text-[11px] font-black uppercase tracking-widest transition-all ${
-                      active
-                        ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                        : 'bg-bg-light text-gray-500 border border-gray-100 hover:border-primary/30 hover:text-primary'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                )
-              })}
-
-              <button
-                type="button"
-                onClick={() => setFiltersOpen(v => !v)}
-                className={`flex-shrink-0 inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-[11px] font-black uppercase tracking-widest transition-all ${
-                  filtersOpen || selectedCategories.length > 0
-                    ? 'bg-accent text-primary border border-primary/10'
-                    : 'bg-bg-light text-gray-500 border border-gray-100 hover:border-primary/30 hover:text-primary'
-                }`}
-              >
-                <Filter size={14} />
-                Filtres
-                {selectedCategories.length > 0 && (
-                  <span className="rounded-full bg-primary text-white px-1.5 py-0.5 text-[9px]">
-                    {selectedCategories.length}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            <div className="relative w-full lg:max-w-sm shrink-0 group">
+        {/* ── Recherche e-commerce ── */}
+        <section className="rounded-3xl border border-gray-100 bg-white p-3 sm:p-4 shadow-sm space-y-3 overflow-hidden">
+          <div className="grid gap-3 lg:grid-cols-[1fr_240px_auto] lg:items-center">
+            <div className="relative w-full group">
               <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors" />
               <input
                 type="text"
@@ -455,6 +420,37 @@ export default function Opportunites() {
                 <Loader2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-primary/60" />
               )}
             </div>
+
+            <label className="relative block">
+              <span className="sr-only">Catégorie</span>
+              <select
+                value={selectedCategories.length > 1 ? '__MULTI__' : selectedCategories[0] || 'Tout'}
+                onChange={e => selectMainCategory(e.target.value)}
+                className="w-full appearance-none rounded-2xl border-2 border-gray-100 bg-bg-light px-4 py-3.5 pr-10 text-xs font-black uppercase tracking-widest text-primary outline-none transition-all focus:border-primary"
+              >
+                {selectedCategories.length > 1 && (
+                  <option value="__MULTI__" disabled>{selectedCategories.length} catégories</option>
+                )}
+                {CATS.map(cat => (
+                  <option key={cat} value={cat}>{cat === 'Tout' ? 'Toutes catégories' : cat}</option>
+                ))}
+              </select>
+              <i className="ti ti-chevron-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400" />
+            </label>
+
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(v => !v)}
+              className="inline-flex h-full min-h-12 items-center justify-center gap-2 rounded-2xl border-2 border-gray-100 bg-white px-4 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500 transition-all hover:border-primary/30 hover:text-primary"
+            >
+              <Filter size={15} />
+              Filtres avancés
+              {selectedCategories.length > 0 && (
+                <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] text-primary">
+                  {selectedCategories.length}
+                </span>
+              )}
+            </button>
           </div>
 
           {filtersOpen && (
