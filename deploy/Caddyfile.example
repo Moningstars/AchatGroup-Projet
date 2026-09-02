@@ -1,0 +1,22 @@
+app.votre-domaine.com {
+  root * /srv/app
+  try_files {path} /index.html
+  file_server
+
+  reverse_proxy /api/* backend:8080
+  reverse_proxy /uploads/* backend:8080
+}
+
+admin.votre-domaine.com {
+  root * /srv/admin
+  try_files {path} /index.html
+  file_server
+
+  reverse_proxy /api/* backend:8080
+  reverse_proxy /uploads/* backend:8080
+}
+
+api.votre-domaine.com {
+  reverse_proxy backend:8080
+}
+

@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: opportunihub-postgres
+    environment:
+      POSTGRES_DB: plateforme_opportunites
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: opportunihub_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - opportunihub_postgres18_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d plateforme_opportunites"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: opportunihub-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - opportunihub_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  backend:
+    image: eclipse-temurin:21-jre
+    container_name: opportunihub-backend
+    working_dir: /app
+    command: ["java", "-jar", "/app/app-1.0.0-SNAPSHOT.jar"]
+    environment:
+      DB_PASSWORD: opportunihub_dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/plateforme_opportunites
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend/app/target/app-1.0.0-SNAPSHOT.jar:/app/app-1.0.0-SNAPSHOT.jar:ro
+      - ./backend/secrets.properties:/app/secrets.properties:ro
+      - ./.runtime/uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  opportunihub_postgres18_data:
+  opportunihub_redis_data:
