@@ -132,6 +132,10 @@ public class WalletService {
         eventPublisher.publishEvent(new SseNotificationEvent(this,
                 "admin:global", "RETRAIT_DEMANDE",
                 "{\"utilisateurId\":\"" + participantId + "\",\"montant\":" + req.getMontant().toPlainString() + "}"));
+        pusherNotificationService.notifierAdmins("RETRAIT_DEMANDE", Map.of(
+                "utilisateurId", participantId,
+                "montant", req.getMontant()
+        ));
     }
 
     public List<TransactionResponse> listerToutesTransactions() {
@@ -161,6 +165,10 @@ public class WalletService {
         eventPublisher.publishEvent(new SseNotificationEvent(this,
                 "user:" + tx.getUtilisateurId(), "RETRAIT",
                 "{\"statut\":\"APPROUVE\",\"montant\":" + tx.getMontant().toPlainString() + "}"));
+        pusherNotificationService.notifierUtilisateur(tx.getUtilisateurId(), "RETRAIT", Map.of(
+                "statut", "APPROUVE",
+                "montant", tx.getMontant()
+        ));
     }
 
     @Transactional
@@ -181,6 +189,10 @@ public class WalletService {
         eventPublisher.publishEvent(new SseNotificationEvent(this,
                 "user:" + tx.getUtilisateurId(), "RETRAIT",
                 "{\"statut\":\"REJETE\",\"montant\":" + tx.getMontant().toPlainString() + "}"));
+        pusherNotificationService.notifierUtilisateur(tx.getUtilisateurId(), "RETRAIT", Map.of(
+                "statut", "REJETE",
+                "montant", tx.getMontant()
+        ));
     }
 
     @Transactional

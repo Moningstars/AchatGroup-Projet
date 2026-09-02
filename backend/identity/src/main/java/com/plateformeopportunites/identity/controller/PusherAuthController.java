@@ -21,11 +21,18 @@ public class PusherAuthController {
             @RequestParam("channel_name") String channelName,
             Authentication authentication) {
 
-        UUID utilisateurId = UUID.fromString(authentication.getName());
-        String canalAttendu = "private-user-" + utilisateurId;
+        boolean estAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
-        // L'utilisateur ne peut s'abonner qu'à son propre canal
-        if (!channelName.equals(canalAttendu)) {
+        boolean autorise;
+        if (estAdmin) {
+            autorise = channelName.equals("private-admin-global");
+        } else {
+            UUID utilisateurId = UUID.fromString(authentication.getName());
+            autorise = channelName.equals("private-user-" + utilisateurId);
+        }
+
+        if (!autorise) {
             return ResponseEntity.status(403).body("Canal non autorisé");
         }
 

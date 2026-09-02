@@ -46,6 +46,7 @@ public class SecurityConfig {
                                 AntPathRequestMatcher.antMatcher("/api/auth/verifier-token"),
                                 AntPathRequestMatcher.antMatcher("/api/auth/dev/**"),
                                 AntPathRequestMatcher.antMatcher("/api/admin/auth/**"),
+                                AntPathRequestMatcher.antMatcher("/api/health"),
                                 AntPathRequestMatcher.antMatcher("/api/stats"),
                                 AntPathRequestMatcher.antMatcher("/api/bannieres"),
                                 AntPathRequestMatcher.antMatcher("/api/events/opportunite/**"),
@@ -82,7 +83,14 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("*"));
+        config.setAllowedOrigins(List.of(
+                "http://localhost:5173",
+                "http://localhost:5174",
+                "http://localhost:4173",
+                "http://localhost:4174",
+                "https://opportunihub.maitrise.app",
+                "https://admin-opportunihub.maitrise.app"
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

@@ -138,6 +138,10 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
                     <configuration>
+                        <!-- Plus fiable sur Windows pendant le build reactor multi-modules :
+                             javac lit les JAR inter-modules fraichement generes sans passer
+                             par le compilateur embarque de Maven. -->
+                        <fork>true</fork>
                         <annotationProcessorPaths>
                             <path>
                                 <groupId>org.projectlombok</groupId>

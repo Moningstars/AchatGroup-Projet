@@ -10,6 +10,7 @@ secrets.properties
 .env
 .env.*
 !.env.example
+!.env.*.example
 !secrets.properties.example
 firebase-service-account.json
 

@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || `http://${window.location.hostname}:8080/api`;
+const API_BASE = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8080/api`;
 const BACKEND_BASE = API_BASE.replace(/\/api\/?$/, '');
 
 export const PARTICIPANT_TOKEN_KEY = 'opportunihub-participant-token';

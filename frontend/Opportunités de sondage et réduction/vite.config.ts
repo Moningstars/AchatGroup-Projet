@@ -31,6 +31,12 @@ export default defineConfig({
     },
   },
 
+  preview: {
+    host: '0.0.0.0',
+    port: 4173,
+    allowedHosts: ['opportunihub.maitrise.app'],
+  },
+
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
 })

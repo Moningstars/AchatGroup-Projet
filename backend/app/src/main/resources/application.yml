@@ -82,3 +82,7 @@ pusher:
   key: ${PUSHER_KEY}
   secret: ${PUSHER_SECRET}
   cluster: "eu"
+
+beams:
+  instance-id: ${BEAMS_INSTANCE_ID:}
+  secret-key: ${BEAMS_SECRET_KEY:}

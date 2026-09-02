@@ -2,6 +2,7 @@ package com.plateformeopportunites.identity.service;
 
 import com.plateformeopportunites.common.enums.NiveauVerification;
 import com.plateformeopportunites.common.event.SseNotificationEvent;
+import com.plateformeopportunites.common.service.PusherNotificationService;
 import com.plateformeopportunites.identity.dto.KycDemandeResponse;
 import com.plateformeopportunites.identity.dto.KycRequest;
 import com.plateformeopportunites.identity.dto.KycStatusResponse;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -25,6 +27,7 @@ public class KycService {
     private final UtilisateurRepository utilisateurRepository;
     private final InfoPersonnelleRepository infoPersonnelleRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final PusherNotificationService pusherNotificationService;
 
     public KycStatusResponse getStatut(UUID utilisateurId) {
         Utilisateur u = getUtilisateur(utilisateurId);
@@ -119,6 +122,7 @@ public class KycService {
 
         eventPublisher.publishEvent(new SseNotificationEvent(this,
                 "admin:global", "KYC_SOUMIS", "{\"utilisateurId\":\"" + utilisateurId + "\"}"));
+        pusherNotificationService.notifierAdmins("KYC_SOUMIS", Map.of("utilisateurId", utilisateurId));
 
         return getStatut(utilisateurId);
     }
@@ -143,6 +147,7 @@ public class KycService {
         utilisateurRepository.save(u);
         eventPublisher.publishEvent(new SseNotificationEvent(this,
                 "user:" + utilisateurId, "KYC", "{\"statut\":\"VERIFIE\"}"));
+        pusherNotificationService.notifierUtilisateur(utilisateurId, "KYC", Map.of("statut", "VERIFIE"));
     }
 
     @Transactional
@@ -155,6 +160,7 @@ public class KycService {
         utilisateurRepository.save(u);
         eventPublisher.publishEvent(new SseNotificationEvent(this,
                 "user:" + utilisateurId, "KYC", "{\"statut\":\"REJETE\"}"));
+        pusherNotificationService.notifierUtilisateur(utilisateurId, "KYC", Map.of("statut", "REJETE"));
     }
 
     private Utilisateur getUtilisateur(UUID id) {
