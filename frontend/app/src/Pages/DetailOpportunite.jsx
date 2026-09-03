@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom'
 import {
-  ShieldCheck, Users, Loader2, ChevronRight, ChevronDown, CheckCircle2, AlertCircle, Layers, Timer, Minus, Plus, Copy, Share2, ShoppingCart, PackageCheck, ExternalLink, Gift, Store, Coins, MessageCircle, Camera, Music2
+  ShieldCheck, Users, Loader2, ChevronRight, ChevronDown, CheckCircle2, AlertCircle, Layers, Timer, Minus, Plus, Copy, Share2, ShoppingCart, PackageCheck, ExternalLink, Gift, Store, Coins
 } from 'lucide-react'
 import { getOpportunite, getOpportunites, getMesParticipationsOpportunites, getSolde, souscrire, imgUrl } from '../services/api'
 import { useAuth } from '../context/AuthContext'
@@ -12,6 +12,44 @@ import { calculerProgression } from '../utils/progression'
 
 function fmt(val) { return Number(val || 0).toLocaleString('fr-FR') }
 function pad(n) { return String(n).padStart(2, '0') }
+
+function WhatsAppLogo({ className = 'h-5 w-5' }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.5 11.7a8.5 8.5 0 0 1-12.6 7.4L3 20.5l1.4-4.7A8.5 8.5 0 1 1 20.5 11.7Z" />
+      <path d="M8.2 7.7c.2-.5.5-.5.8-.5h.5c.2 0 .4.1.5.5l.8 1.8c.1.3.1.5-.1.7l-.6.8c-.2.2-.1.5 0 .7.7 1.3 1.7 2.3 3 2.9.3.1.5.1.7-.1l.9-1.1c.2-.2.4-.3.7-.2l1.8.8c.3.1.5.3.5.5 0 .3-.2 1.5-.8 2.1-.6.6-1.5.9-2.4.7-1.2-.2-2.8-.8-4.5-2.3-1.4-1.3-2.4-2.8-2.7-4-.3-1.2.2-2.5.9-3.3Z" />
+    </svg>
+  )
+}
+
+function InstagramLogo({ className = 'h-5 w-5' }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.4" cy="6.7" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+function TikTokLogo({ className = 'h-5 w-5' }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
+      <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.08 2.7 1.57 4.24 1.74v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.72-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07Z" />
+    </svg>
+  )
+}
+
+function ShareIconButton({ label, onClick, className, children }) {
+  return (
+    <button type="button" onClick={onClick} aria-label={label} title={label} className={`group relative flex h-10 w-10 items-center justify-center rounded-xl transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-primary/30 ${className}`}>
+      {children}
+      <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-950 px-2.5 py-1.5 text-[10px] font-bold text-white shadow-lg group-hover:block group-focus:block">
+        {label}
+      </span>
+    </button>
+  )
+}
 
 const SUIVI_PARTICIPATION = {
   EN_ATTENTE_QUOTA: 'Campagne en cours',
@@ -216,8 +254,16 @@ export default function DetailOpportunite() {
     }
   }
 
-  const getShareMessage = () => opportunite?.messagePartage?.trim()
-    || 'Rejoignez vite cette opportunité et profitez de ce produit à un prix imbattable !'
+  const getShareMessage = () => {
+    const ancienMessage = 'Rejoignez vite cette opportunité et profitez de ce produit à un prix imbattable !'
+    const messageConfigure = opportunite?.messagePartage?.trim()
+    const template = messageConfigure && messageConfigure !== ancienMessage
+      ? messageConfigure
+      : "🔥 Bon plan OpportuniHub !\n\nDécouvrez « {titre} » à partir de {prix} FCFA grâce à l’achat groupé.\n⏳ Rejoignez l’offre avant sa clôture et profitez du meilleur tarif.\n\n👉 Voir l’offre et participer :"
+    return template
+      .replaceAll('{titre}', opportunite?.titre || 'cette opportunité')
+      .replaceAll('{prix}', fmt(opportunite?.prixActuel || opportunite?.prixNormal))
+  }
 
   const getShareUrl = () => {
     const base = `${window.location.origin}/opportunity/${id}`
@@ -616,22 +662,12 @@ export default function DetailOpportunite() {
                       Votre lien personnel vous récompense lorsqu’un proche rejoint cette offre et finalise son achat.
                     </p>
                   )}
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                    <button type="button" onClick={handleCopyLink} className="flex h-9 items-center justify-center gap-1.5 rounded-xl bg-gray-50 px-2 text-[10px] font-black text-primary transition hover:bg-gray-100" title="Copier le lien">
-                      <Copy size={14} /> {copied ? 'Copié !' : 'Copier'}
-                    </button>
-                    <button type="button" onClick={() => handleSocialShare('whatsapp')} className="flex h-9 items-center justify-center gap-1.5 rounded-xl bg-[#25D366]/10 px-2 text-[10px] font-black text-[#128C4A] transition hover:bg-[#25D366]/20" title="Partager sur WhatsApp">
-                      <MessageCircle size={14} /> WhatsApp
-                    </button>
-                    <button type="button" onClick={() => handleSocialShare('instagram')} className="flex h-9 items-center justify-center gap-1.5 rounded-xl bg-fuchsia-50 px-2 text-[10px] font-black text-fuchsia-700 transition hover:bg-fuchsia-100" title="Partager sur Instagram">
-                      <Camera size={14} /> Instagram
-                    </button>
-                    <button type="button" onClick={() => handleSocialShare('tiktok')} className="flex h-9 items-center justify-center gap-1.5 rounded-xl bg-slate-950 px-2 text-[10px] font-black text-white transition hover:bg-slate-800" title="Partager sur TikTok">
-                      <Music2 size={14} /> TikTok
-                    </button>
-                    <button type="button" onClick={handleShare} className="col-span-2 flex h-9 items-center justify-center gap-1.5 rounded-xl border border-gray-200 px-2 text-[10px] font-black text-primary transition hover:border-primary/30 sm:col-span-1" title="Autres applications">
-                      <Share2 size={14} /> Autres
-                    </button>
+                  <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                    <ShareIconButton label={copied ? 'Lien copié !' : 'Copier le lien'} onClick={handleCopyLink} className="bg-gray-50 text-primary hover:bg-gray-100"><Copy size={18} /></ShareIconButton>
+                    <ShareIconButton label="Partager via WhatsApp" onClick={() => handleSocialShare('whatsapp')} className="bg-[#25D366] text-white shadow-sm shadow-emerald-200 hover:bg-[#20bd5a]"><WhatsAppLogo /></ShareIconButton>
+                    <ShareIconButton label="Partager via Instagram" onClick={() => handleSocialShare('instagram')} className="bg-gradient-to-br from-fuchsia-600 via-rose-500 to-amber-400 text-white shadow-sm shadow-fuchsia-200"><InstagramLogo /></ShareIconButton>
+                    <ShareIconButton label="Partager via TikTok" onClick={() => handleSocialShare('tiktok')} className="bg-slate-950 text-white shadow-sm hover:bg-slate-800"><TikTokLogo /></ShareIconButton>
+                    <ShareIconButton label="Partager via une autre application" onClick={handleShare} className="border border-gray-200 bg-white text-primary hover:border-primary/30"><Share2 size={18} /></ShareIconButton>
                   </div>
                   {shareFeedback && <p role="status" className="mt-2 text-center text-[10px] font-black text-success">{shareFeedback}</p>}
                 </div>

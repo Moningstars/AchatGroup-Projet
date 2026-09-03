@@ -40,7 +40,7 @@ function contactCommanditaire(commanditaire) {
 }
 
 const CATEGORIES = ['Mode', 'Électronique', 'Véhicules', 'Maison', 'Alimentaire', 'Informatique', 'Beauté', 'Mobilier', 'Sport']
-const MESSAGE_PARTAGE_DEFAUT = "Rejoignez vite cette opportunité et profitez de ce produit à un prix imbattable !"
+const MESSAGE_PARTAGE_DEFAUT = "🔥 Bon plan OpportuniHub !\n\nDécouvrez « {titre} » à partir de {prix} FCFA grâce à l’achat groupé.\n⏳ Rejoignez l’offre avant sa clôture et profitez du meilleur tarif.\n\n👉 Voir l’offre et participer :"
 const CREATION_STEPS = [
   { label: 'Présentation', short: 'Produit', icon: FileText },
   { label: 'Tarification', short: 'Prix', icon: BadgeDollarSign },
@@ -1327,7 +1327,7 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
                 <div className="sm:col-span-2"><label className={labelCls}>Titre du produit *</label><input autoFocus value={form.titre} onChange={e => setField('titre', e.target.value)} className={inputCls} placeholder="Ex. Table pliante de marché renforcée" /></div>
                 <div><label className={labelCls}>Catégorie</label><select value={form.categorie} onChange={e => setField('categorie', e.target.value)} className={inputCls}><option value="">— Sélectionner —</option>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                 <div className="sm:col-span-2"><label className={labelCls}>Description du produit</label><textarea value={form.description} onChange={e => setField('description', e.target.value)} rows={4} className={`${inputCls} resize-none`} placeholder="Décrivez le produit, ses caractéristiques et ses avantages…" /></div>
-                <div className="sm:col-span-2 rounded-xl border border-violet-100 bg-violet-50/60 p-4"><label className={labelCls}>Message de partage</label><textarea value={form.messagePartage} onChange={e => setField('messagePartage', e.target.value)} rows={2} maxLength={500} className={`${inputCls} resize-none bg-white`} /><p className="mt-1.5 text-[10px] leading-4 text-slate-500">Ajouté automatiquement au lien partagé sur WhatsApp, Instagram, TikTok et les autres applications.</p></div>
+                <div className="sm:col-span-2 rounded-xl border border-violet-100 bg-violet-50/60 p-4"><label className={labelCls}>Message de partage</label><textarea value={form.messagePartage} onChange={e => setField('messagePartage', e.target.value)} rows={6} maxLength={500} className={`${inputCls} resize-none bg-white`} /><p className="mt-1.5 text-[10px] leading-4 text-slate-500">Ajouté automatiquement au lien partagé. Utilisez <strong>{'{titre}'}</strong> et <strong>{'{prix}'}</strong> pour insérer les informations de l’offre.</p></div>
               </div>
             )}
 
@@ -1572,8 +1572,8 @@ function ModifierOpportuniteModal({ item, onClose, onSaved }) {
             <div className="sm:col-span-2">
               <label className={labelCls}>Message de partage</label>
               <textarea value={form.messagePartage} onChange={e => setField('messagePartage', e.target.value)}
-                rows={2} maxLength={500} className={`${inputCls} resize-none`} />
-              <p className="mt-1 text-[10px] leading-4 text-slate-400">Ce texte accompagne automatiquement le lien partagé sur WhatsApp et les autres applications.</p>
+                rows={5} maxLength={500} className={`${inputCls} resize-none`} />
+              <p className="mt-1 text-[10px] leading-4 text-slate-400">Ce texte accompagne automatiquement le lien partagé. Variables disponibles : <strong>{'{titre}'}</strong> et <strong>{'{prix}'}</strong>.</p>
             </div>
             <div>
               <label className={labelCls}>Catégorie</label>
