@@ -31,6 +31,9 @@ export const adminLogout = async () => {
 export const getAdminOpportunites = () =>
   api.get('/admin/opportunites').then(r => r.data)
 
+export const getAdminOpportunite = (id) =>
+  api.get(`/admin/opportunites/${id}`).then(r => r.data)
+
 export const activerOpportunite = (id) =>
   api.patch(`/admin/opportunites/${id}/activer`).then(r => r.data)
 

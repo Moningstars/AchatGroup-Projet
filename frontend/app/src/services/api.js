@@ -49,8 +49,13 @@ export const getStats = () =>
 
 // ── Opportunités ──────────────────────────────────────────────────────────────
 
-export const getOpportunites = () =>
-  api.get('/opportunites').then((r) => r.data)
+export const getOpportunites = (params = {}) =>
+  api.get('/opportunites', {
+    params,
+    paramsSerializer: {
+      indexes: null,
+    },
+  }).then((r) => r.data)
 
 export const getOpportunite = (id) =>
   api.get(`/opportunites/${id}`).then((r) => r.data)
@@ -60,6 +65,9 @@ export const souscrire = (id, quantite = 1) =>
 
 export const getMesParticipationsOpportunites = () =>
   api.get('/opportunites/mes-participations').then((r) => r.data)
+
+export const confirmerReceptionOpportunite = (participationId, recu = true, commentaire = '') =>
+  api.patch(`/opportunites/mes-participations/${participationId}/reception`, { recu, commentaire }).then((r) => r.data)
 
 // ── Portefeuille ──────────────────────────────────────────────────────────────
 

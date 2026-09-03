@@ -5,7 +5,12 @@ const USER_KEY = 'opportunihub-admin-user'
 const AuthContext = createContext(null)
 
 function parseJwt(token) {
-  try { return JSON.parse(atob(token.split('.')[1])) } catch { return null }
+  try {
+    const encoded = token.split('.')[1]
+    if (!encoded) return null
+    const normalized = encoded.replace(/-/g, '+').replace(/_/g, '/')
+    return JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')))
+  } catch { return null }
 }
 
 function isExpired(token) {
@@ -18,15 +23,20 @@ function isExpired(token) {
 function loadValidSession() {
   const t = localStorage.getItem(TOKEN_KEY)
   if (!t) return { token: null, admin: null }
-  if (isExpired(t)) {
+  const payload = parseJwt(t)
+  if (isExpired(t) || payload?.role !== 'ADMIN') {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
     return { token: null, admin: null }
   }
   try {
-    return { token: t, admin: JSON.parse(localStorage.getItem(USER_KEY)) }
+    const parsed = JSON.parse(localStorage.getItem(USER_KEY))
+    if (!parsed?.id || parsed.role !== 'ADMIN' || parsed.id !== payload?.sub) throw new Error('Session incohérente')
+    return { token: t, admin: parsed }
   } catch {
-    return { token: t, admin: null }
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(USER_KEY)
+    return { token: null, admin: null }
   }
 }
 
@@ -57,6 +67,10 @@ export function AuthProvider({ children }) {
 
   const login = (authResponse) => {
     const { token: t, id, nom, email, role, niveauAcces } = authResponse
+    const payload = parseJwt(t)
+    if (!payload || payload.role !== 'ADMIN' || payload.sub !== String(id)) {
+      throw new Error('Session administrateur invalide')
+    }
     localStorage.setItem(TOKEN_KEY, t)
     const userData = { id, nom, email, role, niveauAcces }
     localStorage.setItem(USER_KEY, JSON.stringify(userData))

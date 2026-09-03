@@ -21,6 +21,9 @@ public class MaParticipationOpportuniteResponse {
     private BigDecimal montantGele;
     private Integer quantite;
     private StatutParticipation statut;
+    private String statutPaiement;
+    private BigDecimal montantRestant;
+    private Boolean confirmationEnRetard;
     private StatutLivraison statutLivraison;
     private Integer progressionLivraison;
     private Boolean prioriteTraitement;

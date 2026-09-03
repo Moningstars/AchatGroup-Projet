@@ -38,6 +38,11 @@ public class AdminOpportuniteController {
         return ResponseEntity.ok(opportuniteService.listerToutes());
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<OpportuniteResponse> consulter(@PathVariable UUID id) {
+        return ResponseEntity.ok(opportuniteService.getById(id));
+    }
+
     @PostMapping
     public ResponseEntity<OpportuniteResponse> creer(Authentication auth,
                                                       @Valid @RequestBody CreerOpportuniteRequest req) {

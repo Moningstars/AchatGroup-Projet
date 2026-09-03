@@ -56,6 +56,27 @@ public class Opportunite {
     @Column(nullable = false)
     private Integer participantsActuels;
 
+    /** Fournisseur/partenaire de la campagne. Ces informations restent optionnelles. */
+    private String partenaireNom;
+
+    private String partenaireLogoUrl;
+
+    private String partenaireContact;
+
+    private String partenaireReseauxUrl;
+
+    private BigDecimal montantDuPartenaire;
+
+    private BigDecimal montantPayePartenaire;
+
+    private LocalDateTime dateConfirmationPartenaire;
+
+    /** Délai accordé au client après la date promise avant de signaler une anomalie. */
+    private Integer delaiConfirmationReceptionJours;
+
+    @Column(length = 500)
+    private String messageNotificationLivraison;
+
     @Column(nullable = false)
     private LocalDateTime dateExpiration;
 
@@ -78,5 +99,8 @@ public class Opportunite {
         this.createdAt = LocalDateTime.now();
         if (this.statut == null) this.statut = StatutOpportunite.BROUILLON;
         if (this.participantsActuels == null) this.participantsActuels = 0;
+        if (this.montantDuPartenaire == null) this.montantDuPartenaire = BigDecimal.ZERO;
+        if (this.montantPayePartenaire == null) this.montantPayePartenaire = BigDecimal.ZERO;
+        if (this.delaiConfirmationReceptionJours == null) this.delaiConfirmationReceptionJours = 3;
     }
 }

@@ -39,6 +39,15 @@ public class CreerOpportuniteRequest {
     /** Nom de la catégorie (optionnel). Créée automatiquement si inconnue. */
     private String categorie;
 
+    private String partenaireNom;
+    private String partenaireLogoUrl;
+    private String partenaireContact;
+    private String partenaireReseauxUrl;
+    @DecimalMin("0") private BigDecimal montantDuPartenaire;
+    @DecimalMin("0") private BigDecimal montantPayePartenaire;
+    @Min(1) private Integer delaiConfirmationReceptionJours;
+    @Size(max = 500) private String messageNotificationLivraison;
+
     /** true = ACTIVE immédiatement, false (défaut) = BROUILLON */
     private boolean actif = true;
 

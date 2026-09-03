@@ -92,7 +92,7 @@ public class AdminSondageController {
 
     @PatchMapping("/{id}")
     public ResponseEntity<SondageResponse> modifier(@PathVariable UUID id,
-                                                     @RequestBody ModifierSondageRequest req) {
+                                                     @Valid @RequestBody ModifierSondageRequest req) {
         return ResponseEntity.ok(sondageService.modifier(id, req));
     }
 }

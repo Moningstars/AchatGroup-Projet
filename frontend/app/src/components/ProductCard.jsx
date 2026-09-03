@@ -26,6 +26,9 @@ const ProductCard = ({ opportunity }) => {
     ? Math.round((1 - Number(prixActuel) / Number(prixNormal)) * 100) : null
 
   const { pct: progress, valide } = calculerProgression({ participantsActuels, seuilMinimum, seuilMaximal })
+  const isExpired = dateExpiration && new Date(dateExpiration) <= new Date()
+  const isOpen = opportunity.souscriptionOuverte ?? (opportunity.statut === 'ACTIVE' && !isExpired)
+  const isActivated = opportunity.activationAtteinte ?? participantsActuels >= seuilMinimum
 
   const heroImg = images?.[0]?.url
     ? imgUrl(images[0].url)
@@ -93,8 +96,8 @@ const ProductCard = ({ opportunity }) => {
             {valide
               ? seuilMaximal != null
                 ? `${participantsActuels} / ${seuilMaximal} places`
-                : 'Offre validée'
-              : `${participantsActuels} / ${seuilMinimum} participants`}
+                : `${participantsActuels} unités · offre validée`
+              : `${participantsActuels} / ${seuilMinimum} unités réservées`}
           </p>
 
           {/* Barre de progression inline — mobile seulement */}
@@ -107,6 +110,15 @@ const ProductCard = ({ opportunity }) => {
               <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${progress}%` }} />
             </div>
           </div>
+        </div>
+
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <span className="text-[9px] font-black uppercase tracking-wider text-primary">
+            Voir les offres
+          </span>
+          <span className={`text-[9px] font-black uppercase tracking-wider ${isOpen ? 'text-success' : 'text-gray-300'}`}>
+            {isOpen ? (isActivated ? 'Activée' : 'Ouverte') : 'Fermée'}
+          </span>
         </div>
       </div>
     </Link>

@@ -1,27 +1,32 @@
-import { useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { ArrowRight, X, Loader2, ShieldCheck, Lock, ArrowLeft, CheckCircle2, ChevronDown, Search, Check } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
-// import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth'
+import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth'
 import { useAuth } from '../context/AuthContext'
 import { authVerifierFirebase, completerProfil, connexionDev } from '../services/api'
-// import { firebaseAuth } from '../services/firebase'
+import { firebaseAuth, firebaseConfigured } from '../services/firebase'
 import { AsYouType, isValidPhoneNumber } from 'libphonenumber-js'
 
-// [DEV] Contournement temporaire tant que Firebase Phone Auth n'est pas configuré
-// (voir backend AuthService.connecterDev — actif tant que firebase.dev-mode=true).
-// Le flow Firebase réel est conservé en commentaire ci-dessous, à réactiver une fois
-// Firebase configuré : décommenter les imports + blocs marqués "Firebase" et supprimer
-// les blocs marqués "[DEV]".
 const DEV_OTP_CODE = '123456'
+const USE_LOCAL_AUTH = import.meta.env.DEV && !firebaseConfigured
 
 const ERREURS_FIREBASE = {
   'auth/invalid-phone-number': 'Numéro de téléphone invalide',
-  'auth/too-many-requests': 'Trop de tentatives. Réessayez plus tard',
   'auth/invalid-verification-code': 'Code invalide',
-  'auth/code-expired': 'Code expiré, redemandez-en un',
+  'auth/code-expired': 'Code expiré. Demandez un nouveau code',
+  'auth/session-expired': 'La session de vérification a expiré. Demandez un nouveau code',
+  'auth/too-many-requests': 'Trop de tentatives. Réessayez plus tard',
+  'auth/quota-exceeded': "Le quota d'envoi de SMS est atteint. Réessayez plus tard",
+  'auth/captcha-check-failed': 'La vérification anti-robot a échoué. Réessayez',
+  'auth/network-request-failed': 'Connexion réseau impossible. Vérifiez votre accès Internet',
+  'auth/unauthorized-domain': "Ce domaine n'est pas autorisé dans Firebase Authentication",
+  'auth/operation-not-allowed': "La connexion par téléphone n'est pas activée dans Firebase",
+  'auth/app-not-authorized': "Cette application n'est pas autorisée par Firebase",
+  'auth/missing-verification-code': 'Saisissez le code reçu par SMS',
+  'auth/invalid-verification-id': 'Cette demande de code a expiré. Recommencez',
 }
 
-const messageErreurFirebase = (e) => ERREURS_FIREBASE[e.code] || "Erreur d'envoi du code"
+const messageErreurFirebase = (e) => ERREURS_FIREBASE[e?.code] || e?.message || "La connexion Firebase a échoué"
 
 const PAYS = [
   { code: 'TG', indicatif: '+228', nom: 'Togo',          flag: '🇹🇬' },
@@ -36,7 +41,11 @@ const PAYS = [
 ]
 
 export default function Connexion() {
-  const [step, setStep]               = useState('phone')
+  const navigate   = useNavigate()
+  const location   = useLocation()
+  const { user, saveSession, isAuthenticated } = useAuth()
+  const from       = location.state?.from || '/'
+  const [step, setStep]               = useState(() => user?.profilComplete === false ? 'profil' : 'phone')
   const [pays, setPays]               = useState(PAYS[0])
   const [telephone, setTelephone]     = useState('')
   const [searchPays, setSearchPays]   = useState('')
@@ -45,19 +54,27 @@ export default function Connexion() {
   const [loading, setLoading]         = useState(false)
   const [error, setError]             = useState('')
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [resendDelay, setResendDelay]   = useState(0)
   const dropdownRef                   = useRef(null)
   const confirmationResultRef         = useRef(null)
   const recaptchaVerifierRef          = useRef(null)
 
-  const navigate   = useNavigate()
-  const location   = useLocation()
-  const { user, saveSession, isAuthenticated } = useAuth()
-  const from       = location.state?.from || '/'
+  const clearRecaptcha = useCallback(() => {
+    recaptchaVerifierRef.current?.clear()
+    recaptchaVerifierRef.current = null
+  }, [])
+
+  useEffect(() => clearRecaptcha, [clearRecaptcha])
+
+  useEffect(() => {
+    if (resendDelay <= 0) return undefined
+    const timer = window.setInterval(() => setResendDelay((value) => Math.max(0, value - 1)), 1000)
+    return () => window.clearInterval(timer)
+  }, [resendDelay])
 
   useEffect(() => {
     if (!isAuthenticated) return
-    if (user?.profilComplete === false) setStep('profil')
-    else navigate(from, { replace: true })
+    if (user?.profilComplete !== false) navigate(from, { replace: true })
   }, [isAuthenticated, user, from, navigate])
 
   // Fermer dropdown au clic extérieur
@@ -80,6 +97,8 @@ export default function Connexion() {
   }
 
   const handlePaysChange = (p) => {
+    clearRecaptcha()
+    confirmationResultRef.current = null
     setPays(p)
     setTelephone('')
     setDropdownOpen(false)
@@ -101,46 +120,59 @@ export default function Connexion() {
   )
 
   const handleInitier = async () => {
+    if (loading) return
     if (!telephone.trim()) { setError('Entrez votre numéro'); return }
     if (!isPhoneValid) { setError(`Numéro invalide pour ${pays.nom}`); return }
     setError(''); setLoading(true)
     try {
-      // ── Firebase ──
-      // if (!recaptchaVerifierRef.current) {
-      //   recaptchaVerifierRef.current = new RecaptchaVerifier(firebaseAuth, 'recaptcha-container', { size: 'invisible' })
-      // }
-      // confirmationResultRef.current = await signInWithPhoneNumber(firebaseAuth, telephoneComplet, recaptchaVerifierRef.current)
+      if (!firebaseConfigured && !USE_LOCAL_AUTH) {
+        throw new Error("La connexion par téléphone n'est pas configurée. Contactez l'administrateur")
+      }
+      if (!USE_LOCAL_AUTH) {
+        clearRecaptcha()
+        recaptchaVerifierRef.current = new RecaptchaVerifier(firebaseAuth, 'recaptcha-container', {
+          size: 'invisible',
+        })
+        confirmationResultRef.current = await signInWithPhoneNumber(
+          firebaseAuth,
+          telephoneComplet,
+          recaptchaVerifierRef.current,
+        )
+      }
 
-      // ── [DEV] pas d'envoi de SMS réel, code fixe ──
-      console.info(`[DEV] Code OTP pour ${telephoneComplet} : ${DEV_OTP_CODE}`)
-
+      setCode(['', '', '', '', '', ''])
+      setResendDelay(45)
       setStep('otp')
     } catch (e) {
+      clearRecaptcha()
       setError(messageErreurFirebase(e))
     } finally { setLoading(false) }
   }
 
   const handleVerifier = async (otpCode) => {
+    if (loading) return
     const finalCode = otpCode || code.join('')
     if (finalCode.length !== 6) return
     setError(''); setLoading(true)
     try {
-      // ── Firebase ──
-      // const credential = await confirmationResultRef.current.confirm(finalCode)
-      // const idToken = await credential.user.getIdToken()
-      // const auth = await authVerifierFirebase(idToken)
-
-      // ── [DEV] vérification locale du code fixe + connexion sans token Firebase ──
-      if (finalCode !== DEV_OTP_CODE) {
-        throw { response: { data: { message: 'Code invalide' } } }
+      let auth
+      if (USE_LOCAL_AUTH) {
+        if (finalCode !== DEV_OTP_CODE) throw new Error('Code local invalide')
+        auth = await connexionDev(telephoneComplet)
+      } else {
+        if (!confirmationResultRef.current) throw new Error('Demandez un nouveau code avant de continuer')
+        const credential = await confirmationResultRef.current.confirm(finalCode)
+        const idToken = await credential.user.getIdToken(true)
+        auth = await authVerifierFirebase(idToken)
       }
-      const auth = await connexionDev(telephoneComplet)
 
       saveSession(auth)
       if (!auth.profilComplete) setStep('profil')
       else navigate(from, { replace: true })
     } catch (e) {
-      setError(e.code ? messageErreurFirebase(e) : (e.response?.data?.message || 'Code invalide'))
+      setCode(['', '', '', '', '', ''])
+      document.getElementById('otp-0')?.focus()
+      setError(e?.response?.data?.message || messageErreurFirebase(e))
     } finally { setLoading(false) }
   }
 
@@ -172,6 +204,14 @@ export default function Connexion() {
 
   const stepNum    = { phone: 1, otp: 2, profil: 3 }[step]
   const totalSteps = 3
+
+  const changeNumber = () => {
+    clearRecaptcha()
+    confirmationResultRef.current = null
+    setCode(['', '', '', '', '', ''])
+    setError('')
+    setStep('phone')
+  }
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-primary/10 backdrop-blur-md">
@@ -219,7 +259,7 @@ export default function Connexion() {
               <div className="space-y-1">
                 <div className="flex items-center gap-3">
                   {step !== 'phone' && (
-                    <button onClick={() => setStep('phone')} className="w-8 h-8 rounded-full bg-bg-light flex items-center justify-center text-primary active:scale-90 transition-transform">
+                    <button onClick={changeNumber} className="w-8 h-8 rounded-full bg-bg-light flex items-center justify-center text-primary active:scale-90 transition-transform">
                       <ArrowLeft size={16} />
                     </button>
                   )}
@@ -229,7 +269,7 @@ export default function Connexion() {
                 </div>
                 <p className="text-gray-400 text-sm font-medium">
                   {step === 'phone'  ? 'Entrez votre numéro pour continuer' :
-                   step === 'otp'    ? `Code envoyé au ${telephoneComplet}` :
+                   step === 'otp'    ? (USE_LOCAL_AUTH ? `Mode local — code de test ${DEV_OTP_CODE}` : `Code envoyé au ${telephoneComplet}`) :
                    'Complétez votre profil pour commencer'}
                 </p>
               </div>
@@ -353,9 +393,15 @@ export default function Connexion() {
                         />
                       ))}
                     </div>
-                    <button onClick={() => setStep('phone')} className="text-xs font-black text-gray-400 uppercase tracking-widest hover:text-primary transition-colors underline underline-offset-8">
-                      Changer de numéro
-                    </button>
+                    {loading && <Loader2 className="mx-auto animate-spin text-primary" aria-label="Vérification en cours" />}
+                    <div className="flex flex-wrap items-center justify-center gap-5">
+                      <button onClick={changeNumber} disabled={loading} className="text-xs font-black text-gray-400 uppercase tracking-widest hover:text-primary transition-colors underline underline-offset-8 disabled:opacity-50">
+                        Changer de numéro
+                      </button>
+                      <button onClick={handleInitier} disabled={loading || resendDelay > 0} className="text-xs font-black text-primary uppercase tracking-widest hover:text-accent transition-colors underline underline-offset-8 disabled:text-gray-300 disabled:no-underline">
+                        {resendDelay > 0 ? `Renvoyer dans ${resendDelay}s` : 'Renvoyer le code'}
+                      </button>
+                    </div>
                   </div>
                 )}
 
