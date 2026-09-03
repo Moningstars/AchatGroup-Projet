@@ -22,8 +22,16 @@ const ProductCard = ({ opportunity }) => {
   if (!opportunity) return null
   const { id, titre, prixActuel, prixNormal, participantsActuels, seuilMinimum, seuilMaximal, images, dateExpiration } = opportunity
 
-  const discount = prixNormal && Number(prixNormal) > Number(prixActuel)
-    ? Math.round((1 - Number(prixActuel) / Number(prixNormal)) * 100) : null
+  const paliersTries = [...(opportunity.paliers || [])].sort((a, b) => a.seuilMin - b.seuilMin)
+  const palierActif = paliersTries.find((palier, i) => {
+    const dernier = i === paliersTries.length - 1
+    return (participantsActuels >= palier.seuilMin || (i === 0 && participantsActuels < palier.seuilMin)) &&
+      (dernier || !palier.seuilMax || participantsActuels <= palier.seuilMax)
+  })
+  const prixAffiche = palierActif ? palierActif.prix : prixActuel
+
+  const discount = prixNormal && Number(prixNormal) > Number(prixAffiche)
+    ? Math.round((1 - Number(prixAffiche) / Number(prixNormal)) * 100) : null
 
   const { pct: progress, valide } = calculerProgression({ participantsActuels, seuilMinimum, seuilMaximal, paliers: opportunity.paliers })
   const isOpen = opportunity.souscriptionOuverte ?? (opportunity.statut === 'ACTIVE' && !isExpired)
@@ -85,9 +93,9 @@ const ProductCard = ({ opportunity }) => {
         <div>
           <div className="flex items-baseline gap-1.5 flex-wrap">
             <span className="text-base font-black text-urgency tabular-nums leading-none">
-              {fmt(prixActuel)}<span className="text-[9px] font-bold ml-0.5">F</span>
+              {fmt(prixAffiche)}<span className="text-[9px] font-bold ml-0.5">F</span>
             </span>
-            {prixNormal && Number(prixNormal) > Number(prixActuel) && (
+            {prixNormal && Number(prixNormal) > Number(prixAffiche) && (
               <span className="text-[10px] text-gray-300 line-through tabular-nums">{fmt(prixNormal)}F</span>
             )}
           </div>
