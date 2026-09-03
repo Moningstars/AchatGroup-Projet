@@ -275,6 +275,14 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
         (planningFiltre === 'DEMAIN' && slotDay === tomorrow) ||
         (planningFiltre === 'PLANIFIES' && hasSlot)
       return matchesSearch && matchesStatut && matchesLivraison && matchesPlanning
+    }).sort((a, b) => {
+      const quantiteDiff = Number(b.quantite || 0) - Number(a.quantite || 0)
+      if (quantiteDiff !== 0) return quantiteDiff
+
+      const montantDiff = Number(b.montantGele || 0) - Number(a.montantGele || 0)
+      if (montantDiff !== 0) return montantDiff
+
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
     })
   })()
 

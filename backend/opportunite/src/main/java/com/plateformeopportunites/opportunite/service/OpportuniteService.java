@@ -196,7 +196,7 @@ public class OpportuniteService {
 
     @Transactional(readOnly = true)
     public List<ParticipantOpportuniteResponse> listerParticipants(UUID opportuniteId) {
-        return participationRepository.findByOpportuniteId(opportuniteId)
+        return participationRepository.findByOpportuniteIdOrderByQuantiteDescMontantGeleDescCreatedAtDesc(opportuniteId)
                 .stream()
                 .map(p -> ParticipantOpportuniteResponse.builder()
                         .id(p.getId())
