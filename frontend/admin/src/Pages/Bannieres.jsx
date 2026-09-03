@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, X, Edit2, Trash2, Eye, EyeOff, Image, Loader2, Calendar } from 'lucide-react'
+import { Plus, X, Edit2, Trash2, Eye, EyeOff, Image, Loader2, Calendar, Search, SlidersHorizontal, RotateCcw } from 'lucide-react'
 import {
   getAdminBannieres, creerBanniere, modifierBanniere,
   toggleBanniere, supprimerBanniere,
@@ -54,6 +54,21 @@ function BanniereModal({ banniere, onClose, onSaved }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && !loading) onClose()
+    }
+
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [loading, onClose])
+
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const handleFile = (e) => {
@@ -97,25 +112,42 @@ function BanniereModal({ banniere, onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
-      <div className="my-8 w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
-        <div className="mb-5 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-slate-950">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-2 backdrop-blur-[2px] sm:p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !loading) onClose()
+      }}
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="banniere-modal-title"
+        className="flex max-h-[calc(100dvh-1rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
+      >
+        <header className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3 sm:px-6 sm:py-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-violet-600">
+              {isEdit ? 'Édition' : 'Création'}
+            </p>
+            <h3 id="banniere-modal-title" className="mt-0.5 text-lg font-bold text-slate-950">
             {isEdit ? 'Modifier la bannière' : 'Nouvelle bannière'}
-          </h3>
-          <button onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100">
+            </h3>
+          </div>
+          <button type="button" onClick={onClose} disabled={loading} aria-label="Fermer" className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50">
             <X size={20} />
           </button>
-        </div>
+        </header>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
           {/* Image */}
           <div>
             <label className={labelCls}>Image de fond *</label>
-            <div
+            <button
+              type="button"
               onClick={() => fileRef.current?.click()}
-              className="relative cursor-pointer overflow-hidden rounded-xl border-2 border-dashed border-slate-200 hover:border-violet-400 transition-colors"
-              style={{ height: 160 }}
+              aria-label={preview ? "Changer l'image de fond" : "Choisir une image de fond"}
+              className="relative h-32 w-full cursor-pointer overflow-hidden rounded-xl border-2 border-dashed border-slate-200 text-left transition-colors hover:border-violet-400 sm:h-40"
             >
               {preview ? (
                 <>
@@ -131,12 +163,12 @@ function BanniereModal({ banniere, onClose, onSaved }) {
                   <span className="text-xs">JPG, PNG, WebP — recommandé 1200×400px</span>
                 </div>
               )}
-            </div>
+            </button>
             <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
           </div>
 
           {/* Titre + Tag */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className={labelCls}>Titre *</label>
               <input value={form.titre} onChange={e => set('titre', e.target.value)} className={inputCls} placeholder="Ex : L'union fait le prix." />
@@ -154,7 +186,7 @@ function BanniereModal({ banniere, onClose, onSaved }) {
           </div>
 
           {/* Page + Icone */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className={labelCls}>Page cible *</label>
               <select value={form.pageCible} onChange={e => set('pageCible', e.target.value)} className={inputCls}>
@@ -168,7 +200,7 @@ function BanniereModal({ banniere, onClose, onSaved }) {
           </div>
 
           {/* Lien + Ordre */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className={labelCls}>Lien au clic (optionnel)</label>
               <input value={form.lien} onChange={e => set('lien', e.target.value)} className={inputCls} placeholder="/opportunites ou /sondages/uuid" />
@@ -185,7 +217,7 @@ function BanniereModal({ banniere, onClose, onSaved }) {
               <Calendar size={13} className="text-slate-400" />
               <span className="text-xs font-semibold text-slate-500">Planification (optionnel)</span>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className={labelCls}>Date de début</label>
                 <input type="datetime-local" value={form.dateDebut} onChange={e => set('dateDebut', e.target.value)} className={inputCls} />
@@ -199,95 +231,101 @@ function BanniereModal({ banniere, onClose, onSaved }) {
           </div>
 
           {error && <div className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
+          </div>
 
-          <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+          <footer className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 bg-white px-4 py-3 sm:flex-row sm:justify-end sm:px-6 sm:py-4">
+            <button type="button" onClick={onClose} disabled={loading} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50">
               Annuler
             </button>
-            <button type="submit" disabled={loading} className="flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white hover:bg-violet-700 disabled:opacity-60">
+            <button type="submit" disabled={loading} className="flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-violet-700 disabled:opacity-60">
               {loading && <Loader2 size={14} className="animate-spin" />}
               {isEdit ? 'Enregistrer' : 'Créer la bannière'}
             </button>
-          </div>
+          </footer>
         </form>
-      </div>
+      </section>
     </div>
   )
 }
 
 // ── Carte bannière ────────────────────────────────────────────────────────────
 
-function BanniereCard({ b, onEdit, onToggle, onDelete }) {
+function BanniereCard({ b, onEdit, onToggle, onDelete, pending }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
 
+  const dateLabel = b.dateDebut || b.dateFin
+    ? [
+        b.dateDebut ? `Du ${new Date(b.dateDebut).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}` : null,
+        b.dateFin ? `au ${new Date(b.dateFin).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}` : null,
+      ].filter(Boolean).join(' ')
+    : 'Diffusion sans limite de date'
+
   return (
-    <div className={`rounded-xl border bg-white overflow-hidden transition-opacity ${b.actif ? '' : 'opacity-60'}`}>
+    <article className={`group flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${b.actif ? 'border-slate-200' : 'border-slate-200 bg-slate-50'}`}>
       {/* Image preview */}
-      <div className="relative h-36 bg-slate-100">
+      <div className="relative aspect-[16/7] overflow-hidden bg-slate-100">
         {b.imageUrl ? (
-          <img src={imgSrc(b.imageUrl)} alt={b.titre} className="h-full w-full object-cover" />
+          <img src={imgSrc(b.imageUrl)} alt={b.titre} className={`h-full w-full object-cover transition duration-300 group-hover:scale-[1.02] ${b.actif ? '' : 'grayscale'}`} />
         ) : (
           <div className="flex h-full items-center justify-center text-slate-300">
             <Image size={32} />
           </div>
         )}
         {/* Overlay infos */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-        <div className="absolute bottom-0 left-0 right-0 p-3">
-          {b.tag && (
-            <span className="mb-1 inline-block rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
-              {b.tag}
-            </span>
-          )}
-          <p className="text-sm font-bold text-white line-clamp-1">{b.titre}</p>
-        </div>
         {/* Badge statut */}
-        <div className={`absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-bold ${b.actif ? 'bg-emerald-500 text-white' : 'bg-slate-400 text-white'}`}>
+        <div className={`absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold shadow-sm ${b.actif ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-white'}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${b.actif ? 'bg-white' : 'bg-slate-300'}`} />
           {b.actif ? 'Actif' : 'Inactif'}
         </div>
       </div>
 
       {/* Infos */}
-      <div className="p-3">
-        <div className="flex items-center justify-between mb-2">
+      <div className="flex flex-1 flex-col p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${PAGE_COLORS[b.pageCible] || 'bg-slate-100 text-slate-600'}`}>
             {PAGE_LABELS[b.pageCible] || b.pageCible}
           </span>
-          <span className="text-[11px] text-slate-400">Ordre {b.ordre}</span>
+          <span className="whitespace-nowrap text-[11px] font-medium text-slate-400">Position {b.ordre}</span>
         </div>
 
-        {b.description && (
-          <p className="text-xs text-slate-500 line-clamp-2 mb-2">{b.description}</p>
-        )}
+        {b.tag && <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-violet-600">{b.tag}</p>}
+        <h3 className="line-clamp-2 text-base font-bold leading-snug text-slate-950">{b.titre}</h3>
+        <p className="mt-2 line-clamp-2 min-h-10 text-sm leading-5 text-slate-500">
+          {b.description || 'Aucune description renseignée.'}
+        </p>
 
-        {(b.dateDebut || b.dateFin) && (
-          <div className="flex items-center gap-1 text-[11px] text-slate-400 mb-2">
-            <Calendar size={11} />
-            {b.dateDebut && <span>Dès {new Date(b.dateDebut).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}</span>}
-            {b.dateFin   && <span>→ {new Date(b.dateFin).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}</span>}
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex gap-2 mt-1">
-          <button onClick={() => onEdit(b)} className="flex-1 flex items-center justify-center gap-1 rounded-lg border border-slate-200 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-            <Edit2 size={12} /> Modifier
-          </button>
-          <button onClick={() => onToggle(b)} className={`flex items-center justify-center gap-1 rounded-lg border py-1.5 px-2.5 text-xs font-semibold transition ${b.actif ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
-            {b.actif ? <EyeOff size={12} /> : <Eye size={12} />}
-          </button>
-          {confirmDelete ? (
-            <button onClick={() => onDelete(b)} className="flex items-center gap-1 rounded-lg bg-rose-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-rose-700">
-              Confirmer
-            </button>
-          ) : (
-            <button onClick={() => setConfirmDelete(true)} className="flex items-center justify-center rounded-lg border border-slate-200 p-1.5 text-slate-400 hover:border-rose-200 hover:text-rose-500">
-              <Trash2 size={12} />
-            </button>
-          )}
+        <div className="mt-4 flex items-start gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
+          <Calendar size={14} className="mt-0.5 shrink-0 text-slate-400" />
+          <span>{dateLabel}</span>
         </div>
       </div>
-    </div>
+
+      {/* Actions */}
+      <div className="border-t border-slate-100 bg-slate-50/70 p-3">
+        {confirmDelete ? (
+          <div className="flex items-center gap-2">
+            <p className="mr-auto text-xs font-semibold text-rose-700">Supprimer cette bannière ?</p>
+            <button type="button" onClick={() => setConfirmDelete(false)} disabled={pending} className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-white">Annuler</button>
+            <button type="button" onClick={() => onDelete(b)} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-2 text-xs font-bold text-white hover:bg-rose-700 disabled:opacity-60">
+              {pending ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />} Supprimer
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+          <button type="button" onClick={() => onEdit(b)} disabled={pending} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 transition hover:border-violet-300 hover:text-violet-700 disabled:opacity-60">
+            <Edit2 size={14} /> Modifier
+          </button>
+          <button type="button" onClick={() => onToggle(b)} disabled={pending} aria-label={b.actif ? `Masquer ${b.titre}` : `Afficher ${b.titre}`} className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-bold transition disabled:opacity-60 ${b.actif ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
+            {pending ? <Loader2 size={14} className="animate-spin" /> : b.actif ? <EyeOff size={14} /> : <Eye size={14} />}
+            <span className="hidden 2xl:inline">{b.actif ? 'Masquer' : 'Afficher'}</span>
+          </button>
+          <button type="button" onClick={() => setConfirmDelete(true)} disabled={pending} aria-label={`Supprimer ${b.titre}`} className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-2.5 text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-60">
+            <Trash2 size={14} />
+          </button>
+          </div>
+        )}
+        </div>
+    </article>
   )
 }
 
@@ -297,6 +335,10 @@ export default function Bannieres() {
   const [bannieres, setBannieres] = useState([])
   const [loading, setLoading] = useState(true)
   const [filtre, setFiltre] = useState('TOUS')
+  const [statut, setStatut] = useState('TOUS')
+  const [recherche, setRecherche] = useState('')
+  const [pendingId, setPendingId] = useState(null)
+  const [feedback, setFeedback] = useState('')
   const [modal, setModal] = useState(null) // null | 'new' | <banniere>
 
   const fetchData = () => {
@@ -310,16 +352,43 @@ export default function Bannieres() {
   useEffect(() => { fetchData() }, [])
 
   const handleToggle = async (b) => {
-    await toggleBanniere(b.id)
-    fetchData()
+    setPendingId(b.id)
+    try {
+      await toggleBanniere(b.id)
+      setBannieres(items => items.map(item => item.id === b.id ? { ...item, actif: !item.actif } : item))
+      setFeedback(`La bannière « ${b.titre} » est maintenant ${b.actif ? 'masquée' : 'visible'}.`)
+    } catch {
+      setFeedback("L'état de la bannière n'a pas pu être modifié.")
+    } finally {
+      setPendingId(null)
+    }
   }
 
   const handleDelete = async (b) => {
-    await supprimerBanniere(b.id)
-    fetchData()
+    setPendingId(b.id)
+    try {
+      await supprimerBanniere(b.id)
+      setBannieres(items => items.filter(item => item.id !== b.id))
+      setFeedback(`La bannière « ${b.titre} » a été supprimée.`)
+    } catch {
+      setFeedback("La bannière n'a pas pu être supprimée.")
+    } finally {
+      setPendingId(null)
+    }
   }
 
-  const filtrees = filtre === 'TOUS' ? bannieres : bannieres.filter(b => b.pageCible === filtre)
+  useEffect(() => {
+    if (!feedback) return undefined
+    const timer = window.setTimeout(() => setFeedback(''), 3500)
+    return () => window.clearTimeout(timer)
+  }, [feedback])
+
+  const terme = recherche.trim().toLocaleLowerCase('fr')
+  const filtrees = bannieres
+    .filter(b => filtre === 'TOUS' || b.pageCible === filtre)
+    .filter(b => statut === 'TOUS' || (statut === 'ACTIF' ? b.actif : !b.actif))
+    .filter(b => !terme || [b.titre, b.description, b.tag].some(value => value?.toLocaleLowerCase('fr').includes(terme)))
+    .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0) || a.titre.localeCompare(b.titre, 'fr'))
 
   const counts = bannieres.reduce((acc, b) => {
     acc[b.pageCible] = (acc[b.pageCible] || 0) + 1
@@ -327,37 +396,66 @@ export default function Bannieres() {
     return acc
   }, {})
 
+  const activeCount = bannieres.filter(b => b.actif).length
+  const hasFilters = filtre !== 'TOUS' || statut !== 'TOUS' || recherche.trim()
+
+  const resetFilters = () => {
+    setFiltre('TOUS')
+    setStatut('TOUS')
+    setRecherche('')
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 pb-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
           <h2 className="text-xl font-bold text-slate-950">Bannières publicitaires</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Gérez les carousels affichés sur l'application</p>
+          <p className="mt-1 text-sm text-slate-500">Créez, planifiez et contrôlez les visuels affichés dans l’application.</p>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
+            <span><strong className="text-slate-950">{bannieres.length}</strong> au total</span>
+            <span><strong className="text-emerald-600">{activeCount}</strong> visibles</span>
+            <span><strong className="text-slate-600">{bannieres.length - activeCount}</strong> masquées</span>
+          </div>
         </div>
         <button
           onClick={() => setModal('new')}
-          className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-violet-500/20 hover:bg-violet-700 transition"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-700 sm:w-auto"
         >
           <Plus size={16} /> Nouvelle bannière
         </button>
       </div>
 
-      {/* Filtres par page */}
-      <div className="flex flex-wrap gap-2">
-        {[{ key: 'TOUS', label: 'Toutes' }, ...PAGE_OPTS].map(({ key, value, label }) => {
-          const k = key || value
-          return (
-            <button
-              key={k}
-              onClick={() => setFiltre(k)}
-              className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${filtre === k ? 'bg-violet-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-violet-300'}`}
-            >
-              {label} {counts[k] ? <span className="ml-1 opacity-70">({counts[k]})</span> : null}
-            </button>
-          )
-        })}
-      </div>
+      {/* Recherche et filtres */}
+      <section aria-label="Filtres des bannières" className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+        <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_220px_180px_auto]">
+          <label className="relative block">
+            <span className="sr-only">Rechercher une bannière</span>
+            <Search size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input value={recherche} onChange={event => setRecherche(event.target.value)} placeholder="Rechercher par titre, tag ou description…" className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100" />
+          </label>
+          <label className="relative block">
+            <span className="sr-only">Filtrer par page</span>
+            <SlidersHorizontal size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <select value={filtre} onChange={event => setFiltre(event.target.value)} className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-10 pr-8 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
+              <option value="TOUS">Toutes les destinations ({counts.TOUS || 0})</option>
+              {PAGE_OPTS.map(option => <option key={option.value} value={option.value}>{option.value === 'TOUTES' ? 'Globales (toutes les pages)' : option.label} ({counts[option.value] || 0})</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="sr-only">Filtrer par statut</span>
+            <select value={statut} onChange={event => setStatut(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
+              <option value="TOUS">Tous les statuts</option>
+              <option value="ACTIF">Visibles</option>
+              <option value="INACTIF">Masquées</option>
+            </select>
+          </label>
+          <button type="button" onClick={resetFilters} disabled={!hasFilters} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+            <RotateCcw size={15} /> Réinitialiser
+          </button>
+        </div>
+        <p className="mt-3 text-xs text-slate-500"><strong className="text-slate-800">{filtrees.length}</strong> résultat{filtrees.length !== 1 ? 's' : ''}, classé{filtrees.length !== 1 ? 's' : ''} par position d’affichage.</p>
+      </section>
 
       {/* Grille */}
       {loading ? (
@@ -365,13 +463,14 @@ export default function Bannieres() {
           <Loader2 className="animate-spin text-slate-400" size={28} />
         </div>
       ) : filtrees.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white py-16 px-4 text-center">
           <Image size={36} className="text-slate-300 mb-3" />
-          <p className="font-semibold text-slate-500">Aucune bannière</p>
-          <p className="text-sm text-slate-400 mt-1">Créez votre première bannière avec le bouton ci-dessus.</p>
+          <p className="font-semibold text-slate-700">Aucune bannière trouvée</p>
+          <p className="mt-1 max-w-sm text-sm text-slate-400">Modifiez les critères de recherche ou créez une nouvelle bannière.</p>
+          {hasFilters && <button type="button" onClick={resetFilters} className="mt-4 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800">Effacer les filtres</button>}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filtrees.map(b => (
             <BanniereCard
               key={b.id}
@@ -379,8 +478,15 @@ export default function Bannieres() {
               onEdit={setModal}
               onToggle={handleToggle}
               onDelete={handleDelete}
+              pending={pendingId === b.id}
             />
           ))}
+        </div>
+      )}
+
+      {feedback && (
+        <div role="status" className="fixed bottom-5 left-1/2 z-[60] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-xl bg-slate-950 px-4 py-3 text-center text-sm font-semibold text-white shadow-2xl">
+          {feedback}
         </div>
       )}
 
