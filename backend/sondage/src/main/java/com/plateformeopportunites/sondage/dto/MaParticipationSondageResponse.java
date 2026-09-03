@@ -1,6 +1,8 @@
 package com.plateformeopportunites.sondage.dto;
 
 import com.plateformeopportunites.common.enums.StatutValidation;
+import com.plateformeopportunites.common.enums.StatutSondage;
+import com.plateformeopportunites.common.enums.ModeDistribution;
 import com.plateformeopportunites.common.enums.TypeRecompense;
 import lombok.Builder;
 import lombok.Data;
@@ -18,7 +20,10 @@ public class MaParticipationSondageResponse {
     private BigDecimal recompense;
     private TypeRecompense typeRecompense;
     private StatutValidation statutValidation;
+    private StatutSondage statutSondage;
+    private ModeDistribution modeDistribution;
     private Boolean recompenseVersee;
     private LocalDateTime createdAt;
     private LocalDateTime valideeAt;
+    private LocalDateTime dateExpiration;
 }

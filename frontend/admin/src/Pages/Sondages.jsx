@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import {
   Loader2, Plus, Trash2, X, ChevronDown, ChevronUp,
-  Edit2, CheckCircle2, XCircle, Clock, Users, Send,
-  AlertTriangle, ClipboardList, Eye, BarChart3,
+  Edit2, CheckCircle2, XCircle, Clock, Users,
+  AlertTriangle, ClipboardList, Eye, BarChart3, Search, SlidersHorizontal,
 } from 'lucide-react'
 import { Badge, ProgressBar } from '../components/ui'
 import { useSSE } from '../hooks/useSSE'
@@ -16,7 +16,7 @@ import {
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 const STATUT_VALIDATION_COLOR = { VALIDE: 'emerald', EN_ATTENTE_PREUVE: 'amber', REJETE: 'rose' }
-const STATUT_VALIDATION_LABEL = { VALIDE: 'Validée', EN_ATTENTE_PREUVE: 'En attente', REJETE: 'Rejetée' }
+const STATUT_VALIDATION_LABEL = { VALIDE: 'Validée', EN_ATTENTE_PREUVE: 'À vérifier', REJETE: 'Non retenue' }
 
 function formatDate(dt) {
   if (!dt) return '—'
@@ -36,7 +36,7 @@ function fmt(val) {
 const STATUT_CONFIG = {
   BROUILLON:               { label: 'Brouillon',   color: 'gray',    dot: 'bg-slate-400' },
   ACTIF:                   { label: 'En cours',     color: 'sky',     dot: 'bg-sky-500' },
-  EN_ATTENTE_DISTRIBUTION: { label: 'En attente',   color: 'amber',   dot: 'bg-amber-500' },
+  EN_ATTENTE_DISTRIBUTION: { label: 'À finaliser',  color: 'amber',   dot: 'bg-amber-500' },
   CLOTURE:                 { label: 'Clôturé',      color: 'emerald', dot: 'bg-emerald-500' },
   ANNULE:                  { label: 'Annulé',       color: 'rose',    dot: 'bg-rose-500' },
 }
@@ -57,10 +57,13 @@ const FILTRES = [
   { key: 'TOUS', label: 'Tous' },
   { key: 'BROUILLON', label: 'Brouillon' },
   { key: 'ACTIF', label: 'En cours' },
-  { key: 'EN_ATTENTE_DISTRIBUTION', label: 'En attente' },
+  { key: 'EN_ATTENTE_DISTRIBUTION', label: 'À finaliser' },
   { key: 'CLOTURE', label: 'Clôturé' },
   { key: 'ANNULE', label: 'Annulé' },
 ]
+
+const MODE_LABEL = { AUTO: 'Validation automatique', MANUEL: 'Validation manuelle' }
+const RECOMPENSE_LABEL = { ARGENT: 'Paiement FCFA', POINTS: 'Points' }
 
 const inputCls = 'w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition'
 
@@ -205,8 +208,13 @@ function NouveauSondageModal({ onClose, onSaved }) {
     // Vérification : au moins une bonne réponse par question d'éligibilité à choix
     for (const q of eligQuestions) {
       if (['CHOIX_UNIQUE', 'CHOIX_MULTIPLE'].includes(q.typeQuestion)) {
-        if (!q.options.some(o => o.estCorrecte)) {
+        const bonnes = q.options.filter(o => o.estCorrecte).length
+        if (bonnes === 0) {
           setError(`Test d'éligibilité — Question "${q.texte || `Q${q.ordre}`}" : cochez au moins une bonne réponse.`)
+          return
+        }
+        if (q.typeQuestion === 'CHOIX_UNIQUE' && bonnes !== 1) {
+          setError(`Test d'éligibilité — Question "${q.texte || `Q${q.ordre}`}" : choisissez exactement une bonne réponse.`)
           return
         }
       }
@@ -317,10 +325,10 @@ function NouveauSondageModal({ onClose, onSaved }) {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Mode distribution *</label>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Mode de validation *</label>
                 <select value={form.modeDistribution} onChange={e => setField('modeDistribution', e.target.value)} className={inputCls}>
-                  <option value="AUTO">Automatique</option>
-                  <option value="MANUEL">Manuel</option>
+                  <option value="AUTO">Automatique — versement immédiat</option>
+                  <option value="MANUEL">Manuelle — décision de l’équipe</option>
                 </select>
               </div>
               <div>
@@ -391,8 +399,13 @@ function ConfigurerEligibiliteModal({ sondage, onClose, onSaved }) {
 
     for (const q of eligQuestions) {
       if (['CHOIX_UNIQUE', 'CHOIX_MULTIPLE'].includes(q.typeQuestion)) {
-        if (!q.options.some(o => o.estCorrecte)) {
+        const bonnes = q.options.filter(o => o.estCorrecte).length
+        if (bonnes === 0) {
           setError(`Question "${q.texte || `Q${q.ordre}`}" : cochez au moins une bonne réponse.`)
+          return
+        }
+        if (q.typeQuestion === 'CHOIX_UNIQUE' && bonnes !== 1) {
+          setError(`Question "${q.texte || `Q${q.ordre}`}" : choisissez exactement une bonne réponse.`)
           return
         }
         if (q.options.some(o => !o.libelle.trim())) {
@@ -811,6 +824,7 @@ function ResultatsModal({ sondageId, onClose }) {
 
 function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, onModifier, onSupprimer, onVoirReponses, onConfigurerElig, onVoirResultats }) {
   const [expanded, setExpanded] = useState(false)
+  const [actionsOpen, setActionsOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const cfg = STATUT_CONFIG[survey.statut] || { label: survey.statut, color: 'gray', dot: 'bg-slate-400' }
@@ -828,8 +842,8 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
               <Badge color={cfg.color} size="sm">{cfg.label}</Badge>
-              <Badge color="gray" size="sm">{survey.modeDistribution}</Badge>
-              <Badge color="gray" size="sm">{survey.typeRecompense}</Badge>
+              <Badge color="gray" size="sm">{MODE_LABEL[survey.modeDistribution] || survey.modeDistribution}</Badge>
+              <Badge color="gray" size="sm">{RECOMPENSE_LABEL[survey.typeRecompense] || survey.typeRecompense}</Badge>
             </div>
             <h3 className="text-base font-bold text-slate-900 leading-tight">{survey.titre}</h3>
             {survey.commanditaireNom && (
@@ -845,6 +859,11 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
 
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2 flex-shrink-0">
+            <button onClick={() => setActionsOpen(v => !v)}
+              className="flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-800 transition">
+              Gérer {actionsOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+            {actionsOpen && <>
             {/* ⚠️ Pas de test d'éligibilité */}
             {!survey.hasEligibilite && !['CLOTURE', 'ANNULE'].includes(survey.statut) && (
               <button onClick={() => onConfigurerElig(survey)}
@@ -906,12 +925,18 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
             )}
 
             {(survey.statut === 'EN_ATTENTE_DISTRIBUTION') && (
-              <button onClick={() => onDistribuer(survey.id)}
-                disabled={isActing('-distribuer')}
-                className="flex items-center gap-1.5 rounded-lg bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50 transition">
-                {isActing('-distribuer') ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
-                Distribuer
-              </button>
+              <>
+                <button onClick={() => onVoirReponses(survey.id)}
+                  className="flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition">
+                  <Eye size={12} /> Vérifier les réponses
+                </button>
+                <button onClick={() => onDistribuer(survey.id)}
+                  disabled={isActing('-distribuer')}
+                  className="flex items-center gap-1.5 rounded-lg bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50 transition">
+                  {isActing('-distribuer') ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                  Finaliser
+                </button>
+              </>
             )}
 
             {!['BROUILLON'].includes(survey.statut) && (
@@ -930,6 +955,7 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
                 {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
               </button>
             )}
+            </>}
           </div>
         </div>
 
@@ -940,7 +966,7 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
             {survey.repondantsActuels} / {survey.quotaVise} répondants
           </span>
           <span className="flex items-center gap-1 font-semibold text-violet-600">
-            {fmt(survey.recompense)} FCFA / répondant
+            {fmt(survey.recompense)} {survey.typeRecompense === 'POINTS' ? 'points' : 'FCFA'} / répondant
           </span>
           {survey.budgetReserve != null && (
             <span className="flex items-center gap-1 font-semibold text-emerald-700">
@@ -1006,6 +1032,10 @@ export default function Sondages() {
   const [sondages, setSondages] = useState([])
   const [loading, setLoading] = useState(true)
   const [filtre, setFiltre] = useState('TOUS')
+  const [search, setSearch] = useState('')
+  const [modeFilter, setModeFilter] = useState('TOUS')
+  const [rewardFilter, setRewardFilter] = useState('TOUS')
+  const [sort, setSort] = useState('RECENTS')
   const [actionId, setActionId] = useState(null)
   const [actionError, setActionError] = useState(null)
   const [showNouveauModal, setShowNouveauModal] = useState(false)
@@ -1053,9 +1083,24 @@ export default function Sondages() {
   const handleCloturer   = (id) => act(id, '-cloturer',   () => cloturerSondage(id))
   const handleSupprimer  = (id) => act(id, '-supprimer',  () => supprimerSondage(id))
 
-  const sondagesFiltres = filtre === 'TOUS'
-    ? sondages
-    : sondages.filter(s => s.statut === filtre)
+  const sondagesFiltres = sondages
+    .filter(s => filtre === 'TOUS' || s.statut === filtre)
+    .filter(s => modeFilter === 'TOUS' || s.modeDistribution === modeFilter)
+    .filter(s => rewardFilter === 'TOUS' || s.typeRecompense === rewardFilter)
+    .filter(s => {
+      const q = search.trim().toLocaleLowerCase('fr')
+      if (!q) return true
+      return [s.titre, s.description, s.commanditaireNom, s.commanditaireSociete]
+        .some(v => v?.toLocaleLowerCase('fr').includes(q))
+    })
+    .sort((a, b) => {
+      if (sort === 'EXPIRATION') return new Date(a.dateExpiration) - new Date(b.dateExpiration)
+      if (sort === 'PROGRESSION') return (b.repondantsActuels / b.quotaVise) - (a.repondantsActuels / a.quotaVise)
+      return new Date(b.createdAt) - new Date(a.createdAt)
+    })
+
+  const hasActiveFilters = filtre !== 'TOUS' || modeFilter !== 'TOUS' || rewardFilter !== 'TOUS' || search.trim()
+  const resetFilters = () => { setFiltre('TOUS'); setModeFilter('TOUS'); setRewardFilter('TOUS'); setSearch('') }
 
   const countByStatut = (key) => sondages.filter(s => s.statut === key).length
 
@@ -1096,36 +1141,19 @@ export default function Sondages() {
         />
       )}
 
-      {/* ── Header ── */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">Gestion des Sondages</h2>
-          <p className="text-sm text-slate-500 mt-0.5">{sondages.length} sondage{sondages.length !== 1 ? 's' : ''} au total</p>
+      {/* ── En-tête compact ── */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3 text-sm text-slate-500">
+          <span><strong className="text-slate-900">{sondages.length}</strong> sondage{sondages.length !== 1 ? 's' : ''}</span>
+          <span className="h-1 w-1 rounded-full bg-slate-300" />
+          <span><strong className="text-sky-600">{countByStatut('ACTIF')}</strong> en cours</span>
+          <span className="h-1 w-1 rounded-full bg-slate-300" />
+          <span><strong className="text-amber-600">{countByStatut('EN_ATTENTE_DISTRIBUTION')}</strong> à finaliser</span>
         </div>
-        <button
-          onClick={() => setShowNouveauModal(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-violet-700 px-3.5 py-2 text-sm font-semibold text-white hover:bg-violet-800 transition shadow-sm shadow-violet-200"
-        >
+        <button onClick={() => setShowNouveauModal(true)}
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-violet-200 transition hover:bg-violet-800 sm:w-auto">
           <Plus size={15} /> Nouveau sondage
         </button>
-      </div>
-
-      {/* ── Stats rapides ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { key: 'ACTIF',                   label: 'En cours',   color: 'bg-sky-500' },
-          { key: 'BROUILLON',               label: 'Brouillon',  color: 'bg-slate-400' },
-          { key: 'EN_ATTENTE_DISTRIBUTION', label: 'En attente', color: 'bg-amber-500' },
-          { key: 'CLOTURE',                 label: 'Clôturés',   color: 'bg-emerald-500' },
-        ].map(({ key, label, color }) => (
-          <div key={key} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-            <div className="flex items-center gap-2 mb-1">
-              <span className={`w-2 h-2 rounded-full ${color}`} />
-              <span className="text-xs text-slate-500 font-medium">{label}</span>
-            </div>
-            <p className="text-2xl font-extrabold text-slate-800">{countByStatut(key)}</p>
-          </div>
-        ))}
       </div>
 
       {/* ── Erreur action ── */}
@@ -1141,26 +1169,31 @@ export default function Sondages() {
         </div>
       )}
 
-      {/* ── Filtres ── */}
-      <div className="flex flex-wrap gap-2">
-        {FILTRES.map(f => (
-          <button
-            key={f.key}
-            onClick={() => setFiltre(f.key)}
-            className={`px-4 py-2 rounded-full text-sm font-semibold border transition ${
-              filtre === f.key
-                ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-violet-200 hover:text-violet-600'
-            }`}
-          >
-            {f.label}
-            {f.key !== 'TOUS' && (
-              <span className={`ml-1.5 text-xs ${filtre === f.key ? 'text-violet-200' : 'text-slate-400'}`}>
-                {countByStatut(f.key)}
-              </span>
-            )}
-          </button>
-        ))}
+      {/* ── Recherche et filtres structurés ── */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+        <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_repeat(4,minmax(145px,auto))]">
+          <label className="relative block">
+            <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Titre, description ou commanditaire…"
+              className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none transition focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100" />
+          </label>
+          <select aria-label="Filtrer par statut" value={filtre} onChange={e => setFiltre(e.target.value)} className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
+            {FILTRES.map(f => <option key={f.key} value={f.key}>{f.label}{f.key !== 'TOUS' ? ` (${countByStatut(f.key)})` : ''}</option>)}
+          </select>
+          <select aria-label="Filtrer par mode" value={modeFilter} onChange={e => setModeFilter(e.target.value)} className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
+            <option value="TOUS">Tous les modes</option><option value="AUTO">Automatique</option><option value="MANUEL">Manuel</option>
+          </select>
+          <select aria-label="Filtrer par récompense" value={rewardFilter} onChange={e => setRewardFilter(e.target.value)} className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
+            <option value="TOUS">Toutes récompenses</option><option value="ARGENT">Paiement FCFA</option><option value="POINTS">Points</option>
+          </select>
+          <select aria-label="Trier les sondages" value={sort} onChange={e => setSort(e.target.value)} className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
+            <option value="RECENTS">Plus récents</option><option value="EXPIRATION">Expiration proche</option><option value="PROGRESSION">Progression</option>
+          </select>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+          <p className="inline-flex items-center gap-2 text-xs font-medium text-slate-500"><SlidersHorizontal size={14} /> {sondagesFiltres.length} résultat{sondagesFiltres.length !== 1 ? 's' : ''}</p>
+          {hasActiveFilters && <button type="button" onClick={resetFilters} className="text-xs font-semibold text-violet-700 hover:underline">Réinitialiser les filtres</button>}
+        </div>
       </div>
 
       {/* ── Liste ── */}

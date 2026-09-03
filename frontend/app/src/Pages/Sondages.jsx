@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { getSondages, getBannieres, imgUrl } from '../services/api'
 import PageCarousel from '../components/PageCarousel'
@@ -18,12 +18,10 @@ function formatDate(dt) {
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
 }
 
-const CATS = ['Tous', 'Consommation', 'Lifestyle', 'Tech', 'Santé', 'Finance']
-
 const STATUT = {
   ACTIF: { label: 'Ouvert', cls: 'bg-success/15 text-success border-success/20' },
   EN_ATTENTE: { label: 'En attente', cls: 'bg-accent/15 text-accent border-accent/20' },
-  EN_ATTENTE_DISTRIBUTION: { label: 'Distribution', cls: 'bg-blue-500/10 text-blue-600 border-blue-200' },
+  EN_ATTENTE_DISTRIBUTION: { label: 'En validation', cls: 'bg-blue-500/10 text-blue-600 border-blue-200' },
   CLOTURE: { label: 'Clôturé', cls: 'bg-gray-100 text-gray-400 border-gray-200' },
 }
 
@@ -35,8 +33,7 @@ export default function Sondages() {
   const [slides, setSlides] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [searchParams] = useSearchParams()
-  const activecat = searchParams.get('cat') ?? 'Tous'
+  const [rewardFilter, setRewardFilter] = useState('TOUS')
   const [page, setPage] = useState(1)
 
   useEffect(() => {
@@ -56,7 +53,7 @@ export default function Sondages() {
       .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => { setPage(1) }, [activecat, search])
+  useEffect(() => { setPage(1) }, [rewardFilter, search])
 
   // Compteurs/statut mis à jour en direct
   useSSE('sondages', {
@@ -70,7 +67,9 @@ export default function Sondages() {
 
   const filtered = sondages.filter(s => {
     const q = search.toLowerCase()
-    return !q || s.titre?.toLowerCase().includes(q) || s.description?.toLowerCase().includes(q)
+    const correspondRecherche = !q || s.titre?.toLowerCase().includes(q) || s.description?.toLowerCase().includes(q)
+    const correspondRecompense = rewardFilter === 'TOUS' || s.typeRecompense === rewardFilter
+    return correspondRecherche && correspondRecompense
   })
 
   const actifs = filtered.filter(s => s.statut === 'ACTIF')
@@ -113,7 +112,7 @@ export default function Sondages() {
 
         {/* ── Search ── */}
         <div className="py-5 space-y-4">
-          <div className="flex gap-2">
+          <div>
             <div className="relative flex-1">
               <i className="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg" />
               <input
@@ -124,24 +123,14 @@ export default function Sondages() {
                 className="w-full bg-white border-2 border-gray-100 rounded-2xl py-3.5 pl-11 pr-4 text-sm font-semibold focus:border-primary focus:outline-none transition-all shadow-sm"
               />
             </div>
-            <button className="w-12 h-12 border-2 border-gray-100 rounded-2xl flex items-center justify-center text-gray-400 bg-white shadow-sm shrink-0">
-              <i className="ti ti-adjustments-horizontal text-xl" />
-            </button>
           </div>
 
-          <div className="flex gap-6 overflow-x-auto scrollbar-hide border-b border-gray-100">
-            {CATS.map(cat => (
-              <Link
-                key={cat}
-                to={`?cat=${encodeURIComponent(cat)}`}
-                className={`whitespace-nowrap pb-3 text-xs font-black uppercase tracking-widest transition-colors ${
-                  activecat === cat
-                    ? 'text-primary border-b-2 border-primary -mb-px'
-                    : 'text-gray-400 hover:text-primary border-b-2 border-transparent -mb-px'
-                }`}
-              >
-                {cat}
-              </Link>
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+            {[['TOUS', 'Toutes les récompenses'], ['ARGENT', 'Paiement FCFA'], ['POINTS', 'Points']].map(([value, label]) => (
+              <button key={value} type="button" onClick={() => setRewardFilter(value)}
+                className={`whitespace-nowrap rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-colors ${rewardFilter === value ? 'border-primary bg-primary text-white' : 'border-gray-100 bg-white text-gray-500 hover:border-primary/30'}`}>
+                {label}
+              </button>
             ))}
           </div>
         </div>
@@ -156,13 +145,13 @@ export default function Sondages() {
               <i className="ti ti-forms text-4xl text-gray-200" />
             </div>
             <p className="font-heading font-extrabold text-lg text-primary">
-              {search ? 'Aucun résultat' : 'Aucun sondage disponible'}
+              {search || rewardFilter !== 'TOUS' ? 'Aucun résultat' : 'Aucun sondage disponible'}
             </p>
             <p className="text-xs text-gray-400 font-bold">
-              {search ? 'Essayez un autre terme de recherche' : 'Revenez bientôt !'}
+              {search || rewardFilter !== 'TOUS' ? 'Modifiez votre recherche ou vos filtres' : 'Revenez bientôt !'}
             </p>
-            {search && (
-              <button onClick={() => setSearch('')} className="text-xs font-black text-primary uppercase tracking-widest border-2 border-primary/20 px-5 py-2.5 rounded-full hover:bg-primary hover:text-white transition-all">
+            {(search || rewardFilter !== 'TOUS') && (
+              <button onClick={() => { setSearch(''); setRewardFilter('TOUS') }} className="text-xs font-black text-primary uppercase tracking-widest border-2 border-primary/20 px-5 py-2.5 rounded-full hover:bg-primary hover:text-white transition-all">
                 Réinitialiser
               </button>
             )}
@@ -240,7 +229,7 @@ function SurveyCardFeatured({ survey: s, onClick }) {
             <span className="text-[9px] text-white/40 font-bold uppercase tracking-widest mb-1">Récompense</span>
             <div className="flex items-center gap-1.5">
               <span className="text-3xl font-heading font-extrabold text-accent">{fmt(s.recompense)}</span>
-              <span className="text-sm font-bold text-white/50">FCFA</span>
+              <span className="text-sm font-bold text-white/50">FCFA{s.typeRecompense === 'POINTS' ? ' → points' : ''}</span>
             </div>
           </div>
           {s.statut === 'ACTIF' && (
@@ -295,7 +284,7 @@ function SurveyCardCompact({ survey: s, onClick }) {
         {/* Récompense */}
         <div className="flex items-baseline gap-1">
           <span className="text-base font-heading font-extrabold text-accent tabular-nums leading-none">{fmt(s.recompense)}</span>
-          <span className="text-[9px] font-bold text-gray-400">FCFA</span>
+          <span className="text-[9px] font-bold text-gray-400">FCFA{s.typeRecompense === 'POINTS' ? ' → pts' : ''}</span>
         </div>
 
         {/* Expiry */}
@@ -335,8 +324,7 @@ function SurveyCard({ survey: s, onClick }) {
 
       <div className="flex items-baseline gap-1.5 mb-4">
         <span className="text-2xl font-heading font-extrabold text-accent">{fmt(s.recompense)}</span>
-        <span className="text-xs font-bold text-gray-400">FCFA</span>
-        {s.typeRecompense === 'POINTS' && <span className="text-[10px] text-gray-300 font-bold">en points</span>}
+        <span className="text-xs font-bold text-gray-400">FCFA{s.typeRecompense === 'POINTS' ? ' → pts' : ''}</span>
       </div>
 
       {pct !== null && (

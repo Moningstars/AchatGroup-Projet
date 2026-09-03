@@ -3,6 +3,7 @@ package com.plateformeopportunites.sondage.dto;
 import com.plateformeopportunites.common.enums.TypeQuestion;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotEmpty;
 import lombok.Data;
 import java.util.List;
 
@@ -12,7 +13,7 @@ public class CreerEligibiliteRequest {
     @NotBlank
     private String titre;
 
-    @NotNull
+    @NotEmpty
     private List<QuestionEligibiliteRequest> questions;
 
     @Data
@@ -24,6 +25,7 @@ public class CreerEligibiliteRequest {
         @NotNull
         private Integer ordre;
         private Boolean obligatoire = true;
+        @NotEmpty
         private List<OptionEligibiliteRequest> options;
     }
 
