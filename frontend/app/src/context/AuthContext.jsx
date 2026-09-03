@@ -7,7 +7,13 @@ const USER_KEY = 'opportunihub-user'
 
 function parseJwt(token) {
   try {
-    return JSON.parse(atob(token.split('.')[1]))
+    const encoded = token.split('.')[1]
+    if (!encoded) return null
+    const normalized = encoded.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
+    return JSON.parse(decodeURIComponent(atob(padded).split('').map((c) =>
+      `%${c.charCodeAt(0).toString(16).padStart(2, '0')}`
+    ).join('')))
   } catch {
     return null
   }
@@ -20,33 +26,40 @@ function isExpired(token) {
   return payload.exp * 1000 < Date.now()
 }
 
+function clearSession() {
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
+}
+
+function loadValidSession() {
+  const token = getToken()
+  if (!token) return null
+  const payload = parseJwt(token)
+  if (isExpired(token) || payload?.role !== 'PARTICIPANT') {
+    clearSession()
+    return null
+  }
+  try {
+    const parsed = JSON.parse(localStorage.getItem(USER_KEY))
+    if (!parsed?.id || parsed.role !== 'PARTICIPANT' || parsed.id !== payload.sub) {
+      clearSession()
+      return null
+    }
+    return parsed
+  } catch {
+    clearSession()
+    return null
+  }
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState(loadValidSession)
   const navigate = useNavigate()
 
-  // Vérification expiration au chargement
+  // Le contrôle est synchrone au chargement pour éviter une redirection fugace.
   useEffect(() => {
-    const token = getToken()
-    if (!token) return
-
-    if (isExpired(token)) {
-      localStorage.removeItem(TOKEN_KEY)
-      localStorage.removeItem(USER_KEY)
-      navigate('/connexion', { replace: true })
-      return
-    }
-
-    const stored = localStorage.getItem(USER_KEY)
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored)
-        setUser(parsed)
-        if (!parsed.profilComplete) {
-          navigate('/connexion', { replace: true })
-        }
-      } catch { localStorage.removeItem(USER_KEY) }
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (user && !user.profilComplete) navigate('/connexion', { replace: true })
+  }, [navigate, user])
 
   // Intercepteur 401 — token rejeté par le serveur en cours de session
   useEffect(() => {
@@ -55,8 +68,7 @@ export function AuthProvider({ children }) {
       err => {
         const url = err.config?.url || ''
         if (err.response?.status === 401 && !url.includes('/auth/')) {
-          localStorage.removeItem(TOKEN_KEY)
-          localStorage.removeItem(USER_KEY)
+          clearSession()
           setUser(null)
           navigate('/connexion', { replace: true })
         }
@@ -67,6 +79,10 @@ export function AuthProvider({ children }) {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveSession = (authResponse) => {
+    const payload = parseJwt(authResponse?.token)
+    if (!payload || payload.role !== 'PARTICIPANT' || payload.sub !== String(authResponse.id)) {
+      throw new Error('Session participant invalide')
+    }
     setToken(authResponse.token)
     const userData = {
       id: authResponse.id,
@@ -80,10 +96,13 @@ export function AuthProvider({ children }) {
     return userData
   }
 
-  const logout = () => {
-    removeToken()
-    localStorage.removeItem(USER_KEY)
-    setUser(null)
+  const logout = async () => {
+    try {
+      await removeToken()
+    } finally {
+      clearSession()
+      setUser(null)
+    }
   }
 
   return (
