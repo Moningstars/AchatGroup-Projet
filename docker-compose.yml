@@ -42,6 +42,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/plateforme_opportunites
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+      # Le contournement OTP 123456 reste limité à cette stack locale.
+      DEV_AUTH_ENABLED: ${DEV_AUTH_ENABLED:-true}
+      FIREBASE_DEV_MODE: ${FIREBASE_DEV_MODE:-true}
     ports:
       - "8080:8080"
     volumes:

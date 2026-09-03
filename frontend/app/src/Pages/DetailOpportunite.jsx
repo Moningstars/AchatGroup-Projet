@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import {
-  ShieldCheck, Users, Loader2, ChevronRight, CheckCircle2, AlertCircle, Layers, Sparkles, Timer, Minus, Plus
+  ShieldCheck, Users, Loader2, ChevronRight, CheckCircle2, AlertCircle, Layers, Sparkles, Timer, Minus, Plus, Copy, Share2, Link2, ShoppingCart, PackageCheck, ExternalLink
 } from 'lucide-react'
-import { getOpportunite, getOpportunites, souscrire, imgUrl } from '../services/api'
+import { getOpportunite, getOpportunites, getMesParticipationsOpportunites, souscrire, imgUrl } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useCountdown } from '../hooks/useCountdown'
 import { useSSE } from '../hooks/useSSE'
@@ -12,6 +12,19 @@ import { calculerProgression } from '../utils/progression'
 
 function fmt(val) { return Number(val || 0).toLocaleString('fr-FR') }
 function pad(n) { return String(n).padStart(2, '0') }
+
+const SUIVI_PARTICIPATION = {
+  EN_ATTENTE_QUOTA: 'Campagne en cours',
+  A_PREPARER: 'Paiement validé',
+  PREPARATION: 'Lot transmis au partenaire',
+  PRET_LIVRAISON: 'Partenaire confirmé',
+  EN_LIVRAISON: 'Date promise communiquée',
+  LIVRE_A_CONFIRMER: 'Votre confirmation est attendue',
+  LIVRE_CONFIRME: 'Réception confirmée',
+  ECHEC_LIVRAISON: 'Promesse non tenue',
+  LITIGE: 'Anomalie signalée',
+  ANNULE: 'Annulée',
+}
 
 function FloatingCountdown({ dateExpiration }) {
   const c = useCountdown(dateExpiration, 1000)
@@ -64,6 +77,8 @@ export default function DetailOpportunite() {
   const [activeImg, setActiveIdx] = useState(0)
   const [lightbox, setLightbox] = useState(false)
   const [quantite, setQuantite] = useState(1)
+  const [maParticipation, setMaParticipation] = useState(null)
+  const [copied, setCopied] = useState(false)
 
   useSSE(id ? `opportunite/${id}` : null, {
     COMPTEUR: ({ participantsActuels, prixActuel }) => {
@@ -81,6 +96,16 @@ export default function DetailOpportunite() {
       .then(async op => {
         if (cancelled) return
         setOpportunite(op)
+        if (isAuthenticated) {
+          try {
+            const participations = await getMesParticipationsOpportunites()
+            if (!cancelled) setMaParticipation(participations.find(p => p.opportuniteId === id) || null)
+          } catch {
+            if (!cancelled) setMaParticipation(null)
+          }
+        } else {
+          setMaParticipation(null)
+        }
         if (op?.categorie) {
           const all = await getOpportunites()
           if (!cancelled) setSimilaires(all.filter(a => a.categorie === op.categorie && a.id !== op.id).slice(0, 4))
@@ -89,7 +114,17 @@ export default function DetailOpportunite() {
       .catch(() => { if (!cancelled) setOpportunite(null) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [id])
+  }, [id, isAuthenticated])
+
+  const refreshParticipation = async () => {
+    if (!isAuthenticated) return
+    try {
+      const participations = await getMesParticipationsOpportunites()
+      setMaParticipation(participations.find(p => p.opportuniteId === id) || null)
+    } catch {
+      setMaParticipation(null)
+    }
+  }
 
   const handleJoindre = async () => {
     if (!isAuthenticated) {
@@ -98,16 +133,36 @@ export default function DetailOpportunite() {
     }
     setJoinError(''); setJoining(true)
     try {
-      await souscrire(id, quantite)
+      await souscrire(id, quantiteEffective)
       setJoinSuccess(true)
       const updated = await getOpportunite(id)
       setOpportunite(updated)
+      await refreshParticipation()
       setQuantite(1)
       // Réactive le bouton après un court instant pour permettre d'ajouter encore de la quantité.
       setTimeout(() => setJoinSuccess(false), 2500)
     } catch (e) {
       setJoinError(e.response?.data?.message || 'Impossible de rejoindre.')
     } finally { setJoining(false) }
+  }
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/opportunity/${id}`)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {
+      setCopied(false)
+    }
+  }
+
+  const handleShare = async () => {
+    const url = `${window.location.origin}/opportunity/${id}`
+    if (navigator.share) {
+      await navigator.share({ title: opportunite?.titre || 'Campagne OpportuniHub', text: 'Rejoins cette campagne d’achat groupé', url })
+    } else {
+      await handleCopyLink()
+    }
   }
 
   if (loading) return (
@@ -129,11 +184,19 @@ export default function DetailOpportunite() {
     </div>
   )
 
-  const { pct: progress, valide, phase, placesRestantes = Infinity } = calculerProgression(opportunite)
+  const { pct: progress, valide: progressionValidee, phase: phaseProgression, placesRestantes: placesRestantesCalculees } = calculerProgression(opportunite)
   const discount = opportunite.prixNormal && Number(opportunite.prixNormal) > Number(opportunite.prixActuel)
     ? Math.round((1 - Number(opportunite.prixActuel) / Number(opportunite.prixNormal)) * 100) : null
   const paliersTries = [...(opportunite.paliers || [])].sort((a, b) => a.seuilMin - b.seuilMin)
-  const isComplet = phase === 'plafond' && placesRestantes <= 0
+  const placesRestantes = phaseProgression === 'plafond' ? placesRestantesCalculees : Infinity
+  const isComplet = phaseProgression === 'plafond' && placesRestantes <= 0
+  const isExpired = opportunite.dateExpiration && new Date(opportunite.dateExpiration) <= new Date()
+  const souscriptionOuverte = opportunite.souscriptionOuverte ?? (opportunite.statut === 'ACTIVE' && !isExpired && !isComplet)
+  const activationAtteinte = opportunite.activationAtteinte ?? opportunite.participantsActuels >= opportunite.seuilMinimum
+  const dejaSouscrit = Boolean(maParticipation)
+  const maxAjout = Number.isFinite(placesRestantes) ? placesRestantes : 99
+  const quantiteEffective = Math.min(quantite, Math.max(maxAjout || 1, 1))
+  const totalCommande = Number(opportunite.prixActuel) * quantiteEffective
 
   return (
     <div className="min-h-screen bg-bg-light pb-20">
@@ -166,6 +229,13 @@ export default function DetailOpportunite() {
               <div className="absolute top-4 left-4">
                 <span className="bg-success text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-md">Stock vérifié</span>
               </div>
+              {dejaSouscrit && (
+                <div className="absolute top-4 right-4">
+                  <span className="inline-flex items-center gap-1.5 bg-white text-success px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-md">
+                    <CheckCircle2 size={12} /> Déjà souscrit
+                  </span>
+                </div>
+              )}
               <div className="absolute bottom-4 right-4 bg-black/40 backdrop-blur-sm text-white text-[10px] font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                 <i className="ti ti-zoom-in" /> Agrandir
               </div>
@@ -248,6 +318,11 @@ export default function DetailOpportunite() {
                 <span className="px-3 py-1 bg-primary/5 text-primary text-[10px] font-black rounded-full uppercase tracking-widest border border-primary/10">{opportunite.categorie}</span>
               )}
               <span className="px-3 py-1 bg-success/10 text-success text-[10px] font-black rounded-full uppercase tracking-widest border border-success/20">Achat groupé</span>
+              <span className={`px-3 py-1 text-[10px] font-black rounded-full uppercase tracking-widest border ${
+                souscriptionOuverte ? 'bg-accent/15 text-primary border-accent/30' : 'bg-gray-100 text-gray-400 border-gray-100'
+              }`}>
+                {souscriptionOuverte ? 'Souscription ouverte' : 'Souscription fermée'}
+              </span>
             </div>
 
             {/* Titre */}
@@ -276,23 +351,28 @@ export default function DetailOpportunite() {
               <div className="flex justify-between items-center text-[11px] font-black uppercase tracking-widest">
                 <span className="text-gray-400 flex items-center gap-1.5">
                   <Users size={12} />
-                  {valide
-                    ? phase === 'plafond'
+                  {progressionValidee
+                    ? phaseProgression === 'plafond'
                       ? `${opportunite.participantsActuels} / ${opportunite.seuilMaximal} places`
-                      : 'Offre validée'
-                    : `${opportunite.participantsActuels} / ${opportunite.seuilMinimum} participants`}
+                      : `${opportunite.participantsActuels} unités · offre validée`
+                    : `${opportunite.participantsActuels} / ${opportunite.seuilMinimum} unités réservées`}
                 </span>
-                <span className="text-success">{progress}%</span>
+                <span className={activationAtteinte ? 'text-success' : 'text-accent'}>{progress}%</span>
               </div>
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div className="h-full bg-success rounded-full transition-all duration-700" style={{ width: `${progress}%` }} />
               </div>
-              {!valide && (
+              {!progressionValidee && (
                 <p className="text-[10px] text-gray-400 font-bold">
-                  Plus que {opportunite.seuilMinimum - opportunite.participantsActuels} participant{opportunite.seuilMinimum - opportunite.participantsActuels > 1 ? 's' : ''} pour activer l'offre
+                  Plus que {opportunite.seuilMinimum - opportunite.participantsActuels} unité{opportunite.seuilMinimum - opportunite.participantsActuels > 1 ? 's' : ''} pour activer l'offre
                 </p>
               )}
-              {phase === 'plafond' && (
+              {activationAtteinte && (
+                <p className="text-[10px] text-success font-bold">
+                  Quota atteint : la campagne est activée et peut être traitée.
+                </p>
+              )}
+              {phaseProgression === 'plafond' && (
                 <p className={`text-[10px] font-bold ${isComplet ? 'text-urgency' : 'text-accent'}`}>
                   {isComplet ? 'Stock épuisé' : `Plus que ${placesRestantes} place${placesRestantes > 1 ? 's' : ''} disponible${placesRestantes > 1 ? 's' : ''}`}
                 </p>
@@ -311,10 +391,8 @@ export default function DetailOpportunite() {
                     .map((palier, i) => {
                       const dernier = i === paliersTries.length - 1
                       const atteint = opportunite.participantsActuels >= palier.seuilMin
-                      // Le dernier palier reste actif au-delà de son seuilMax (voir calculerPrixActuel côté backend :
-                      // le prix ne remonte jamais une fois le dernier palier atteint).
                       const actif = opportunite.participantsActuels >= palier.seuilMin &&
-                        (dernier || opportunite.participantsActuels <= palier.seuilMax)
+                        (dernier || !palier.seuilMax || opportunite.participantsActuels <= palier.seuilMax)
                       return (
                         <div key={i} className={`flex items-center justify-between px-4 py-3 transition-colors ${actif ? 'bg-success/5' : ''}`}>
                           <div className="flex items-center gap-3">
@@ -322,7 +400,7 @@ export default function DetailOpportunite() {
                               {atteint && <CheckCircle2 size={12} className="text-white" />}
                             </div>
                             <span className={`text-xs font-bold ${actif ? 'text-success' : 'text-gray-500'}`}>
-                              {palier.seuilMin}{dernier ? ' et plus' : ` – ${palier.seuilMax}`} participants
+                              {palier.seuilMin}{dernier ? ' et plus' : ` – ${palier.seuilMax}`} unités
                             </span>
                             {actif && <span className="text-[9px] bg-success text-white px-2 py-0.5 rounded-full font-black uppercase tracking-wide">Actif</span>}
                           </div>
@@ -336,9 +414,55 @@ export default function DetailOpportunite() {
               </div>
             )}
 
+            {opportunite.partenaireNom && (
+              <div className="flex items-center gap-3 rounded-2xl border-2 border-gray-100 bg-white p-4">
+                {opportunite.partenaireLogoUrl ? (
+                  <img src={opportunite.partenaireLogoUrl} alt="" className="h-11 w-11 rounded-xl object-contain" />
+                ) : <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/5 font-heading font-black text-primary">{opportunite.partenaireNom[0]}</div>}
+                <div className="min-w-0 flex-1">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Produit fourni par</p>
+                  <p className="truncate font-heading text-sm font-black text-primary">{opportunite.partenaireNom}</p>
+                </div>
+                {opportunite.partenaireReseauxUrl && (
+                  <a href={opportunite.partenaireReseauxUrl} target="_blank" rel="noreferrer" className="flex h-9 w-9 items-center justify-center rounded-xl border-2 border-gray-100 text-primary" title="Voir le partenaire">
+                    <ExternalLink size={15} />
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* Participation existante */}
+            {dejaSouscrit && (
+              <div className="bg-success/10 rounded-2xl border-2 border-success/20 p-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 size={20} className="text-success shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-heading font-black text-success text-sm">Vous avez déjà rejoint cette campagne</p>
+                    <p className="text-xs text-success/80 font-bold mt-1">
+                      Quantité actuelle : {maParticipation.quantite || 1} · Fonds gelés : {fmt(maParticipation.montantGele)} FCFA
+                    </p>
+                    <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-white/70 px-3 py-2">
+                      <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-primary">
+                        <PackageCheck size={14} />
+                        {SUIVI_PARTICIPATION[maParticipation.statutLivraison] || 'Campagne en cours'}
+                      </span>
+                      <span className="text-[11px] font-black text-success tabular-nums">{maParticipation.progressionLivraison || 0}%</span>
+                    </div>
+                    {souscriptionOuverte && (
+                      <p className="mt-2 text-xs text-success/80">
+                        Besoin de plus d’unités ? Choisissez une quantité ci-dessous : elle sera ajoutée à votre commande existante.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Quantité */}
             <div className="bg-white rounded-2xl border-2 border-gray-100 p-4 flex items-center justify-between">
-              <span className="text-[11px] font-black uppercase tracking-widest text-gray-400">Quantité</span>
+              <span className="text-[11px] font-black uppercase tracking-widest text-gray-400">
+                {dejaSouscrit ? 'Quantité à ajouter' : 'Quantité'}
+              </span>
               <div className="flex items-center gap-4">
                 <button
                   type="button"
@@ -351,8 +475,8 @@ export default function DetailOpportunite() {
                 <span className="text-lg font-heading font-extrabold text-primary tabular-nums w-6 text-center">{quantite}</span>
                 <button
                   type="button"
-                  onClick={() => setQuantite(q => Math.min(placesRestantes, q + 1))}
-                  disabled={joining || joinSuccess || quantite >= placesRestantes}
+                  onClick={() => setQuantite(q => Math.min(maxAjout, q + 1))}
+                  disabled={joining || joinSuccess || quantite >= maxAjout}
                   className="w-9 h-9 rounded-full border-2 border-gray-100 flex items-center justify-center text-primary hover:border-primary/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                   <Plus size={16} />
@@ -360,17 +484,47 @@ export default function DetailOpportunite() {
               </div>
             </div>
 
+            {/* Lien campagne */}
+            <div className="bg-white rounded-2xl border-2 border-gray-100 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-primary">
+                  <Link2 size={14} /> Lien de campagne
+                </span>
+                {copied && <span className="text-[10px] font-black text-success uppercase tracking-widest">Copié</span>}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  readOnly
+                  value={`${window.location.origin}/opportunity/${id}`}
+                  className="min-w-0 flex-1 rounded-xl bg-bg-light border-2 border-gray-100 px-3 py-2 text-xs font-bold text-gray-400"
+                />
+                <button type="button" onClick={handleCopyLink} className="w-10 h-10 rounded-xl border-2 border-gray-100 flex items-center justify-center text-primary hover:border-primary/30 transition-colors" title="Copier le lien">
+                  <Copy size={16} />
+                </button>
+                <button type="button" onClick={handleShare} className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center hover:brightness-105 transition-colors" title="Partager">
+                  <Share2 size={16} />
+                </button>
+              </div>
+            </div>
+
             {/* CTA */}
             <div className="pt-2 space-y-3 mt-auto">
+              {!souscriptionOuverte && (
+                <div className="text-urgency text-xs font-bold bg-urgency/5 p-3 rounded-xl border border-urgency/10">
+                  {opportunite.raisonIndisponibilite || (isExpired ? 'Cette campagne est expirée.' : 'Cette campagne ne peut plus recevoir de commandes.')}
+                </div>
+              )}
               <button
                 onClick={handleJoindre}
-                disabled={joining || opportunite.statut !== 'ACTIVE' || isComplet}
-                className={`w-full py-4 rounded-2xl font-heading font-black text-base shadow-lg flex items-center justify-center gap-3 transition-all active:scale-95 ${joinSuccess ? 'bg-success text-white cursor-default' : isComplet ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-accent text-primary hover:brightness-105'}`}
+                disabled={joining || joinSuccess || !souscriptionOuverte || maxAjout <= 0}
+                className={`w-full py-4 rounded-2xl font-heading font-black text-base shadow-lg flex items-center justify-center gap-3 transition-all active:scale-95 ${joinSuccess ? 'bg-success text-white cursor-default' : !souscriptionOuverte || maxAjout <= 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-accent text-primary hover:brightness-105'}`}
               >
                 {joining && <Loader2 size={20} className="animate-spin" />}
+                {!joining && !joinSuccess && <ShoppingCart size={20} />}
                 {joinSuccess ? <><CheckCircle2 size={18} /> Inscrit avec succès</>
                   : isComplet ? 'Offre complète'
-                  : `Rejoindre — ${fmt(Number(opportunite.prixActuel) * quantite)} FCFA`}
+                  : dejaSouscrit ? `Ajouter ${quantiteEffective} — ${fmt(totalCommande)} FCFA`
+                  : `Passer la commande — ${fmt(totalCommande)} FCFA`}
               </button>
               <div className="flex items-center justify-center gap-1.5 text-[10px] text-gray-400 font-bold">
                 <ShieldCheck size={12} className="text-success" /> Fonds sécurisés jusqu'à la fin de la vente

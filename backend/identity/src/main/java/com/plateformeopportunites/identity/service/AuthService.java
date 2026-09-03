@@ -55,10 +55,12 @@ public class AuthService {
     }
 
     private AuthResponse connecterOuCreerParTelephone(String telephone) {
+        telephone = normaliserTelephone(telephone);
+        final String telephoneNormalise = telephone;
         Utilisateur utilisateur = utilisateurRepository.findByTelephone(telephone)
                 .orElseGet(() -> {
                     Utilisateur nouveau = utilisateurRepository.save(
-                            Utilisateur.builder().telephone(telephone).build()
+                            Utilisateur.builder().telephone(telephoneNormalise).build()
                     );
                     eventPublisher.publishEvent(new UtilisateurCreeEvent(nouveau.getId()));
                     return nouveau;
@@ -70,6 +72,17 @@ public class AuthService {
 
         String token = jwtService.generateParticipantToken(utilisateur.getId(), telephone);
         return buildParticipantResponse(utilisateur, token);
+    }
+
+    private String normaliserTelephone(String telephone) {
+        if (telephone == null) {
+            throw new IllegalArgumentException("Numéro de téléphone manquant");
+        }
+        String normalise = telephone.trim().replaceAll("[\\s().-]", "");
+        if (!normalise.matches("^\\+[1-9]\\d{7,14}$")) {
+            throw new IllegalArgumentException("Numéro de téléphone invalide");
+        }
+        return normalise;
     }
 
     // ── Compléter le profil : nom (authentifié) ──────────────────────────────────

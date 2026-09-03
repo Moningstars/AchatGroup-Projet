@@ -44,6 +44,15 @@ public class ClotureScheduler {
         }
     }
 
+    @Scheduled(fixedDelay = 900_000)
+    public void notifierConfirmationsReceptionEnRetard() {
+        try {
+            opportuniteService.notifierRetardsLivraison();
+        } catch (Exception e) {
+            log.error("Erreur notification des confirmations de réception en retard", e);
+        }
+    }
+
     @Scheduled(fixedDelay = 60_000)
     public void cloturerSondagesExpires() {
         log.debug("Job clôture sondages — début");

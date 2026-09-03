@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Search } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { getOpportunites, getSondages, getBannieres, imgUrl } from '../services/api'
 import ProductCard from '../components/ProductCard'
@@ -68,7 +68,10 @@ export default function Opportunites() {
   const [sondages, setSondages] = useState([])
   const [heroSlides, setHeroSlides] = useState(HERO_SLIDES)
   const [loading, setLoading] = useState(true)
+  const [searching, setSearching] = useState(false)
   const [search, setSearch] = useState('')
+  const [serverSearch, setServerSearch] = useState('')
+  const [selectedCategories, setSelectedCategories] = useState([])
   const [slide, setSlide] = useState(0)
   const [visible, setVisible] = useState(true)
   const navigate = useNavigate()
@@ -121,13 +124,34 @@ export default function Opportunites() {
 
   useEffect(() => {
     Promise.all([
-      getOpportunites().catch(() => []),
       getSondages().catch(() => []),
-    ]).then(([ops, sonds]) => {
-      setOpportunites(ops)
+    ]).then(([sonds]) => {
       setSondages(sonds.filter(s => s.statut === 'ACTIF'))
-    }).finally(() => setLoading(false))
+    })
   }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setServerSearch(search.trim()), 350)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  useEffect(() => {
+    let cancelled = false
+    setSearching(true)
+    getOpportunites({
+      q: serverSearch || undefined,
+      categories: selectedCategories.length ? selectedCategories : undefined,
+    })
+      .then(ops => { if (!cancelled) setOpportunites(ops) })
+      .catch(() => { if (!cancelled) setOpportunites([]) })
+      .finally(() => {
+        if (!cancelled) {
+          setSearching(false)
+          setLoading(false)
+        }
+      })
+    return () => { cancelled = true }
+  }, [serverSearch, selectedCategories])
 
   // Compteurs/prix/statut mis à jour en direct
   useSSE('opportunites', {
@@ -147,13 +171,23 @@ export default function Opportunites() {
     },
   })
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return opportunites
-    const q = search.toLowerCase()
-    return opportunites.filter(op =>
-      op.titre?.toLowerCase().includes(q) || op.description?.toLowerCase().includes(q)
-    )
-  }, [opportunites, search])
+  const filtered = opportunites
+
+  const resetFilters = () => {
+    setSearch('')
+    setServerSearch('')
+    setSelectedCategories([])
+  }
+
+  const selectMainCategory = (cat) => {
+    setSelectedCategories(cat === 'Tout' ? [] : [cat])
+  }
+
+  const catalogueState = {
+    search,
+    categories: selectedCategories,
+    category: selectedCategories[0] || 'Tout',
+  }
 
   const expirantBientot = useMemo(() => opportunites
     .filter(o => o.dateExpiration && o.statut === 'ACTIVE')
@@ -256,7 +290,7 @@ export default function Opportunites() {
             </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-0 pt-8 space-y-10">
+      <main className="max-w-7xl mx-auto px-4 lg:px-0 pt-8 space-y-10">
 
         {/* ── Expire bientôt ── */}
         {expirantBientot.length > 0 && (
@@ -358,32 +392,39 @@ export default function Opportunites() {
           </section>
         )}
 
-        {/* ── Catégories + Recherche ── */}
-        <section className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-hide">
-            {CATS.map((cat, i) => (
-              <span key={cat} className="flex items-center shrink-0">
-                <Link
-                  to="/opportunites"
-                  state={{ category: cat }}
-                  className="text-sm font-bold text-gray-400 hover:text-primary transition-colors px-1 py-0.5"
-                >
-                  {cat}
-                </Link>
-                {i < CATS.length - 1 && <span className="text-gray-200 mx-1 select-none">·</span>}
-              </span>
-            ))}
-          </div>
+        {/* ── Recherche e-commerce ── */}
+        <section className="rounded-3xl border border-gray-100 bg-white p-3 sm:p-4 shadow-sm overflow-hidden">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-center">
+            <div className="relative w-full group">
+              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors" />
+              <input
+                type="text"
+                placeholder="Rechercher une offre..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full bg-bg-light border-2 border-gray-100 rounded-2xl py-3.5 pl-11 pr-4 focus:outline-none focus:border-primary font-bold text-sm transition-all"
+              />
+              {searching && (
+                <Loader2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-primary/60" />
+              )}
+            </div>
 
-          <div className="relative w-full sm:max-w-xs shrink-0 group">
-            <i className="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg group-focus-within:text-primary transition-colors" />
-            <input
-              type="text"
-              placeholder="Rechercher..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full bg-white border-2 border-gray-100 rounded-2xl py-3.5 pl-11 pr-4 focus:outline-none focus:border-primary font-bold text-sm transition-all shadow-sm"
-            />
+            <label className="relative block">
+              <span className="sr-only">Catégorie</span>
+              <select
+                value={selectedCategories.length > 1 ? '__MULTI__' : selectedCategories[0] || 'Tout'}
+                onChange={e => selectMainCategory(e.target.value)}
+                className="w-full appearance-none rounded-2xl border-2 border-gray-100 bg-bg-light px-4 py-3.5 pr-10 text-xs font-black uppercase tracking-widest text-primary outline-none transition-all focus:border-primary"
+              >
+                {selectedCategories.length > 1 && (
+                  <option value="__MULTI__" disabled>{selectedCategories.length} catégories</option>
+                )}
+                {CATS.map(cat => (
+                  <option key={cat} value={cat}>{cat === 'Tout' ? 'Toutes catégories' : cat}</option>
+                ))}
+              </select>
+              <i className="ti ti-chevron-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400" />
+            </label>
           </div>
         </section>
 
@@ -396,7 +437,7 @@ export default function Opportunites() {
               </div>
               <p className="text-gray-400 font-heading font-bold text-xl">Aucune offre trouvée</p>
               <button
-                onClick={() => setSearch('')}
+                onClick={resetFilters}
                 className="bg-primary text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg"
               >
                 Réinitialiser
@@ -412,6 +453,7 @@ export default function Opportunites() {
                 <div className="flex justify-center pt-2">
                   <Link
                     to="/opportunites"
+                    state={catalogueState}
                     className="flex items-center gap-2 bg-white border-2 border-gray-100 text-primary font-black uppercase text-[11px] tracking-widest px-8 py-3.5 rounded-2xl hover:border-primary transition-all active:scale-95 shadow-sm"
                   >
                     <i className="ti ti-layout-grid" />

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import {
   getSondage, getEligibiliteQuestions, getMonEligibilite,
-  passerEligibilite, repondreASondage, getKycStatus,
+  passerEligibilite, repondreASondage, getKycStatus, getMesParticipationsSondages,
 } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useSSE } from '../hooks/useSSE'
@@ -144,7 +144,7 @@ function SondageCard({ sondage }) {
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="rounded-2xl bg-white/10 p-3.5 border border-white/10">
             <p className="text-[10px] text-white/50 font-bold uppercase tracking-widest mb-1">Récompense</p>
-            <p className="text-xl font-heading font-black text-accent">{formatMontant(sondage.recompense)}<span className="text-xs font-bold text-white/50 ml-1">{sondage.typeRecompense === 'POINTS' ? 'pts' : 'FCFA'}</span></p>
+            <p className="text-xl font-heading font-black text-accent">{formatMontant(sondage.recompense)}<span className="text-xs font-bold text-white/50 ml-1">FCFA{sondage.typeRecompense === 'POINTS' ? ' convertis en points' : ''}</span></p>
           </div>
           <div className="rounded-2xl bg-white/10 p-3.5 border border-white/10">
             <p className="text-[10px] text-white/50 font-bold uppercase tracking-widest mb-1 flex items-center gap-1"><Users size={9} /> Participants</p>
@@ -380,6 +380,7 @@ export default function SondageDetail() {
   const [step, setStep] = useState('loading')
   const [tauxEchec, setTauxEchec] = useState(null)
   const [kycStatus, setKycStatus] = useState(null)
+  const [participation, setParticipation] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -388,6 +389,18 @@ export default function SondageDetail() {
         const [s, eq] = await Promise.all([getSondage(id), getEligibiliteQuestions(id)])
         if (cancelled) return
         setSondage(s)
+
+        if (isAuthenticated) {
+          const participations = await getMesParticipationsSondages().catch(() => [])
+          if (cancelled) return
+          const existante = participations.find(p => p.sondageId === id)
+          if (existante) {
+            setParticipation(existante)
+            setStep('suivi')
+            return
+          }
+        }
+
         if (s.statut !== 'ACTIF') { setStep('ferme'); return }
 
         if (s.niveauVerification === 'VERIFIE' && isAuthenticated) {
@@ -425,7 +438,7 @@ export default function SondageDetail() {
   useSSE(id ? `sondage/${id}` : null, {
     STATUT: ({ statut }) => {
       setSondage(prev => prev ? { ...prev, statut } : prev)
-      if (statut !== 'ACTIF' && step !== 'done' && step !== 'non_eligible') setStep('ferme')
+      if (statut !== 'ACTIF' && !['done', 'suivi', 'non_eligible'].includes(step)) setStep('ferme')
     },
   })
 
@@ -528,14 +541,65 @@ export default function SondageDetail() {
           <h2 className="text-2xl font-heading font-extrabold text-primary">Réponses envoyées !</h2>
           <p className="text-gray-500 text-sm font-medium leading-relaxed max-w-xs">
             Merci pour votre participation. Votre récompense de{' '}
-            <span className="font-black text-accent">{formatMontant(sondage.recompense)} {sondage.typeRecompense === 'POINTS' ? 'points' : 'FCFA'}</span>{' '}
-            sera créditée après validation.
+            <span className="font-black text-accent">{sondage.typeRecompense === 'POINTS' ? `l’équivalent en points de ${formatMontant(sondage.recompense)} FCFA` : `${formatMontant(sondage.recompense)} FCFA`}</span>{' '}
+            {sondage.modeDistribution === 'AUTO'
+              ? 'a été traitée automatiquement.'
+              : 'sera créditée dès que notre équipe aura validé votre participation.'}
           </p>
         </div>
         <button onClick={() => navigate('/sondages')}
           className="mt-2 px-8 py-4 rounded-2xl bg-primary text-white text-sm font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-primary/20">
           Voir d'autres sondages
         </button>
+      </div>
+    )
+  }
+
+  if (step === 'suivi' && participation) {
+    const validee = participation.statutValidation === 'VALIDE'
+    const rejetee = participation.statutValidation === 'REJETE'
+    const payee = participation.recompenseVersee
+    return (
+      <div className="min-h-screen bg-bg-light p-4 sm:p-6 flex flex-col items-center justify-center pb-28">
+        <div className="w-full max-w-md rounded-3xl border-2 border-gray-100 bg-white p-6 sm:p-8 shadow-sm">
+          <button onClick={() => navigate('/sondages')} className="mb-6 inline-flex items-center gap-2 text-xs font-black text-gray-400 hover:text-primary">
+            <ArrowLeft size={15} /> Retour aux sondages
+          </button>
+          <div className={`mb-5 flex h-16 w-16 items-center justify-center rounded-2xl ${payee ? 'bg-success/10' : rejetee ? 'bg-urgency/10' : 'bg-accent/10'}`}>
+            {payee ? <CheckCircle2 size={32} className="text-success" /> : rejetee ? <XCircle size={32} className="text-urgency" /> : <Clock size={32} className="text-accent" />}
+          </div>
+          <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-gray-400">Ma participation</p>
+          <h1 className="text-xl font-heading font-extrabold text-primary">{sondage.titre}</h1>
+          <div className="mt-6 rounded-2xl bg-bg-light p-4">
+            <p className="text-sm font-black text-primary">
+              {payee ? 'Participation validée et récompensée' : rejetee ? 'Participation non retenue' : validee ? 'Validation terminée, versement en cours' : 'Vérification en cours'}
+            </p>
+            <p className="mt-1 text-xs font-medium leading-relaxed text-gray-500">
+              {payee
+                ? participation.typeRecompense === 'POINTS'
+                  ? `Les points correspondant à ${formatMontant(participation.recompense)} FCFA ont été crédités.`
+                  : `Votre récompense de ${formatMontant(participation.recompense)} FCFA a été créditée.`
+                : rejetee
+                  ? 'La vérification de votre participation n’a pas permis de la valider. Aucun versement ne sera effectué.'
+                  : participation.statutSondage === 'EN_ATTENTE_DISTRIBUTION'
+                    ? 'Le sondage est fermé aux nouvelles réponses. Les participations reçues sont maintenant en cours de validation.'
+                    : 'Votre réponse est bien enregistrée. Aucune preuve supplémentaire n’est obligatoire ; notre équipe vous notifiera après sa décision.'}
+            </p>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-gray-100 p-4">
+              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Récompense</p>
+              <p className="mt-1 font-heading font-extrabold text-primary">{formatMontant(participation.recompense)} FCFA{participation.typeRecompense === 'POINTS' ? ' → points' : ''}</p>
+            </div>
+            <div className="rounded-2xl border border-gray-100 p-4">
+              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Soumis le</p>
+              <p className="mt-1 text-sm font-extrabold text-primary">{formatDate(participation.createdAt)}</p>
+            </div>
+          </div>
+          <button onClick={() => navigate('/historique')} className="mt-6 w-full rounded-2xl bg-primary py-3.5 text-xs font-black uppercase tracking-widest text-white">
+            Voir toutes mes participations
+          </button>
+        </div>
       </div>
     )
   }

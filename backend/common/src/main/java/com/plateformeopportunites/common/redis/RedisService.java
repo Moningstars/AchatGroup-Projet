@@ -65,4 +65,8 @@ public class RedisService {
     public boolean aDejaVote(UUID sondageId, UUID participantId) {
         return Boolean.TRUE.equals(redis.hasKey("sondage:" + sondageId + ":voted:" + participantId));
     }
+
+    public void supprimerMarqueurVote(UUID sondageId, UUID participantId) {
+        redis.delete("sondage:" + sondageId + ":voted:" + participantId);
+    }
 }

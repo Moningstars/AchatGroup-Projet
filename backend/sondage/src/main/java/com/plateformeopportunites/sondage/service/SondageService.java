@@ -33,6 +33,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -140,9 +142,12 @@ public class SondageService {
                             .recompense(s.getRecompense())
                             .typeRecompense(s.getTypeRecompense())
                             .statutValidation(r.getStatutValidation())
+                            .statutSondage(s.getStatut())
+                            .modeDistribution(s.getModeDistribution())
                             .recompenseVersee(r.getRecompenseVersee())
                             .createdAt(r.getCreatedAt())
                             .valideeAt(r.getValideeAt())
+                            .dateExpiration(s.getDateExpiration())
                             .build();
                 })
                 .toList();
@@ -152,12 +157,19 @@ public class SondageService {
 
     @Transactional
     public void activer(UUID sondageId) {
-        Sondage sondage = getSondage(sondageId);
+        Sondage sondage = getSondageForUpdate(sondageId);
         if (sondage.getStatut() != StatutSondage.BROUILLON) {
             throw new IllegalStateException("Seul un sondage en brouillon peut être activé");
         }
         if (sondageEligibiliteRepository.findBySondageId(sondageId).isEmpty()) {
             throw new IllegalStateException("Impossible d'activer : aucun test d'éligibilité configuré pour ce sondage");
+        }
+        if (!sondage.getDateExpiration().isAfter(LocalDateTime.now())) {
+            throw new IllegalStateException("La date d'expiration doit être future avant l'activation");
+        }
+        if (sondage.getQuotaVise() == null || sondage.getQuotaVise() < 1
+                || sondage.getRecompense() == null || sondage.getRecompense().compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalStateException("Le quota et la récompense du sondage sont invalides");
         }
 
         // Réserve le budget nécessaire depuis le wallet plateforme
@@ -179,19 +191,13 @@ public class SondageService {
 
     @Transactional
     public void cloturerManuellement(UUID sondageId) {
-        Sondage sondage = getSondage(sondageId);
-
-        distribuerManuel(sondageId);
-        libererReliquatSiNecessaire(sondage);
-
-        sondage.setStatut(StatutSondage.CLOTURE);
-        sondageRepository.save(sondage);
-
-        String payloadDistribution = "{\"id\":\"" + sondageId + "\",\"statut\":\"CLOTURE\"}";
-        eventPublisher.publishEvent(new SseNotificationEvent(this,
-                "sondage:" + sondageId, "STATUT", payloadDistribution));
-        eventPublisher.publishEvent(new SseNotificationEvent(this,
-                "sondages:global", "STATUT", payloadDistribution));
+        Sondage sondage = getSondageForUpdate(sondageId);
+        if (sondage.getStatut() != StatutSondage.ACTIF
+                && sondage.getStatut() != StatutSondage.EN_ATTENTE_DISTRIBUTION) {
+            throw new IllegalStateException("Seul un sondage actif ou en cours de finalisation peut être clôturé");
+        }
+        passerEnFinalisation(sondage);
+        finaliserSiPossible(sondage);
     }
 
     @Transactional
@@ -201,7 +207,10 @@ public class SondageService {
         if (modifieBudget && sondage.getStatut() != StatutSondage.BROUILLON) {
             throw new IllegalStateException("Le quota et la récompense ne peuvent plus être modifiés après réservation du budget");
         }
-        if (req.getTitre() != null && !req.getTitre().isBlank()) sondage.setTitre(req.getTitre());
+        if (req.getTitre() != null && req.getTitre().isBlank()) {
+            throw new IllegalArgumentException("Le titre ne peut pas être vide");
+        }
+        if (req.getTitre() != null) sondage.setTitre(req.getTitre().trim());
         if (req.getDescription() != null) sondage.setDescription(req.getDescription());
         if (req.getQuotaVise() != null) sondage.setQuotaVise(req.getQuotaVise());
         if (req.getRecompense() != null) sondage.setRecompense(req.getRecompense());
@@ -228,11 +237,21 @@ public class SondageService {
         if (sondageEligibiliteRepository.findBySondageId(sondageId).isPresent()) {
             throw new IllegalArgumentException("Un test d'éligibilité existe déjà pour ce sondage");
         }
-        boolean hasTexteLibre = req.getQuestions().stream()
-                .anyMatch(q -> q.getTypeQuestion() == TypeQuestion.TEXTE_LIBRE);
-        if (hasTexteLibre) {
+        boolean hasTypeNonScorable = req.getQuestions().stream()
+                .anyMatch(q -> q.getTypeQuestion() == TypeQuestion.TEXTE_LIBRE
+                        || q.getTypeQuestion() == TypeQuestion.OUI_NON);
+        if (hasTypeNonScorable) {
             throw new IllegalArgumentException(
-                "Les questions d'éligibilité ne peuvent pas être de type TEXTE_LIBRE — utilisez CHOIX_UNIQUE, CHOIX_MULTIPLE ou OUI_NON");
+                "Les questions d'éligibilité doivent être à choix unique ou multiple afin d'avoir une correction vérifiable");
+        }
+        for (CreerEligibiliteRequest.QuestionEligibiliteRequest question : req.getQuestions()) {
+            if (question.getOptions() == null || question.getOptions().size() < 2) {
+                throw new IllegalArgumentException("Chaque question d'éligibilité doit avoir au moins deux options");
+            }
+            long bonnesReponses = question.getOptions().stream().filter(o -> Boolean.TRUE.equals(o.getEstCorrecte())).count();
+            if (bonnesReponses == 0 || (question.getTypeQuestion() == TypeQuestion.CHOIX_UNIQUE && bonnesReponses != 1)) {
+                throw new IllegalArgumentException("Chaque question doit définir ses bonnes réponses de manière cohérente");
+            }
         }
 
         // Sauvegarde d'abord pour obtenir un ID
@@ -331,12 +350,17 @@ public class SondageService {
 
         List<QuestionEligibilite> questions = eligibilite.getQuestions();
         validerReponsesEligibilite(questions, req);
-        long correctes = req.getReponses().stream()
-                .filter(r -> questions.stream()
-                        .filter(q -> q.getId().equals(r.getQuestionId()))
-                        .flatMap(q -> q.getOptions().stream())
-                        .anyMatch(o -> o.getId().equals(r.getOptionId()) && o.getEstCorrecte()))
-                .count();
+        long correctes = questions.stream().filter(question -> {
+            Set<UUID> attendues = question.getOptions().stream()
+                    .filter(o -> Boolean.TRUE.equals(o.getEstCorrecte()))
+                    .map(OptionEligibilite::getId)
+                    .collect(Collectors.toSet());
+            Set<UUID> fournies = req.getReponses().stream()
+                    .filter(r -> question.getId().equals(r.getQuestionId()) && r.getOptionId() != null)
+                    .map(EligibiliteRequest.ReponseEligibiliteRequest::getOptionId)
+                    .collect(Collectors.toSet());
+            return !attendues.isEmpty() && attendues.equals(fournies);
+        }).count();
 
         BigDecimal taux = questions.isEmpty() ? BigDecimal.ZERO
                 : BigDecimal.valueOf(correctes * 100.0 / questions.size());
@@ -362,11 +386,15 @@ public class SondageService {
     public SondageReponse repondre(UUID participantId, UUID sondageId, RepondreRequest req) {
         Utilisateur utilisateur = utilisateurRepository.findById(participantId)
                 .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable"));
-        Sondage sondage = getSondage(sondageId);
+        Sondage sondage = getSondageForUpdate(sondageId);
         verifierSondageOuvert(sondage);
 
         if (sondageReponseRepository.existsBySondageIdAndUtilisateurId(sondageId, participantId)) {
             throw new IllegalArgumentException("Déjà répondu à ce sondage");
+        }
+        if (sondageReponseRepository.countBySondageId(sondageId) >= sondage.getQuotaVise()) {
+            passerEnFinalisation(sondage);
+            throw new IllegalStateException("Quota atteint : ce sondage n'accepte plus de réponses");
         }
 
         // Vérification du niveau KYC requis par le sondage
@@ -395,6 +423,16 @@ public class SondageService {
         boolean reserve = redisService.marquerVoteSiAbsent(sondageId, participantId, 90L * 24 * 3600);
         if (!reserve) {
             throw new IllegalArgumentException("Déjà répondu à ce sondage");
+        }
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int status) {
+                    if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                        redisService.supprimerMarqueurVote(sondageId, participantId);
+                    }
+                }
+            });
         }
 
         SondageReponse sondageReponse = SondageReponse.builder()
@@ -438,6 +476,14 @@ public class SondageService {
         }
         // En mode MANUEL, la réponse reste EN_ATTENTE_PREUVE — l'admin valide
 
+        long nombreReponses = sondageReponseRepository.countBySondageId(sondageId);
+        if (nombreReponses >= sondage.getQuotaVise()) {
+            passerEnFinalisation(sondage);
+            if (sondage.getModeDistribution() == ModeDistribution.AUTO) {
+                finaliserSiPossible(sondage);
+            }
+        }
+
         return saved;
     }
 
@@ -458,11 +504,16 @@ public class SondageService {
 
     @Transactional
     public void validerPreuve(UUID sondageReponseId, boolean approuve) {
-        SondageReponse reponse = sondageReponseRepository.findById(sondageReponseId)
+        SondageReponse reponse = sondageReponseRepository.findByIdForUpdate(sondageReponseId)
                 .orElseThrow(() -> new IllegalArgumentException("Réponse introuvable"));
+        if (reponse.getStatutValidation() != StatutValidation.EN_ATTENTE_PREUVE) {
+            throw new IllegalStateException("Cette réponse a déjà fait l'objet d'une décision");
+        }
 
-        if (approuve && (reponse.getFichierPreuve() == null || reponse.getFichierPreuve().isBlank())) {
-            throw new IllegalArgumentException("Impossible d'approuver : aucune preuve fournie pour cette réponse");
+        Sondage sondage = getSondageForUpdate(reponse.getSondage().getId());
+        if (sondage.getStatut() != StatutSondage.ACTIF
+                && sondage.getStatut() != StatutSondage.EN_ATTENTE_DISTRIBUTION) {
+            throw new IllegalStateException("Ce sondage n'accepte plus de décisions de validation");
         }
 
         reponse.setStatutValidation(approuve ? StatutValidation.VALIDE : StatutValidation.REJETE);
@@ -471,7 +522,6 @@ public class SondageService {
 
         if (approuve) {
             // repondantsActuels ne compte que les réponses VALIDES
-            Sondage sondage = reponse.getSondage();
             if (sondage.getRepondantsActuels() >= sondage.getQuotaVise()) {
                 throw new IllegalStateException("Quota déjà atteint : cette réponse ne peut plus être récompensée");
             }
@@ -483,11 +533,27 @@ public class SondageService {
 
             distribuerRecompense(reponse, ModeDistribution.MANUEL);
         }
+        if (sondage.getStatut() == StatutSondage.EN_ATTENTE_DISTRIBUTION) {
+            finaliserSiPossible(sondage);
+        }
     }
 
     @Transactional
     public void distribuerManuel(UUID sondageId) {
-        // Distribue toutes les réponses VALIDES non encore payées
+        Sondage sondage = getSondageForUpdate(sondageId);
+        if (sondage.getStatut() != StatutSondage.EN_ATTENTE_DISTRIBUTION) {
+            throw new IllegalStateException("Le sondage doit d'abord être fermé aux réponses et passer en finalisation");
+        }
+        long decisionsEnAttente = sondageReponseRepository.countBySondageIdAndStatutValidation(
+                sondageId, StatutValidation.EN_ATTENTE_PREUVE);
+        if (decisionsEnAttente > 0) {
+            throw new IllegalStateException(decisionsEnAttente
+                    + " participation(s) attendent encore une décision avant la clôture définitive");
+        }
+        finaliserSiPossible(sondage);
+    }
+
+    private void distribuerValidesNonPayees(UUID sondageId) {
         List<SondageReponse> reponses = sondageReponseRepository
                 .findBySondageIdAndStatutValidationAndRecompenseVersee(sondageId, StatutValidation.VALIDE, false);
         for (SondageReponse r : reponses) {
@@ -638,10 +704,9 @@ public class SondageService {
         List<Sondage> expires = sondageRepository
                 .findByStatutAndDateExpirationBefore(StatutSondage.ACTIF, LocalDateTime.now());
         for (Sondage s : expires) {
-            distribuerManuel(s.getId());
-            libererReliquatSiNecessaire(s);
-            s.setStatut(StatutSondage.CLOTURE);
-            sondageRepository.save(s);
+            Sondage verrouille = getSondageForUpdate(s.getId());
+            passerEnFinalisation(verrouille);
+            finaliserSiPossible(verrouille);
         }
     }
 
@@ -837,6 +902,43 @@ public class SondageService {
     private Sondage getSondage(UUID id) {
         return sondageRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Sondage introuvable"));
+    }
+
+    private Sondage getSondageForUpdate(UUID id) {
+        return sondageRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new IllegalArgumentException("Sondage introuvable"));
+    }
+
+    private void passerEnFinalisation(Sondage sondage) {
+        if (sondage.getStatut() == StatutSondage.ACTIF) {
+            sondage.setStatut(StatutSondage.EN_ATTENTE_DISTRIBUTION);
+            sondageRepository.save(sondage);
+            publierStatut(sondage);
+        }
+    }
+
+    /**
+     * Clôture définitivement seulement lorsque toutes les réponses manuelles ont reçu
+     * une décision. Le reliquat reste ainsi réservé tant qu'une récompense peut encore
+     * être due à un participant.
+     */
+    private void finaliserSiPossible(Sondage sondage) {
+        long decisionsEnAttente = sondageReponseRepository.countBySondageIdAndStatutValidation(
+                sondage.getId(), StatutValidation.EN_ATTENTE_PREUVE);
+        if (decisionsEnAttente > 0) return;
+
+        distribuerValidesNonPayees(sondage.getId());
+        libererReliquatSiNecessaire(sondage);
+        sondage.setStatut(StatutSondage.CLOTURE);
+        sondageRepository.save(sondage);
+        publierStatut(sondage);
+    }
+
+    private void publierStatut(Sondage sondage) {
+        String payload = "{\"id\":\"" + sondage.getId() + "\",\"statut\":\""
+                + sondage.getStatut() + "\"}";
+        eventPublisher.publishEvent(new SseNotificationEvent(this, "sondages:global", "STATUT", payload));
+        eventPublisher.publishEvent(new SseNotificationEvent(this, "sondage:" + sondage.getId(), "STATUT", payload));
     }
 
     private SondageResponse toResponse(Sondage s) {
