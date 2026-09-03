@@ -31,6 +31,7 @@ public class OpportuniteResponse {
     private LocalDateTime createdAt;
     private String categorie;
     private String categorieIcone;
+    private UUID commanditaireId;
     private String partenaireNom;
     private String partenaireLogoUrl;
     private String partenaireContact;
@@ -42,6 +43,7 @@ public class OpportuniteResponse {
     private LocalDateTime dateConfirmationPartenaire;
     private Integer delaiConfirmationReceptionJours;
     private String messageNotificationLivraison;
+    private String messagePartage;
     private List<PalierPrixResponse> paliers;
     private List<ImageResponse> images;
 

@@ -12,6 +12,7 @@ public class WalletPlateformeResponse {
     private BigDecimal soldeReserve;
     private BigDecimal soldePoints;
     private BigDecimal tauxConversionPoints;
+    private BigDecimal recompenseParrainagePoints;
     private String devise;
     private LocalDateTime updatedAt;
 }

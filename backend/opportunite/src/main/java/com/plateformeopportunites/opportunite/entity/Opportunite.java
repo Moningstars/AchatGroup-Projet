@@ -57,6 +57,9 @@ public class Opportunite {
     private Integer participantsActuels;
 
     /** Fournisseur/partenaire de la campagne. Ces informations restent optionnelles. */
+    @Column(name = "commanditaire_id")
+    private UUID commanditaireId;
+
     private String partenaireNom;
 
     private String partenaireLogoUrl;
@@ -76,6 +79,10 @@ public class Opportunite {
 
     @Column(length = 500)
     private String messageNotificationLivraison;
+
+    /** Texte marketing ajouté devant le lien lors d'un partage. */
+    @Column(length = 500)
+    private String messagePartage;
 
     @Column(nullable = false)
     private LocalDateTime dateExpiration;

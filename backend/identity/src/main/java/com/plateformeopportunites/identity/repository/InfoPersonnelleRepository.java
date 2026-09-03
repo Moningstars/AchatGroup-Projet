@@ -7,4 +7,6 @@ import java.util.UUID;
 
 public interface InfoPersonnelleRepository extends JpaRepository<InfoPersonnelle, UUID> {
     Optional<InfoPersonnelle> findByUtilisateurId(UUID utilisateurId);
+    boolean existsByNumeroPieceIgnoreCaseAndUtilisateurIdNot(String numeroPiece, UUID utilisateurId);
+    boolean existsByEmailIgnoreCaseAndUtilisateurIdNot(String email, UUID utilisateurId);
 }

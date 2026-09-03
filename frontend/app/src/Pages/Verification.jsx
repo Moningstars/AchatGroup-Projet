@@ -21,6 +21,12 @@ const SOURCE_REVENUS_OPTIONS = [
   { value: 'AUTRE',       label: 'Autre' },
 ]
 
+const todayIso = () => {
+  const now = new Date()
+  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
+  return localDate.toISOString().slice(0, 10)
+}
+
 function StepBar({ step }) {
   return (
     <div className="flex items-center justify-center gap-2 mb-8">
@@ -45,7 +51,7 @@ function StepBar({ step }) {
   )
 }
 
-function Field({ label, name, type = 'text', value, onChange, required, placeholder, error }) {
+function Field({ label, name, type = 'text', value, onChange, required, placeholder, error, ...inputProps }) {
   return (
     <div className="space-y-1.5">
       <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 block">
@@ -57,6 +63,7 @@ function Field({ label, name, type = 'text', value, onChange, required, placehol
         value={value}
         onChange={onChange}
         placeholder={placeholder}
+        {...inputProps}
         className={`w-full bg-bg-light border-2 rounded-2xl px-4 py-3 text-sm font-semibold text-primary placeholder-gray-300 focus:outline-none transition-all ${
           error ? 'border-urgency focus:border-urgency' : 'border-gray-100 focus:border-primary'
         }`}
@@ -112,6 +119,7 @@ export default function Verification() {
   const [loading, setLoading]       = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError]           = useState('')
+  const [loadError, setLoadError]   = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const [form, setForm] = useState(EMPTY_FORM)
 
@@ -138,7 +146,7 @@ export default function Verification() {
           })
         }
       })
-      .catch(() => setKycStatus({ niveauVerification: 'AUCUN', dejaSoumis: false }))
+      .catch(() => setLoadError('Impossible de récupérer votre statut KYC. Vérifiez votre connexion puis réessayez.'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -166,11 +174,12 @@ export default function Verification() {
     if (!form.numeroPiece.trim())   errs.numeroPiece        = 'Champ obligatoire'
     if (!form.dateExpirationPiece) {
       errs.dateExpirationPiece = 'Champ obligatoire'
-    } else if (new Date(form.dateExpirationPiece) < new Date()) {
+    } else if (form.dateExpirationPiece < todayIso()) {
       errs.dateExpirationPiece = 'Votre pièce est expirée'
     }
 
-    if (!form.email.trim())         errs.email   = 'Champ obligatoire'
+    if (!form.email.trim()) errs.email = 'Champ obligatoire'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) errs.email = 'Adresse email invalide'
     if (!form.adresse.trim())       errs.adresse = 'Champ obligatoire'
     if (!form.ville.trim())         errs.ville   = 'Champ obligatoire'
     if (!form.pays.trim())          errs.pays    = 'Champ obligatoire'
@@ -208,6 +217,19 @@ export default function Verification() {
   if (loading) return (
     <div className="flex min-h-screen items-center justify-center bg-bg-light">
       <Loader2 size={36} className="animate-spin text-primary" />
+    </div>
+  )
+
+  if (loadError) return (
+    <div className="flex min-h-screen items-center justify-center bg-bg-light px-5">
+      <div className="w-full max-w-md rounded-3xl border-2 border-red-100 bg-white p-7 text-center shadow-sm">
+        <i className="ti ti-cloud-off text-4xl text-urgency" />
+        <h1 className="mt-4 font-heading text-xl font-extrabold text-primary">Statut KYC indisponible</h1>
+        <p className="mt-2 text-sm font-semibold leading-6 text-gray-500">{loadError}</p>
+        <button onClick={() => window.location.reload()} className="mt-5 rounded-2xl bg-primary px-6 py-3 text-sm font-black text-white">
+          Réessayer
+        </button>
+      </div>
     </div>
   )
 
@@ -312,7 +334,7 @@ export default function Verification() {
                     <Field label="Prénom" name="prenom" value={form.prenom} onChange={onChange} required placeholder="Votre prénom" error={fieldErrors.prenom} />
                   </div>
 
-                  <Field label="Date de naissance" name="dateNaissance" type="date" value={form.dateNaissance} onChange={onChange} required error={fieldErrors.dateNaissance} />
+                  <Field label="Date de naissance" name="dateNaissance" type="date" value={form.dateNaissance} onChange={onChange} required error={fieldErrors.dateNaissance} max={todayIso()} />
 
                   <div className="grid grid-cols-2 gap-4">
                     <Field label="Lieu de naissance" name="lieuNaissance" value={form.lieuNaissance} onChange={onChange} required placeholder="Ville de naissance" error={fieldErrors.lieuNaissance} />
@@ -336,7 +358,7 @@ export default function Verification() {
 
                   <Field label="Numéro de la pièce" name="numeroPiece" value={form.numeroPiece} onChange={onChange} required placeholder="Ex: TG-123456789" error={fieldErrors.numeroPiece} />
 
-                  <Field label="Date d'expiration" name="dateExpirationPiece" type="date" value={form.dateExpirationPiece} onChange={onChange} required error={fieldErrors.dateExpirationPiece} />
+                  <Field label="Date d'expiration" name="dateExpirationPiece" type="date" value={form.dateExpirationPiece} onChange={onChange} required error={fieldErrors.dateExpirationPiece} min={todayIso()} />
                 </div>
 
                 {/* ── Section 3 : Coordonnées ── */}

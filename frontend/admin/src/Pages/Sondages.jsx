@@ -266,8 +266,8 @@ function NouveauSondageModal({ onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
-      <div className="my-8 w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
+    <div className="admin-modal-layer fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+      <div className="my-8 w-full max-w-2xl rounded-2xl bg-white p-4 shadow-2xl sm:p-6">
         <div className="mb-6 flex items-center justify-between">
           <h3 className="text-xl font-bold text-slate-950">Nouveau sondage</h3>
           <button onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X size={20} /></button>
@@ -368,7 +368,7 @@ function NouveauSondageModal({ onClose, onSaved }) {
 
           {error && <div className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-col gap-3 pt-2 sm:flex-row">
             <button type="submit" disabled={loading}
               className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 transition disabled:opacity-60">
               {loading && <Loader2 size={14} className="animate-spin" />}
@@ -442,8 +442,8 @@ function ConfigurerEligibiliteModal({ sondage, onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
-      <div className="my-8 w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
+    <div className="admin-modal-layer fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+      <div className="my-8 w-full max-w-2xl rounded-2xl bg-white p-4 shadow-2xl sm:p-6">
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold text-slate-950">Configurer le test d'éligibilité</h3>
@@ -471,7 +471,7 @@ function ConfigurerEligibiliteModal({ sondage, onClose, onSaved }) {
 
           {error && <div className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
 
-          <div className="flex gap-3 pt-1">
+          <div className="flex flex-col gap-3 pt-1 sm:flex-row">
             <button type="submit" disabled={loading}
               className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 transition disabled:opacity-60">
               {loading && <Loader2 size={14} className="animate-spin" />}
@@ -524,8 +524,8 @@ function ModifierSondageModal({ sondage, onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+    <div className="admin-modal-layer fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white p-4 shadow-2xl sm:p-6">
         <div className="mb-5 flex items-center justify-between">
           <h3 className="text-lg font-bold text-slate-950">Modifier le sondage</h3>
           <button onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X size={20} /></button>
@@ -555,7 +555,7 @@ function ModifierSondageModal({ sondage, onClose, onSaved }) {
             <input type="datetime-local" value={form.dateExpiration} onChange={e => setField('dateExpiration', e.target.value)} className={inputCls} />
           </div>
           {error && <div className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
-          <div className="flex gap-3 pt-1">
+          <div className="flex flex-col gap-3 pt-1 sm:flex-row">
             <button type="submit" disabled={loading}
               className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 transition disabled:opacity-60">
               {loading && <Loader2 size={14} className="animate-spin" />}
@@ -604,7 +604,7 @@ function ReponsesModal({ sondageId, onClose, onChanged }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+    <div className="admin-modal-layer fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
       <div className="my-8 w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <h3 className="text-lg font-bold text-slate-950">Réponses à valider</h3>
@@ -626,13 +626,13 @@ function ReponsesModal({ sondageId, onClose, onChanged }) {
           ) : (
             <div className="space-y-3">
               {reponses.map(r => (
-                <div key={r.id} className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <div key={r.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-slate-800 truncate">{r.participantNom || '—'}</p>
                     <p className="text-xs text-slate-400 truncate">{r.participantContact || '—'}</p>
                     <p className="text-xs text-slate-400 mt-0.5">Soumis le {formatDatetime(r.createdAt)}</p>
                   </div>
-                  <div className="flex gap-2 flex-shrink-0">
+                  <div className="flex w-full flex-shrink-0 gap-2 sm:w-auto">
                     <button
                       onClick={() => handle(r.id, true)}
                       disabled={actionId === r.id}
@@ -686,7 +686,7 @@ function ResultatsModal({ sondageId, onClose }) {
   }, [sondageId])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+    <div className="admin-modal-layer fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
       <div className="my-8 w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <div>
@@ -716,7 +716,7 @@ function ResultatsModal({ sondageId, onClose }) {
           ) : (
             <div className="space-y-6">
               {/* Résumé */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-center">
                   <p className="text-lg font-extrabold text-slate-800">
                     {resultats.repondantsValides}/{resultats.quotaVise}
@@ -851,7 +851,7 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
   const isActing = (suffix) => actionId === survey.id + suffix
 
   return (
-    <article className="relative rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <article className="relative rounded-2xl border border-slate-200 bg-white shadow-soft transition duration-200 hover:shadow-lift">
       {/* ── Header ── */}
       <div className="p-4 sm:p-5">
         <div className="flex flex-wrap items-start gap-3 mb-3">
@@ -877,10 +877,10 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
           {/* Action buttons */}
           <div className="relative flex-shrink-0" ref={actionsRef}>
             <button onClick={() => setActionsOpen(v => !v)} aria-expanded={actionsOpen} aria-haspopup="menu"
-              className="flex h-9 items-center gap-1.5 rounded-lg bg-violet-700 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-800">
+              className="flex h-10 items-center gap-1.5 rounded-xl bg-slate-950 px-3.5 text-xs font-bold text-white shadow-sm transition hover:bg-violet-700">
               Gérer {actionsOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
             </button>
-            {actionsOpen && <div role="menu" className="absolute right-0 top-11 z-20 w-60 space-y-1.5 rounded-xl border border-slate-200 bg-white p-2 shadow-xl [&>button]:w-full [&>button]:justify-start">
+            {actionsOpen && <div role="menu" className="absolute right-0 top-12 z-20 w-64 space-y-1.5 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-lift [&>button]:min-h-9 [&>button]:w-full [&>button]:justify-start [&>button]:rounded-xl">
             {/* ⚠️ Pas de test d'éligibilité */}
             {!survey.hasEligibilite && !['CLOTURE', 'ANNULE'].includes(survey.statut) && (
               <button onClick={() => onConfigurerElig(survey)}
@@ -1160,7 +1160,7 @@ export default function Sondages() {
       )}
 
       {/* ── En-tête compact ── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
           <span><strong className="text-slate-900">{sondages.length}</strong> sondage{sondages.length !== 1 ? 's' : ''}</span>
           <span className="h-1 w-1 rounded-full bg-slate-300" />
@@ -1169,7 +1169,7 @@ export default function Sondages() {
           <span><strong className="text-amber-600">{countByStatut('EN_ATTENTE_DISTRIBUTION')}</strong> à finaliser</span>
         </div>
         <button onClick={() => setShowNouveauModal(true)}
-          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-violet-200 transition hover:bg-violet-800 sm:w-auto">
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-700 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 hover:bg-violet-800 sm:w-auto">
           <Plus size={15} /> Nouveau sondage
         </button>
       </div>

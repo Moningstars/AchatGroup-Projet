@@ -33,6 +33,24 @@ const PAGE_META = {
   '/parametres': { label: 'Paramètres', sub: 'Configuration du compte' },
 }
 
+function getPageMeta(pathname) {
+  if (pathname === '/opportunites/nouvelle') {
+    return { label: 'Nouvelle opportunité', sub: 'Création guidée de la campagne' }
+  }
+  if (pathname.startsWith('/opportunites/')) {
+    return pathname.endsWith('/modifier')
+      ? { label: 'Modifier une opportunité', sub: 'Configuration de la campagne' }
+      : { label: "Détail de l’opportunité", sub: 'Pilotage de la campagne' }
+  }
+  if (pathname === '/bannieres/nouvelle') {
+    return { label: 'Nouvelle bannière', sub: 'Création du contenu publicitaire' }
+  }
+  if (pathname.startsWith('/bannieres/') && pathname.endsWith('/modifier')) {
+    return { label: 'Modifier une bannière', sub: 'Configuration du contenu publicitaire' }
+  }
+  return PAGE_META[pathname] || { label: 'Administration', sub: 'OpportuniHub' }
+}
+
 export default function AdminShell() {
   const { admin, logout } = useAuth()
   const { notifications, unreadCount, dismissNotification, clearAll, markAllRead } = useNotifications()
@@ -41,7 +59,7 @@ export default function AdminShell() {
   const [notifOpen, setNotifOpen] = useState(false)
   const notifRef = useRef(null)
 
-  const meta = PAGE_META[location.pathname] || { label: 'Administration', sub: '' }
+  const meta = getPageMeta(location.pathname)
 
   const handleLogout = () => {
     logout()
@@ -66,20 +84,21 @@ export default function AdminShell() {
       <div className="min-h-screen lg:flex">
         <NavBar />
 
-        <main className="flex-1 overflow-y-auto lg:h-screen lg:ml-72 xl:ml-80">
+        <main className="min-w-0 flex-1 overflow-y-auto lg:ml-56 lg:h-screen">
           {/* Top bar */}
-          <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 px-4 py-3 backdrop-blur sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between gap-4">
+          <div className="sticky top-0 z-30 border-b border-slate-200 bg-slate-50/95 px-4 py-2.5 backdrop-blur-xl sm:px-5 lg:px-6">
+            <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">{meta.sub}</p>
-                <h1 className="text-lg font-bold leading-none text-slate-950">{meta.label}</h1>
+                <p className="hidden text-[9px] font-extrabold uppercase tracking-[0.2em] text-violet-600 sm:block">{meta.sub}</p>
+                <h1 className="text-base font-extrabold leading-tight tracking-tight text-slate-950">{meta.label}</h1>
               </div>
               <div className="flex items-center gap-3">
                 {/* Bouton notifications + panneau */}
                 <div className="relative" ref={notifRef}>
                   <button
                     onClick={toggleNotifs}
-                    className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+                    className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-white hover:text-violet-700 hover:shadow-sm"
+                    aria-label="Afficher les notifications"
                   >
                     <Bell size={16} />
                     {unreadCount > 0 && (
@@ -90,7 +109,7 @@ export default function AdminShell() {
                   </button>
 
                   {notifOpen && (
-                    <div className="absolute right-0 top-10 w-80 max-w-[85vw] bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50">
+                    <div className="absolute right-0 top-12 z-50 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lift">
                       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
                         <p className="font-bold text-sm text-slate-900">Notifications</p>
                         {notifications.length > 0 && (
@@ -142,8 +161,8 @@ export default function AdminShell() {
                 </div>
 
                 {admin && (
-                  <span className="hidden sm:flex items-center gap-2 text-sm text-slate-600">
-                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">
+                  <span className="hidden items-center gap-2 rounded-xl bg-slate-50 py-1.5 pl-1.5 pr-3 text-sm text-slate-600 sm:flex">
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-xs font-bold text-violet-700">
                       {admin.nom ? admin.nom[0].toUpperCase() : 'A'}
                     </span>
                     <span className="font-medium">{admin.nom || admin.email}</span>
@@ -151,7 +170,7 @@ export default function AdminShell() {
                 )}
                 <button
                   onClick={handleLogout}
-                  className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 lg:hidden"
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 lg:hidden"
                 >
                   Déconnexion
                 </button>
@@ -159,7 +178,7 @@ export default function AdminShell() {
             </div>
           </div>
 
-          <div className="px-4 py-6 sm:px-6 lg:px-8 space-y-6">
+          <div className="mx-auto max-w-[1440px] animate-fade-up space-y-4 px-3.5 py-4 sm:px-5 lg:px-6">
             <Outlet />
           </div>
         </main>
