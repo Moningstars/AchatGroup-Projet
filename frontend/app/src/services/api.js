@@ -66,6 +66,9 @@ export const souscrire = (id, quantite = 1) =>
 export const getMesParticipationsOpportunites = () =>
   api.get('/opportunites/mes-participations').then((r) => r.data)
 
+export const confirmerReceptionOpportunite = (participationId, recu = true, commentaire = '') =>
+  api.patch(`/opportunites/mes-participations/${participationId}/reception`, { recu, commentaire }).then((r) => r.data)
+
 // ── Portefeuille ──────────────────────────────────────────────────────────────
 
 export const getSolde = () =>

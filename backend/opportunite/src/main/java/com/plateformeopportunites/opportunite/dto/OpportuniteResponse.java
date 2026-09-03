@@ -31,6 +31,17 @@ public class OpportuniteResponse {
     private LocalDateTime createdAt;
     private String categorie;
     private String categorieIcone;
+    private String partenaireNom;
+    private String partenaireLogoUrl;
+    private String partenaireContact;
+    private String partenaireReseauxUrl;
+    private BigDecimal montantDuPartenaire;
+    private BigDecimal montantPayePartenaire;
+    private BigDecimal montantRestantPartenaire;
+    private String statutPaiementPartenaire;
+    private LocalDateTime dateConfirmationPartenaire;
+    private Integer delaiConfirmationReceptionJours;
+    private String messageNotificationLivraison;
     private List<PalierPrixResponse> paliers;
     private List<ImageResponse> images;
 

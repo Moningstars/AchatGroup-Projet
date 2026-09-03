@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import {
-  ShieldCheck, Users, Loader2, ChevronRight, CheckCircle2, AlertCircle, Layers, Sparkles, Timer, Minus, Plus, Copy, Share2, Link2, ShoppingCart, PackageCheck
+  ShieldCheck, Users, Loader2, ChevronRight, CheckCircle2, AlertCircle, Layers, Sparkles, Timer, Minus, Plus, Copy, Share2, Link2, ShoppingCart, PackageCheck, ExternalLink
 } from 'lucide-react'
 import { getOpportunite, getOpportunites, getMesParticipationsOpportunites, souscrire, imgUrl } from '../services/api'
 import { useAuth } from '../context/AuthContext'
@@ -11,6 +11,19 @@ import ProductCard from '../components/ProductCard'
 
 function fmt(val) { return Number(val || 0).toLocaleString('fr-FR') }
 function pad(n) { return String(n).padStart(2, '0') }
+
+const SUIVI_PARTICIPATION = {
+  EN_ATTENTE_QUOTA: 'Campagne en cours',
+  A_PREPARER: 'Paiement validé',
+  PREPARATION: 'Lot transmis au partenaire',
+  PRET_LIVRAISON: 'Partenaire confirmé',
+  EN_LIVRAISON: 'Date promise communiquée',
+  LIVRE_A_CONFIRMER: 'Votre confirmation est attendue',
+  LIVRE_CONFIRME: 'Réception confirmée',
+  ECHEC_LIVRAISON: 'Promesse non tenue',
+  LITIGE: 'Anomalie signalée',
+  ANNULE: 'Annulée',
+}
 
 function FloatingCountdown({ dateExpiration }) {
   const c = useCountdown(dateExpiration, 1000)
@@ -397,6 +410,23 @@ export default function DetailOpportunite() {
               </div>
             )}
 
+            {opportunite.partenaireNom && (
+              <div className="flex items-center gap-3 rounded-2xl border-2 border-gray-100 bg-white p-4">
+                {opportunite.partenaireLogoUrl ? (
+                  <img src={opportunite.partenaireLogoUrl} alt="" className="h-11 w-11 rounded-xl object-contain" />
+                ) : <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/5 font-heading font-black text-primary">{opportunite.partenaireNom[0]}</div>}
+                <div className="min-w-0 flex-1">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Produit fourni par</p>
+                  <p className="truncate font-heading text-sm font-black text-primary">{opportunite.partenaireNom}</p>
+                </div>
+                {opportunite.partenaireReseauxUrl && (
+                  <a href={opportunite.partenaireReseauxUrl} target="_blank" rel="noreferrer" className="flex h-9 w-9 items-center justify-center rounded-xl border-2 border-gray-100 text-primary" title="Voir le partenaire">
+                    <ExternalLink size={15} />
+                  </a>
+                )}
+              </div>
+            )}
+
             {/* Participation existante */}
             {dejaSouscrit && (
               <div className="bg-success/10 rounded-2xl border-2 border-success/20 p-4">
@@ -410,7 +440,7 @@ export default function DetailOpportunite() {
                     <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-white/70 px-3 py-2">
                       <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-primary">
                         <PackageCheck size={14} />
-                        {(maParticipation.statutLivraison || 'EN_ATTENTE_QUOTA').replaceAll('_', ' ')}
+                        {SUIVI_PARTICIPATION[maParticipation.statutLivraison] || 'Campagne en cours'}
                       </span>
                       <span className="text-[11px] font-black text-success tabular-nums">{maParticipation.progressionLivraison || 0}%</span>
                     </div>

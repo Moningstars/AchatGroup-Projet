@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, ShoppingBag, ClipboardList, ChevronRight } from 'lucide-react'
-import { getMesParticipationsOpportunites, getMesParticipationsSondages, imgUrl } from '../services/api'
+import { Loader2, ShoppingBag, ClipboardList, ChevronRight, PackageCheck, AlertTriangle } from 'lucide-react'
+import { confirmerReceptionOpportunite, getMesParticipationsOpportunites, getMesParticipationsSondages, imgUrl } from '../services/api'
 
 function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
 
@@ -24,11 +24,25 @@ const STATUT_OP_OPPORTUNITE = {
   BROUILLON:{ label: 'Brouillon',cls: 'text-gray-400' },
 }
 
+const LIVRAISON = {
+  EN_ATTENTE_QUOTA: ['Campagne en cours', 0], A_PREPARER: ['Paiement validé', 20],
+  PREPARATION: ['Lot transmis au partenaire', 40], PRET_LIVRAISON: ['Partenaire confirmé', 55],
+  EN_LIVRAISON: ['Date promise communiquée', 75], LIVRE_A_CONFIRMER: ['Votre confirmation est attendue', 90],
+  LIVRE_CONFIRME: ['Terminée', 100], ECHEC_LIVRAISON: ['Anomalie', 70], LITIGE: ['Litige', 70], ANNULE: ['Annulée', 0],
+}
+
 // ── Statuts Validation (sondages) ─────────────────────────────────────────────
 const STATUT_SONDAGE = {
-  VALIDE:              { label: 'Validé',          cls: 'bg-success/10 text-success',   dot: 'bg-success' },
-  EN_ATTENTE_PREUVE:   { label: 'Preuve requise',  cls: 'bg-orange-50 text-orange-600', dot: 'bg-orange-400' },
-  REJETE:              { label: 'Rejeté',          cls: 'bg-urgency/10 text-urgency',   dot: 'bg-urgency' },
+  VALIDE:              { label: 'Validée',              cls: 'bg-success/10 text-success',   dot: 'bg-success' },
+  EN_ATTENTE_PREUVE:   { label: 'Vérification en cours', cls: 'bg-orange-50 text-orange-600', dot: 'bg-orange-400' },
+  REJETE:              { label: 'Non retenue',           cls: 'bg-urgency/10 text-urgency',   dot: 'bg-urgency' },
+}
+
+const ETAPE_SONDAGE = {
+  ACTIF: 'Réponses ouvertes',
+  EN_ATTENTE_DISTRIBUTION: 'Validation des participations',
+  CLOTURE: 'Sondage finalisé',
+  ANNULE: 'Sondage annulé',
 }
 
 function StatutBadge({ map, keyVal }) {
@@ -67,6 +81,16 @@ export default function History() {
   const [opportunites, setOpportunites] = useState([])
   const [sondages, setSondages] = useState([])
   const [loading, setLoading] = useState(true)
+  const [confirmingId, setConfirmingId] = useState(null)
+
+  const confirmerReception = async (e, participation) => {
+    e.stopPropagation()
+    setConfirmingId(participation.id)
+    try {
+      const updated = await confirmerReceptionOpportunite(participation.id, true)
+      setOpportunites(list => list.map(p => p.id === participation.id ? updated : p))
+    } finally { setConfirmingId(null) }
+  }
 
   useEffect(() => {
     Promise.all([
@@ -122,9 +146,9 @@ export default function History() {
               <p className="text-2xl font-heading font-black text-primary">{sondages.length}</p>
             </div>
             <div className="bg-white rounded-2xl p-4 border-2 border-gray-100">
-              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Récompenses reçues</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Valeur des récompenses</p>
               <p className="text-xl font-heading font-black text-success tabular-nums">{fmt(totalRecompenses)}</p>
-              <p className="text-[9px] text-gray-400 font-bold">FCFA</p>
+              <p className="text-[9px] text-gray-400 font-bold">équivalent FCFA</p>
             </div>
           </div>
         )}
@@ -233,6 +257,26 @@ export default function History() {
                       <p className="text-[10px] font-bold text-gray-600">{fmtDate(p.createdAt)}</p>
                     </div>
                   </div>
+                  <div className="border-t border-gray-100 px-4 py-3 space-y-2">
+                    <div className="flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-wider">
+                      <span className={p.confirmationEnRetard ? 'text-urgency' : 'text-primary'}>
+                        {p.confirmationEnRetard && <AlertTriangle size={11} className="mr-1 inline" />}
+                        {(LIVRAISON[p.statutLivraison] || [p.statutLivraison, 0])[0]}
+                      </span>
+                      <span className="text-gray-400">{p.progressionLivraison ?? (LIVRAISON[p.statutLivraison] || ['', 0])[1]}%</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
+                      <div className="h-full rounded-full bg-success transition-all" style={{ width: `${p.progressionLivraison || 0}%` }} />
+                    </div>
+                    {p.dateLivraisonPrevue && <p className="text-[10px] font-bold text-gray-500">Date promise : {fmtDate(p.dateLivraisonPrevue)}</p>}
+                    {['EN_LIVRAISON', 'LIVRE_A_CONFIRMER'].includes(p.statutLivraison) && (
+                      <button type="button" onClick={e => confirmerReception(e, p)} disabled={confirmingId === p.id}
+                        className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-success px-3 py-2.5 text-xs font-black text-white disabled:opacity-50">
+                        {confirmingId === p.id ? <Loader2 size={14} className="animate-spin" /> : <PackageCheck size={14} />}
+                        Confirmer que j'ai reçu le produit
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -272,6 +316,11 @@ export default function History() {
                             <i className="ti ti-coin text-xs" /> Récompense versée
                           </span>
                         )}
+                        {!s.recompenseVersee && s.statutSondage && (
+                          <span className="text-[10px] font-bold text-gray-400">
+                            · {ETAPE_SONDAGE[s.statutSondage] || s.statutSondage}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -283,7 +332,7 @@ export default function History() {
                         <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Récompense</p>
                         <p className="text-sm font-black text-primary tabular-nums">
                           {fmt(s.recompense)} <span className="text-[10px] font-bold text-gray-400">
-                            {s.typeRecompense === 'POINTS' ? 'pts' : 'FCFA'}
+                            {s.typeRecompense === 'POINTS' ? 'FCFA → points' : 'FCFA'}
                           </span>
                         </p>
                       </div>

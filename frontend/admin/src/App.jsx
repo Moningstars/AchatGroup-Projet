@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import AdminShell from './Pages/AdminShell'
 import Dashboard from './Pages/Dashboard'
-import Opportunites from './Pages/Opportunites'
+import Opportunites, { OpportuniteDetailPage, ModifierOpportunitePage } from './Pages/Opportunites'
 import Sondages from './Pages/Sondages'
 import Utilisateurs from './Pages/Utilisateurs'
 import Portefeuilles from './Pages/Portefeuilles'
@@ -36,6 +36,8 @@ function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="opportunites" element={<Opportunites />} />
+          <Route path="opportunites/:id" element={<OpportuniteDetailPage />} />
+          <Route path="opportunites/:id/modifier" element={<ModifierOpportunitePage />} />
           <Route path="sondages" element={<Sondages />} />
           <Route path="utilisateurs" element={<Utilisateurs />} />
           <Route path="portefeuilles" element={<Portefeuilles />} />

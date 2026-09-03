@@ -62,6 +62,7 @@ public class OpportuniteService {
 
     @Transactional
     public OpportuniteResponse creer(UUID adminId, CreerOpportuniteRequest req) {
+        validerPaiementPartenaire(req.getMontantDuPartenaire(), req.getMontantPayePartenaire());
         Administrateur admin = administrateurRepository.findById(adminId)
                 .orElseThrow(() -> new IllegalArgumentException("Admin introuvable"));
 
@@ -85,6 +86,14 @@ public class OpportuniteService {
                 .prixNormal(req.getPrixNormal())
                 .seuilMinimum(req.getSeuilMinimum())
                 .seuilMaximal(req.getSeuilMaximal())
+                .partenaireNom(nettoyer(req.getPartenaireNom()))
+                .partenaireLogoUrl(nettoyer(req.getPartenaireLogoUrl()))
+                .partenaireContact(nettoyer(req.getPartenaireContact()))
+                .partenaireReseauxUrl(nettoyer(req.getPartenaireReseauxUrl()))
+                .montantDuPartenaire(valeurPositiveOuZero(req.getMontantDuPartenaire()))
+                .montantPayePartenaire(valeurPositiveOuZero(req.getMontantPayePartenaire()))
+                .delaiConfirmationReceptionJours(req.getDelaiConfirmationReceptionJours() == null ? 3 : req.getDelaiConfirmationReceptionJours())
+                .messageNotificationLivraison(nettoyer(req.getMessageNotificationLivraison()))
                 .dateExpiration(req.getDateExpiration())
                 .statut(statut)
                 .participantsActuels(0)
@@ -164,6 +173,9 @@ public class OpportuniteService {
                             .montantGele(p.getMontantGele())
                             .quantite(p.getQuantite())
                             .statut(p.getStatut())
+                            .statutPaiement(statutPaiementParticipant(p))
+                            .montantRestant(BigDecimal.ZERO)
+                            .confirmationEnRetard(confirmationEnRetard(p))
                             .statutLivraison(statutLivraisonOuDefaut(p))
                             .progressionLivraison(progressionLivraison(statutLivraisonOuDefaut(p)))
                             .prioriteTraitement(Boolean.TRUE.equals(p.getPrioriteTraitement()))
@@ -194,6 +206,10 @@ public class OpportuniteService {
                         .quantite(p.getQuantite())
                         .montantGele(p.getMontantGele())
                         .statut(p.getStatut())
+                        .statutPaiement(statutPaiementParticipant(p))
+                        .montantAttendu(p.getMontantGele())
+                        .montantRestant(BigDecimal.ZERO)
+                        .confirmationEnRetard(confirmationEnRetard(p))
                         .creneauTraitement(p.getCreneauTraitement())
                         .noteTraitement(p.getNoteTraitement())
                         .statutLivraison(statutLivraisonOuDefaut(p))
@@ -246,6 +262,12 @@ public class OpportuniteService {
 
             if (req.getStatutLivraison() != null) {
                 validerTransitionLivraisonAdmin(p, req.getStatutLivraison());
+                if ((req.getStatutLivraison() == StatutLivraison.EN_LIVRAISON
+                        || req.getStatutLivraison() == StatutLivraison.LIVRE_A_CONFIRMER)
+                        && req.getDateLivraisonPrevue() == null
+                        && p.getDateLivraisonPrevue() == null) {
+                    throw new IllegalStateException("Enregistrez la date promise par le partenaire avant de notifier le participant");
+                }
                 appliquerStatutLivraison(p, req.getStatutLivraison(), now);
             }
             if (req.getPrioriteTraitement() != null) {
@@ -255,6 +277,9 @@ public class OpportuniteService {
                 p.setCreneauTraitement(req.getCreneauTraitement());
             }
             if (req.getDateLivraisonPrevue() != null) {
+                if (req.getDateLivraisonPrevue().isBefore(now)) {
+                    throw new IllegalArgumentException("La date promise au participant doit être future");
+                }
                 p.setDateLivraisonPrevue(req.getDateLivraisonPrevue());
             }
             if (req.getTransporteur() != null) {
@@ -273,6 +298,20 @@ public class OpportuniteService {
                 p.setNoteLivraison(req.getNoteLivraison().isBlank() ? null : req.getNoteLivraison().trim());
             }
             participationRepository.save(p);
+
+            if (req.getDateLivraisonPrevue() != null) {
+                String message = p.getOpportunite().getMessageNotificationLivraison();
+                if (message == null || message.isBlank()) {
+                    message = "Votre commande pour « " + p.getOpportunite().getTitre()
+                            + " » a été validée. Livraison prévue le " + req.getDateLivraisonPrevue().toLocalDate() + ".";
+                }
+                pusherNotificationService.notifierUtilisateur(p.getUtilisateur().getId(), "LIVRAISON_PLANIFIEE", Map.of(
+                        "opportuniteId", opportuniteId,
+                        "participationId", p.getId(),
+                        "dateLivraisonPrevue", req.getDateLivraisonPrevue().toString(),
+                        "message", message
+                ));
+            }
         }
         return listerParticipants(opportuniteId);
     }
@@ -324,6 +363,20 @@ public class OpportuniteService {
                             Categorie.builder().nom(req.getCategorie()).build()));
             opp.setCategorie(categorie);
         }
+        if (req.getPartenaireNom() != null) opp.setPartenaireNom(nettoyer(req.getPartenaireNom()));
+        if (req.getPartenaireLogoUrl() != null) opp.setPartenaireLogoUrl(nettoyer(req.getPartenaireLogoUrl()));
+        if (req.getPartenaireContact() != null) opp.setPartenaireContact(nettoyer(req.getPartenaireContact()));
+        if (req.getPartenaireReseauxUrl() != null) opp.setPartenaireReseauxUrl(nettoyer(req.getPartenaireReseauxUrl()));
+        if (req.getMontantDuPartenaire() != null) opp.setMontantDuPartenaire(valeurPositiveOuZero(req.getMontantDuPartenaire()));
+        if (req.getMontantPayePartenaire() != null) {
+            opp.setMontantPayePartenaire(valeurPositiveOuZero(req.getMontantPayePartenaire()));
+            if (opp.getMontantDuPartenaire() != null && opp.getMontantPayePartenaire().compareTo(opp.getMontantDuPartenaire()) >= 0) {
+                opp.setDateConfirmationPartenaire(LocalDateTime.now());
+            }
+        }
+        if (req.getDelaiConfirmationReceptionJours() != null) opp.setDelaiConfirmationReceptionJours(req.getDelaiConfirmationReceptionJours());
+        if (req.getMessageNotificationLivraison() != null) opp.setMessageNotificationLivraison(nettoyer(req.getMessageNotificationLivraison()));
+        validerPaiementPartenaire(opp.getMontantDuPartenaire(), opp.getMontantPayePartenaire());
 
         boolean paliersFournis = req.getPaliers() != null && !req.getPaliers().isEmpty();
         int maxPalier = paliersFournis
@@ -482,7 +535,8 @@ public class OpportuniteService {
         List<Participation> participations = participationRepository
                 .findByOpportuniteIdAndStatut(opportuniteId, StatutParticipation.EN_ATTENTE);
         for (Participation p : participations) {
-            BigDecimal montantFinal = prixFinal.multiply(BigDecimal.valueOf(p.getQuantite()));
+            int quantiteFinale = p.getQuantite() == null || p.getQuantite() < 1 ? 1 : p.getQuantite();
+            BigDecimal montantFinal = prixFinal.multiply(BigDecimal.valueOf(quantiteFinale));
             BigDecimal montantGele = p.getMontantGele();
             if (montantFinal.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new IllegalStateException("Prix final invalide pour cette opportunité");
@@ -694,6 +748,9 @@ public class OpportuniteService {
                 .montantGele(p.getMontantGele())
                 .quantite(p.getQuantite())
                 .statut(p.getStatut())
+                .statutPaiement(statutPaiementParticipant(p))
+                .montantRestant(BigDecimal.ZERO)
+                .confirmationEnRetard(confirmationEnRetard(p))
                 .statutLivraison(statutLivraison)
                 .progressionLivraison(progressionLivraison(statutLivraison))
                 .prioriteTraitement(Boolean.TRUE.equals(p.getPrioriteTraitement()))
@@ -749,13 +806,12 @@ public class OpportuniteService {
         p.setStatutLivraison(statut);
         switch (statut) {
             case PREPARATION -> {
+                // Champ historique réutilisé comme date de transmission du lot au partenaire.
                 if (p.getDatePreparation() == null) p.setDatePreparation(now);
             }
             case PRET_LIVRAISON, EN_LIVRAISON, LIVRE_A_CONFIRMER -> {
-                if (p.getDatePreparation() == null) p.setDatePreparation(now);
-                if (p.getDateExpedition() == null && (statut == StatutLivraison.EN_LIVRAISON || statut == StatutLivraison.LIVRE_A_CONFIRMER)) {
-                    p.setDateExpedition(now);
-                }
+                // OpportuniHub ne prépare et n'expédie rien : il mémorise uniquement
+                // les engagements communiqués par le partenaire et la remise déclarée.
                 if (statut == StatutLivraison.LIVRE_A_CONFIRMER && p.getDateRemise() == null) {
                     p.setDateRemise(now);
                 }
@@ -848,8 +904,84 @@ public class OpportuniteService {
                 .createdAt(opp.getCreatedAt())
                 .categorie(opp.getCategorie() != null ? opp.getCategorie().getNom() : null)
                 .categorieIcone(opp.getCategorie() != null ? opp.getCategorie().getIcone() : null)
+                .partenaireNom(opp.getPartenaireNom())
+                .partenaireLogoUrl(opp.getPartenaireLogoUrl())
+                .partenaireContact(opp.getPartenaireContact())
+                .partenaireReseauxUrl(opp.getPartenaireReseauxUrl())
+                .montantDuPartenaire(valeurPositiveOuZero(opp.getMontantDuPartenaire()))
+                .montantPayePartenaire(valeurPositiveOuZero(opp.getMontantPayePartenaire()))
+                .montantRestantPartenaire(restantPartenaire(opp))
+                .statutPaiementPartenaire(statutPaiementPartenaire(opp))
+                .dateConfirmationPartenaire(opp.getDateConfirmationPartenaire())
+                .delaiConfirmationReceptionJours(opp.getDelaiConfirmationReceptionJours() == null ? 3 : opp.getDelaiConfirmationReceptionJours())
+                .messageNotificationLivraison(opp.getMessageNotificationLivraison())
                 .paliers(paliers)
                 .images(images)
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public void notifierRetardsLivraison() {
+        LocalDateTime now = LocalDateTime.now();
+        participationRepository.findAll().stream()
+                .filter(this::confirmationEnRetard)
+                .forEach(p -> {
+                    String key = "participation:" + p.getId() + ":reception-retard";
+                    if (!redisService.marquerNotificationSiAbsent(key, 86_400)) return;
+                    pusherNotificationService.notifierAdmins("RECEPTION_EN_RETARD", Map.of(
+                            "opportuniteId", p.getOpportunite().getId(),
+                            "participationId", p.getId(),
+                            "participant", p.getUtilisateur().getNom() == null ? "Participant" : p.getUtilisateur().getNom(),
+                            "datePromise", p.getDateLivraisonPrevue().toString()
+                    ));
+                });
+    }
+
+    private boolean confirmationEnRetard(Participation p) {
+        if (p.getDateLivraisonPrevue() == null || p.getDateConfirmationParticipant() != null) return false;
+        StatutLivraison statut = statutLivraisonOuDefaut(p);
+        if (statut == StatutLivraison.LIVRE_CONFIRME || statut == StatutLivraison.ANNULE) return false;
+        int delai = p.getOpportunite().getDelaiConfirmationReceptionJours() == null
+                ? 3 : p.getOpportunite().getDelaiConfirmationReceptionJours();
+        return p.getDateLivraisonPrevue().plusDays(delai).isBefore(LocalDateTime.now());
+    }
+
+    private String statutPaiementParticipant(Participation p) {
+        return switch (p.getStatut()) {
+            case EN_ATTENTE -> "DEPOT_GELE";
+            case CONFIRMEE -> "PAYE";
+            case REMBOURSEE -> "REMBOURSE";
+        };
+    }
+
+    private BigDecimal restantPartenaire(Opportunite opp) {
+        BigDecimal du = valeurPositiveOuZero(opp.getMontantDuPartenaire());
+        BigDecimal paye = valeurPositiveOuZero(opp.getMontantPayePartenaire());
+        return du.subtract(paye).max(BigDecimal.ZERO);
+    }
+
+    private String statutPaiementPartenaire(Opportunite opp) {
+        BigDecimal du = valeurPositiveOuZero(opp.getMontantDuPartenaire());
+        BigDecimal paye = valeurPositiveOuZero(opp.getMontantPayePartenaire());
+        if (du.signum() == 0) return "NON_CONFIGURE";
+        if (paye.signum() == 0) return "IMPAYE";
+        if (paye.compareTo(du) < 0) return "PARTIEL";
+        return "PAYE";
+    }
+
+    private BigDecimal valeurPositiveOuZero(BigDecimal valeur) {
+        return valeur == null || valeur.signum() < 0 ? BigDecimal.ZERO : valeur;
+    }
+
+    private void validerPaiementPartenaire(BigDecimal montantDu, BigDecimal montantPaye) {
+        BigDecimal du = valeurPositiveOuZero(montantDu);
+        BigDecimal paye = valeurPositiveOuZero(montantPaye);
+        if (paye.compareTo(du) > 0) {
+            throw new IllegalArgumentException("Le montant payé au partenaire ne peut pas dépasser le montant dû");
+        }
+    }
+
+    private String nettoyer(String valeur) {
+        return valeur == null || valeur.isBlank() ? null : valeur.trim();
     }
 }

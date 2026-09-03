@@ -19,6 +19,10 @@ public class ParticipantOpportuniteResponse {
     private Integer quantite;
     private BigDecimal montantGele;
     private StatutParticipation statut;
+    private String statutPaiement;
+    private BigDecimal montantAttendu;
+    private BigDecimal montantRestant;
+    private Boolean confirmationEnRetard;
     private LocalDateTime creneauTraitement;
     private String noteTraitement;
     private StatutLivraison statutLivraison;

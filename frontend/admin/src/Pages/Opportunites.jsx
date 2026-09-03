@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { Loader2, Plus, Trash2, X, Upload, Package, Eye, Users, CalendarClock, Layers, Image, Edit2, Sparkles, Search, Download, Clock, CheckSquare, CalendarDays, UserCheck, ArrowLeft, ClipboardList, Truck, PackageCheck, AlertTriangle, Flag, Route } from 'lucide-react'
-import { Badge, Card, Table, Th, Td, Tr, Spinner, EmptyState, ProgressBar, FilterPill } from '../components/ui'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Loader2, Plus, Trash2, X, Upload, Package, Eye, Users, CalendarClock, Layers, Image, Edit2, Sparkles, Search, Download, Clock, CheckSquare, CalendarDays, UserCheck, ArrowLeft, ClipboardList, Truck, PackageCheck, AlertTriangle, Flag, Route, SlidersHorizontal, RotateCcw } from 'lucide-react'
+import { Badge, Card, Table, Th, Td, Tr, Spinner, EmptyState, ProgressBar } from '../components/ui'
 import { useSSE } from '../hooks/useSSE'
 import {
-  getAdminOpportunites, activerOpportunite, cloturerOpportunite,
+  getAdminOpportunites, getAdminOpportunite, activerOpportunite, cloturerOpportunite,
   creerOpportunite, modifierOpportunite, uploadOpportuniteImage, deleteOpportuniteImage,
   genererSpecsOpportunite, getParticipantsOpportunite, planifierParticipantsOpportunite, mettreAJourLivraisonParticipants,
 } from '../services/api'
@@ -14,6 +15,9 @@ const imgUrl = (url) => url ? (url.startsWith('http') ? url : BACKEND + url) : n
 const CATEGORIES = ['Mode', 'Électronique', 'Véhicules', 'Maison', 'Alimentaire', 'Informatique', 'Beauté', 'Mobilier', 'Sport']
 
 function formatMontant(val) { return Number(val || 0).toLocaleString('fr-FR') }
+function normaliserRecherche(val) {
+  return String(val ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+}
 function formatDate(dt) {
   if (!dt) return '—'
   return new Date(dt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -55,6 +59,8 @@ const STATUT_COLOR = { BROUILLON: 'gray', ACTIVE: 'sky', CLOTUREE: 'emerald', AN
 const STATUT_LABEL = { BROUILLON: 'Brouillon', ACTIVE: 'Active', CLOTUREE: 'Clôturée', ANNULEE: 'Annulée' }
 const STATUT_PARTICIPATION_COLOR = { EN_ATTENTE: 'gray', CONFIRMEE: 'emerald', REMBOURSEE: 'sky' }
 const STATUT_PARTICIPATION_LABEL = { EN_ATTENTE: 'En attente', CONFIRMEE: 'Confirmée', REMBOURSEE: 'Remboursée' }
+const STATUT_PAIEMENT_LABEL = { DEPOT_GELE: 'Dépôt sécurisé', PAYE: 'Payé', PARTIEL: 'Partiellement payé', IMPAYE: 'Impayé', REMBOURSE: 'Remboursé' }
+const STATUT_PAIEMENT_COLOR = { DEPOT_GELE: 'amber', PAYE: 'emerald', PARTIEL: 'amber', IMPAYE: 'rose', REMBOURSE: 'sky' }
 const STATUT_LIVRAISON_COLOR = {
   EN_ATTENTE_QUOTA: 'gray',
   A_PREPARER: 'amber',
@@ -68,35 +74,30 @@ const STATUT_LIVRAISON_COLOR = {
   ANNULE: 'gray',
 }
 const STATUT_LIVRAISON_LABEL = {
-  EN_ATTENTE_QUOTA: 'Quota non validé',
-  A_PREPARER: 'À préparer',
-  PREPARATION: 'Préparation',
-  PRET_LIVRAISON: 'Prêt',
-  EN_LIVRAISON: 'En livraison',
-  LIVRE_A_CONFIRMER: 'Remis — à confirmer',
+  EN_ATTENTE_QUOTA: 'Campagne en cours',
+  A_PREPARER: 'Paiement validé',
+  PREPARATION: 'Lot transmis au partenaire',
+  PRET_LIVRAISON: 'Partenaire confirmé',
+  EN_LIVRAISON: 'Date de livraison annoncée',
+  LIVRE_A_CONFIRMER: 'Confirmation client attendue',
   LIVRE_CONFIRME: 'Reçu confirmé',
-  ECHEC_LIVRAISON: 'Échec livraison',
+  ECHEC_LIVRAISON: 'Promesse non tenue',
   LITIGE: 'Litige',
   ANNULE: 'Annulé',
 }
 const STATUT_LIVRAISON_OPTIONS = [
   'A_PREPARER',
   'PREPARATION',
-  'PRET_LIVRAISON',
   'EN_LIVRAISON',
   'LIVRE_A_CONFIRMER',
-  'LIVRE_CONFIRME',
   'ECHEC_LIVRAISON',
   'LITIGE',
   'ANNULE',
 ]
 const ETAPES_LIVRAISON = [
-  { key: 'A_PREPARER', label: 'À préparer', hint: 'Créer le lot' },
-  { key: 'PREPARATION', label: 'Préparation', hint: 'Colis en cours' },
-  { key: 'PRET_LIVRAISON', label: 'Prêt', hint: 'Remise livreur' },
-  { key: 'EN_LIVRAISON', label: 'En route', hint: 'Suivi terrain' },
-  { key: 'LIVRE_A_CONFIRMER', label: 'À confirmer', hint: 'Attente client' },
-  { key: 'LIVRE_CONFIRME', label: 'Terminé', hint: 'Reçu confirmé' },
+  { key: 'VALIDATION', statuses: ['EN_ATTENTE_QUOTA', 'A_PREPARER'], label: '1. Validation', hint: 'Clôture et paiements' },
+  { key: 'PARTENAIRE', statuses: ['PREPARATION', 'PRET_LIVRAISON', 'EN_LIVRAISON'], label: '2. Partenaire', hint: 'Lot accepté et date promise' },
+  { key: 'RECEPTION', statuses: ['LIVRE_A_CONFIRMER', 'LIVRE_CONFIRME'], label: '3. Réception', hint: 'Confirmation du client' },
 ]
 
 const PALIER_VIDE = { seuilMin: '', seuilMax: '', prix: '' }
@@ -175,9 +176,9 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
   const [selectedIds, setSelectedIds] = useState([])
   const [plan, setPlan] = useState({})
   const [bulkSlot, setBulkSlot] = useState(todaySlot())
-  const [livraisonFiltre, setLivraisonFiltre] = useState('TOUS')
+  const [livraisonFiltre, setLivraisonFiltre] = useState('A_TRAITER')
   const [bulkLivraison, setBulkLivraison] = useState('PREPARATION')
-  const [bulkDeliveryInfo, setBulkDeliveryInfo] = useState({ transporteur: '', referenceLivraison: '', dateLivraisonPrevue: '', noteLivraison: '' })
+  const [bulkDeliveryInfo, setBulkDeliveryInfo] = useState({ referenceLivraison: '', dateLivraisonPrevue: '', noteLivraison: '' })
   const [savingLivraison, setSavingLivraison] = useState(false)
 
   useEffect(() => {
@@ -186,10 +187,10 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
     setSearchParticipant('')
     setStatutFiltre('TOUS')
     setPlanningFiltre('TOUS')
-    setLivraisonFiltre('TOUS')
+    setLivraisonFiltre('A_TRAITER')
     setBulkSlot(todaySlot())
     setBulkLivraison('PREPARATION')
-    setBulkDeliveryInfo({ transporteur: '', referenceLivraison: '', dateLivraisonPrevue: '', noteLivraison: '' })
+    setBulkDeliveryInfo({ referenceLivraison: '', dateLivraisonPrevue: '', noteLivraison: '' })
     setLoadingParticipants(true)
     getParticipantsOpportunite(item.id)
       .then(data => {
@@ -232,9 +233,9 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
     : livraisonEnAttenteConfirmation > 0
       ? { icon: PackageCheck, title: 'Relancer les confirmations', text: `${livraisonEnAttenteConfirmation} participant(s) doivent confirmer la réception.`, color: 'amber' }
       : (livraisonCounts.EN_LIVRAISON || 0) > 0
-        ? { icon: Truck, title: 'Suivre les livreurs', text: `${livraisonCounts.EN_LIVRAISON} livraison(s) sont actuellement en route.`, color: 'sky' }
+        ? { icon: Truck, title: 'Contrôler les dates promises', text: `${livraisonCounts.EN_LIVRAISON} participant(s) ont une livraison annoncée par le partenaire.`, color: 'sky' }
         : (livraisonCounts.A_PREPARER || 0) + (livraisonCounts.PREPARATION || 0) + (livraisonCounts.PRET_LIVRAISON || 0) > 0
-          ? { icon: ClipboardList, title: 'Préparer le prochain lot', text: 'Sélectionnez les participants à traiter aujourd’hui puis avancez le statut du lot.', color: 'violet' }
+          ? { icon: ClipboardList, title: 'Transmettre le prochain lot', text: 'Sélectionnez les participants, exportez la liste et consignez la réponse du partenaire.', color: 'violet' }
           : { icon: CheckSquare, title: 'Suivi à jour', text: 'Aucune action urgente détectée sur cette opportunité.', color: 'emerald' }
 
   const savePlan = (nextPlan) => {
@@ -257,7 +258,11 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
     return participants.filter(p => {
       const matchesSearch = !q || [p.nom, p.telephone, p.utilisateurId].some(v => String(v || '').toLowerCase().includes(q))
       const matchesStatut = statutFiltre === 'TOUS' || p.statut === statutFiltre
-      const matchesLivraison = livraisonFiltre === 'TOUS' || p.statutLivraison === livraisonFiltre || (livraisonFiltre === 'PRIORITAIRES' && p.prioriteTraitement)
+      const matchesLivraison = livraisonFiltre === 'TOUS'
+        || p.statutLivraison === livraisonFiltre
+        || (livraisonFiltre === 'PRIORITAIRES' && p.prioriteTraitement)
+        || (livraisonFiltre === 'A_TRAITER' && !['LIVRE_CONFIRME', 'ANNULE'].includes(p.statutLivraison))
+        || (livraisonFiltre === 'TERMINES' && ['LIVRE_CONFIRME', 'ANNULE'].includes(p.statutLivraison))
       const slot = participantPlan(p.id).slot
       const hasSlot = Boolean(slot)
       const slotDay = hasSlot ? slot.slice(0, 10) : ''
@@ -333,14 +338,13 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
   const applyBulkLivraison = () => {
     updateSelectedLivraison({
       statutLivraison: bulkLivraison,
-      transporteur: bulkDeliveryInfo.transporteur || undefined,
       referenceLivraison: bulkDeliveryInfo.referenceLivraison || undefined,
       dateLivraisonPrevue: bulkDeliveryInfo.dateLivraisonPrevue ? new Date(bulkDeliveryInfo.dateLivraisonPrevue).toISOString() : undefined,
       noteLivraison: bulkDeliveryInfo.noteLivraison || undefined,
     })
   }
   const exportRows = (rows) => {
-    const header = ['Nom', 'Téléphone', 'Quantité', 'Montant gelé', 'Statut paiement', 'Statut livraison', 'Progression livraison', 'Priorité', 'Inscription', 'Créneau traitement', 'Livraison prévue', 'Transporteur', 'Référence', 'Note admin', 'Note livraison', 'Commentaire participant', 'ID participant', 'ID utilisateur']
+    const header = ['Nom', 'Téléphone', 'Quantité', 'Montant gelé', 'Statut paiement', 'État du dossier', 'Avancement', 'Priorité', 'Inscription', 'Lot prévu', 'Date promise par le partenaire', 'Référence partenaire', 'Note admin', 'Note partenaire', 'Confirmation participant', 'ID participant', 'ID utilisateur']
     const body = rows.map(p => {
       const pPlan = participantPlan(p.id)
       return [
@@ -355,7 +359,6 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
         formatDateTime(p.createdAt),
         pPlan.slot ? formatDateTime(pPlan.slot) : '',
         formatDateTime(p.dateLivraisonPrevue),
-        p.transporteur || '',
         p.referenceLivraison || '',
         pPlan.note || '',
         p.noteLivraison || '',
@@ -368,8 +371,8 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/55 p-3 sm:p-5">
-      <div className="mx-auto flex h-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-2xl">
+    <div className="min-h-full bg-slate-50">
+      <div className="mx-auto flex max-w-[1440px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
         <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
@@ -388,13 +391,13 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                 <span>Expire le {formatDate(item.dateExpiration)}</span>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
               <button onClick={() => exportRows(filteredParticipants)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                <Download size={15} /> Exporter filtrés
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 sm:flex-none">
+                <Download size={15} /> Exporter la liste
               </button>
               <button onClick={() => onModifier(item)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 sm:flex-none">
                 <Edit2 size={15} /> Modifier
               </button>
               {item.statut === 'BROUILLON' && (
@@ -411,16 +414,16 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                   Clôturer
                 </button>
               )}
-              <button onClick={onClose} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-700">
+              <button onClick={onClose} className="hidden h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-700 sm:inline-flex">
                 <X size={17} />
               </button>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+        <div className="p-4 sm:p-6">
           <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="grid items-center gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
               <div className="flex items-start gap-3">
                 <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
                   prochaineAction.color === 'rose' ? 'bg-rose-50 text-rose-600'
@@ -436,28 +439,28 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                   <p className="mt-0.5 text-xs text-slate-500">{prochaineAction.text}</p>
                 </div>
               </div>
-              <div className="min-w-[220px]">
+              <div className="w-full">
                 <div className="mb-1 flex items-center justify-between text-xs font-bold text-slate-500">
-                  <span>Complétion livraison</span>
+                  <span>Avancement du dossier</span>
                   <span>{livraisonMoyenne}%</span>
                 </div>
                 <ProgressBar value={livraisonMoyenne} color={livraisonMoyenne >= 90 ? 'emerald' : livraisonMoyenne >= 50 ? 'sky' : 'amber'} />
               </div>
             </div>
-            <div className="mt-4 grid gap-2 md:grid-cols-6">
+            <div className="mx-auto mt-5 grid w-full max-w-3xl gap-3 sm:grid-cols-3">
               {ETAPES_LIVRAISON.map((step, index) => {
-                const count = livraisonCounts[step.key] || 0
+                const count = step.statuses.reduce((sum, status) => sum + (livraisonCounts[status] || 0), 0)
                 const active = count > 0
                 return (
                   <button key={step.key} onClick={() => setLivraisonFiltre(step.key)}
-                    className={`rounded-xl border px-3 py-2 text-left transition ${
+                    className={`rounded-xl border px-4 py-3 text-center transition ${
                       active ? 'border-violet-200 bg-violet-50' : 'border-slate-100 bg-slate-50 hover:bg-slate-100'
                     }`}>
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center justify-center gap-2">
                       <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black ${
                         active ? 'bg-violet-700 text-white' : 'bg-white text-slate-400'
                       }`}>{index + 1}</span>
-                      <span className={`text-xs font-black tabular-nums ${active ? 'text-violet-800' : 'text-slate-400'}`}>{count}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-black tabular-nums ${active ? 'bg-violet-100 text-violet-800' : 'bg-white text-slate-400'}`}>{count}</span>
                     </div>
                     <p className={`mt-2 text-xs font-black ${active ? 'text-violet-900' : 'text-slate-600'}`}>{step.label}</p>
                     <p className="text-[10px] text-slate-400">{step.hint}</p>
@@ -467,9 +470,9 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
             </div>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
-            <aside className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-4">
+            <aside className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 md:col-span-2 xl:col-span-2">
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Prix de base</p>
                   <p className="mt-2 text-lg font-black text-slate-950 tabular-nums">{formatMontant(item.prixNormal)}</p>
@@ -519,7 +522,26 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <div className="mb-3 flex items-center justify-between">
-                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">Suivi livraison</p>
+                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">Partenaire fournisseur</p>
+                  <Package size={15} className="text-violet-500" />
+                </div>
+                {item.partenaireNom ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      {item.partenaireLogoUrl ? <img src={item.partenaireLogoUrl} alt="" className="h-10 w-10 rounded-xl object-contain" /> : <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 font-black text-violet-700">{item.partenaireNom[0]}</div>}
+                      <div><p className="font-black text-slate-900">{item.partenaireNom}</p><p className="text-xs text-slate-400">{item.partenaireContact || 'Contact non renseigné'}</p></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded-xl bg-slate-50 p-3"><p className="font-bold text-slate-400">Montant dû</p><p className="mt-1 font-black text-slate-900">{formatMontant(item.montantDuPartenaire)} FCFA</p></div>
+                      <div className={`rounded-xl p-3 ${item.statutPaiementPartenaire === 'PAYE' ? 'bg-emerald-50' : 'bg-amber-50'}`}><p className="font-bold text-slate-500">Paiement</p><p className="mt-1 font-black text-slate-900">{STATUT_PAIEMENT_LABEL[item.statutPaiementPartenaire] || 'Non configuré'}</p><p className="mt-1 text-[10px] text-slate-500">Reste {formatMontant(item.montantRestantPartenaire)} FCFA</p></div>
+                    </div>
+                  </div>
+                ) : <p className="text-sm text-slate-400">Aucun partenaire lié. Ajoutez-le depuis la page de modification.</p>}
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">Suivi des engagements</p>
                   <Truck size={15} className="text-sky-500" />
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
@@ -541,14 +563,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                     <p className="mt-1 font-black text-rose-700 tabular-nums">{livraisonsProblemes}</p>
                   </div>
                 </div>
-                <div className="mt-3 space-y-2">
-                  {['EN_ATTENTE_QUOTA', 'A_PREPARER', 'PREPARATION', 'PRET_LIVRAISON', 'EN_LIVRAISON', 'LIVRE_A_CONFIRMER', 'LIVRE_CONFIRME', 'LITIGE'].map(status => (
-                    <div key={status} className="flex items-center justify-between gap-3 text-xs">
-                      <span className="font-semibold text-slate-500">{STATUT_LIVRAISON_LABEL[status]}</span>
-                      <span className="font-black tabular-nums text-slate-900">{livraisonCounts[status] || 0}</span>
-                    </div>
-                  ))}
-                </div>
+                <p className="mt-3 text-xs leading-relaxed text-slate-500">OpportuniHub ne prépare ni ne transporte les colis. Nous contrôlons l'engagement du partenaire et la confirmation finale du participant.</p>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -603,27 +618,27 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
 
             <section className="space-y-4">
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex flex-wrap items-end justify-between gap-3">
+                <div className="flex flex-col gap-4">
                   <div>
                     <p className="flex items-center gap-2 text-sm font-black text-slate-950">
                       <Users size={17} className="text-violet-600" /> Participants à traiter
                     </p>
                     <p className="mt-1 text-xs text-slate-400">
-                      Filtrez, cochez les personnes du lot du jour, puis appliquez une action. {filteredParticipants.length} visible(s), {selectedParticipants.length} sélectionné(s).
+                      Constituez le lot transmis au partenaire. Les réceptions confirmées quittent automatiquement la file active. {filteredParticipants.length} visible(s), {selectedParticipants.length} sélectionné(s).
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button onClick={() => exportRows(selectedParticipants)} disabled={selectedParticipants.length === 0}
                       className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40">
-                      <Download size={14} /> Export sélection
+                      <Download size={14} /> Export Excel (.csv)
                     </button>
                     <button onClick={() => planSelected(todaySlot())} disabled={selectedParticipants.length === 0}
                       className="inline-flex items-center gap-1.5 rounded-xl bg-violet-700 px-3 py-2 text-xs font-bold text-white hover:bg-violet-800 disabled:opacity-40">
-                      <UserCheck size={14} /> Traiter aujourd'hui
+                      <UserCheck size={14} /> Lot prioritaire du jour
                     </button>
                     <button onClick={() => planSelected(tomorrowSlot())} disabled={selectedParticipants.length === 0}
                       className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-40">
-                      <CalendarDays size={14} /> Décaler demain
+                      <CalendarDays size={14} /> Reporter au prochain lot
                     </button>
                   </div>
                 </div>
@@ -644,14 +659,16 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                   </select>
                   <select value={livraisonFiltre} onChange={e => setLivraisonFiltre(e.target.value)}
                     className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400">
-                    <option value="TOUS">Toute livraison</option>
+                    <option value="A_TRAITER">File active à traiter</option>
+                    <option value="TERMINES">Terminés / archivés</option>
+                    <option value="TOUS">Tous les dossiers</option>
                     <option value="PRIORITAIRES">Prioritaires</option>
-                    <option value="EN_ATTENTE_QUOTA">Quota non validé</option>
-                    <option value="A_PREPARER">À préparer</option>
-                    <option value="PREPARATION">Préparation</option>
-                    <option value="PRET_LIVRAISON">Prêt</option>
-                    <option value="EN_LIVRAISON">En livraison</option>
-                    <option value="LIVRE_A_CONFIRMER">À confirmer</option>
+                    <option value="EN_ATTENTE_QUOTA">Campagne en cours</option>
+                    <option value="A_PREPARER">Paiement validé</option>
+                    <option value="PREPARATION">Lot transmis au partenaire</option>
+                    <option value="PRET_LIVRAISON">Partenaire confirmé</option>
+                    <option value="EN_LIVRAISON">Date annoncée</option>
+                    <option value="LIVRE_A_CONFIRMER">Confirmation client attendue</option>
                     <option value="LIVRE_CONFIRME">Reçu confirmé</option>
                     <option value="LITIGE">Litiges</option>
                   </select>
@@ -696,7 +713,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                       </button>
                     </div>
                   </div>
-                  <div className="mt-4 grid gap-3 lg:grid-cols-[180px_180px_1fr_1fr_auto]">
+                  <div className="mt-4 grid gap-3 lg:grid-cols-[210px_190px_1fr_auto]">
                     <select value={bulkLivraison} onChange={e => setBulkLivraison(e.target.value)}
                       className="rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500">
                       {STATUT_LIVRAISON_OPTIONS.map(status => (
@@ -705,20 +722,16 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                     </select>
                     <input type="datetime-local" value={bulkDeliveryInfo.dateLivraisonPrevue}
                       onChange={e => setBulkDeliveryInfo(v => ({ ...v, dateLivraisonPrevue: e.target.value }))}
-                      title="Date de livraison prévue"
-                      className="rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500" />
-                    <input value={bulkDeliveryInfo.transporteur}
-                      onChange={e => setBulkDeliveryInfo(v => ({ ...v, transporteur: e.target.value }))}
-                      placeholder="Livreur ou transporteur"
+                      title="Date promise par le partenaire"
                       className="rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500" />
                     <input value={bulkDeliveryInfo.referenceLivraison}
                       onChange={e => setBulkDeliveryInfo(v => ({ ...v, referenceLivraison: e.target.value }))}
-                      placeholder="Référence colis"
+                      placeholder="Référence du lot partenaire"
                       className="rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500" />
                     <button onClick={applyBulkLivraison} disabled={savingLivraison}
                       className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-sky-700 px-3 py-2.5 text-xs font-bold text-white hover:bg-sky-800 disabled:opacity-40">
                       {savingLivraison ? <Loader2 size={13} className="animate-spin" /> : <Route size={13} />}
-                      Appliquer au lot
+                      Enregistrer l'engagement
                     </button>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -743,9 +756,77 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                 {loadingParticipants ? (
                   <Spinner py="py-16" />
                 ) : filteredParticipants.length === 0 ? (
-                  <EmptyState icon={Users} title="Aucun participant dans cette vue" sub="Modifiez les filtres ou attendez les nouvelles participations." />
+                  <div className="flex min-h-52 flex-col items-center justify-center bg-gradient-to-b from-white to-slate-50 px-6 py-10 text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                      <Users size={22} />
+                    </div>
+                    <p className="mt-3 text-sm font-black text-slate-800">
+                      {participants.length === 0 ? 'Aucune souscription pour le moment' : 'Aucun résultat avec ces filtres'}
+                    </p>
+                    <p className="mt-1 max-w-md text-xs leading-relaxed text-slate-500">
+                      {participants.length === 0
+                        ? 'La file apparaîtra ici dès qu’un participant aura payé son dépôt et rejoint cette campagne.'
+                        : 'Essayez une autre recherche ou réinitialisez les filtres pour retrouver les participants.'}
+                    </p>
+                    {participants.length > 0 && (
+                      <button onClick={() => { setSearchParticipant(''); setStatutFiltre('TOUS'); setLivraisonFiltre('A_TRAITER'); setPlanningFiltre('TOUS') }}
+                        className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50">
+                        Réinitialiser les filtres
+                      </button>
+                    )}
+                  </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <>
+                  <div className="divide-y divide-slate-100 md:hidden">
+                    {filteredParticipants.map(p => {
+                      const pPlan = participantPlan(p.id)
+                      const isSelected = selectedIds.includes(p.id)
+                      return (
+                        <article key={p.id} className={`p-4 ${isSelected ? 'bg-violet-50/70' : 'bg-white'}`}>
+                          <div className="flex items-start gap-3">
+                            <input type="checkbox" checked={isSelected} onChange={() => toggleSelected(p.id)}
+                              aria-label={`Sélectionner ${p.nom || p.telephone || p.id}`}
+                              className="mt-1 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div>
+                                  <p className="font-bold text-slate-900">{p.nom || 'Participant sans nom'}</p>
+                                  <p className="text-xs text-slate-400">{p.telephone || 'Téléphone non renseigné'}</p>
+                                </div>
+                                <Badge color={STATUT_PAIEMENT_COLOR[p.statutPaiement] || STATUT_PARTICIPATION_COLOR[p.statut] || 'gray'}>
+                                  {STATUT_PAIEMENT_LABEL[p.statutPaiement] || STATUT_PARTICIPATION_LABEL[p.statut] || p.statut}
+                                </Badge>
+                              </div>
+                              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                                <div className="rounded-xl bg-slate-50 p-2.5"><span className="text-slate-400">Commande</span><p className="mt-1 font-black text-slate-800">×{p.quantite || 0} · {formatMontant(p.montantGele)} FCFA</p></div>
+                                <div className="rounded-xl bg-slate-50 p-2.5"><span className="text-slate-400">Lot prévu</span><p className="mt-1 font-bold text-slate-700">{pPlan.slot ? formatDateTime(pPlan.slot) : 'Non planifié'}</p></div>
+                              </div>
+                              <div className="mt-3">
+                                <div className="mb-1.5 flex items-center justify-between gap-2">
+                                  <Badge color={STATUT_LIVRAISON_COLOR[p.statutLivraison] || 'gray'}>{STATUT_LIVRAISON_LABEL[p.statutLivraison] || 'Campagne en cours'}</Badge>
+                                  <span className="text-[10px] font-bold text-slate-400">{p.progressionLivraison || 0}%</span>
+                                </div>
+                                <ProgressBar value={p.progressionLivraison || 0} color={p.statutLivraison === 'LIVRE_CONFIRME' ? 'emerald' : 'sky'} />
+                              </div>
+                              {p.dateLivraisonPrevue && <p className="mt-2 text-xs text-slate-500"><span className="font-bold">Date promise :</span> {formatDateTime(p.dateLivraisonPrevue)}</p>}
+                              <div className="mt-3 grid grid-cols-2 gap-2">
+                                <select value={p.statutLivraison || 'EN_ATTENTE_QUOTA'} onChange={e => updateLivraison([p.id], { statutLivraison: e.target.value })}
+                                  className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-xs outline-none focus:border-violet-400">
+                                  <option value="EN_ATTENTE_QUOTA">Campagne en cours</option>
+                                  {STATUT_LIVRAISON_OPTIONS.map(status => <option key={status} value={status}>{STATUT_LIVRAISON_LABEL[status]}</option>)}
+                                </select>
+                                <button onClick={() => updateLivraison([p.id], { prioriteTraitement: !p.prioriteTraitement })} disabled={savingLivraison}
+                                  className="rounded-lg border border-violet-200 bg-white px-2 py-2 text-xs font-bold text-violet-700 disabled:opacity-50">
+                                  {p.prioriteTraitement ? 'Retirer priorité' : 'Prioriser'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </article>
+                      )
+                    })}
+                  </div>
+                  <div className="hidden overflow-x-auto md:block">
                     <table className="w-full min-w-[980px] border-collapse">
                       <thead>
                         <tr>
@@ -756,10 +837,10 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                           </Th>
                           <Th>Participant</Th>
                           <Th>Commande</Th>
-                          <Th>Suivi</Th>
-                          <Th>Planning</Th>
-                          <Th>Livraison</Th>
-                          <Th>Action rapide</Th>
+                          <Th>État du dossier</Th>
+                          <Th>Lot / créneau</Th>
+                          <Th>Engagement partenaire</Th>
+                          <Th>Mettre à jour</Th>
                         </tr>
                       </thead>
                       <tbody>
@@ -782,7 +863,8 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                                 <div className="space-y-1">
                                   <p className="font-black text-slate-900 tabular-nums">×{p.quantite || 0}</p>
                                   <p className="text-xs font-bold text-slate-600 tabular-nums">{formatMontant(p.montantGele)} FCFA</p>
-                                  <Badge color={STATUT_PARTICIPATION_COLOR[p.statut] || 'gray'}>{STATUT_PARTICIPATION_LABEL[p.statut] || p.statut}</Badge>
+                                  <Badge color={STATUT_PAIEMENT_COLOR[p.statutPaiement] || STATUT_PARTICIPATION_COLOR[p.statut] || 'gray'}>{STATUT_PAIEMENT_LABEL[p.statutPaiement] || STATUT_PARTICIPATION_LABEL[p.statut] || p.statut}</Badge>
+                                  {Number(p.montantRestant || 0) > 0 && <p className="text-[10px] font-bold text-rose-600">Reste {formatMontant(p.montantRestant)} FCFA</p>}
                                 </div>
                               </Td>
                               <Td>
@@ -819,13 +901,13 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                               </Td>
                               <Td>
                                 <div className="space-y-1 text-[11px] text-slate-500">
-                                  <p><span className="font-bold text-slate-700">Prévue :</span> {formatDateTime(p.dateLivraisonPrevue)}</p>
-                                  <p><span className="font-bold text-slate-700">Livreur :</span> {p.transporteur || '—'}</p>
-                                  <p><span className="font-bold text-slate-700">Réf. :</span> {p.referenceLivraison || '—'}</p>
+                                  <p><span className="font-bold text-slate-700">Date promise :</span> {formatDateTime(p.dateLivraisonPrevue)}</p>
+                                  <p><span className="font-bold text-slate-700">Réf. partenaire :</span> {p.referenceLivraison || '—'}</p>
                                   {p.noteLivraison && <p className="text-slate-400">{p.noteLivraison}</p>}
                                   {p.dateConfirmationParticipant && (
                                     <p className="font-bold text-emerald-700">Confirmé le {formatDateTime(p.dateConfirmationParticipant)}</p>
                                   )}
+                                  {p.confirmationEnRetard && <p className="font-bold text-rose-600">Confirmation en retard</p>}
                                 </div>
                               </Td>
                               <Td>
@@ -833,7 +915,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                                   <select value={p.statutLivraison || 'EN_ATTENTE_QUOTA'}
                                     onChange={e => updateLivraison([p.id], { statutLivraison: e.target.value })}
                                     className="w-40 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-violet-400">
-                                    <option value="EN_ATTENTE_QUOTA">Quota non validé</option>
+                                    <option value="EN_ATTENTE_QUOTA">Campagne en cours</option>
                                     {STATUT_LIVRAISON_OPTIONS.map(status => (
                                       <option key={status} value={status}>{STATUT_LIVRAISON_LABEL[status]}</option>
                                     ))}
@@ -855,21 +937,22 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                       </tbody>
                     </table>
                   </div>
+                  </>
                 )}
               </div>
 
               <div className="grid gap-3 lg:grid-cols-3">
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="flex items-center gap-2 text-sm font-black text-slate-900"><CheckSquare size={16} className="text-emerald-600" /> Traitement conseillé</p>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-500">Une fois le quota validé, passez les participants en préparation, traitez d'abord les prioritaires, puis avancez les statuts jusqu'à “Remis — à confirmer”.</p>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-500">Après la clôture et la validation financière, constituez un lot prioritaire, exportez-le puis transmettez-le au partenaire hors plateforme.</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <p className="flex items-center gap-2 text-sm font-black text-slate-900"><Truck size={16} className="text-sky-600" /> Livraison suivie</p>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-500">Chaque participant a son statut logistique, une progression, un livreur, une référence et une confirmation finale côté participant.</p>
+                  <p className="flex items-center gap-2 text-sm font-black text-slate-900"><Truck size={16} className="text-sky-600" /> Engagement partenaire</p>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-500">Consignez uniquement la date promise et la référence communiquées par le partenaire. Sa préparation et son transport restent hors plateforme.</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="flex items-center gap-2 text-sm font-black text-slate-900"><CalendarClock size={16} className="text-amber-600" /> Décalage</p>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-500">Planifiez aujourd’hui, demain ou un créneau précis ; les autres restent non planifiés pour un autre horaire, sans perdre leur suivi.</p>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-500">Formez un lot aujourd’hui, demain ou à une date précise. Ce créneau organise votre transmission au partenaire ; ce n’est pas un planning de transport.</p>
                 </div>
               </div>
             </section>
@@ -991,6 +1074,8 @@ function NouvelleOpportuniteModal({ onClose, onSaved }) {
   const [form, setForm] = useState({
     titre: '', description: '', prixNormal: '', seuilMinimum: '', seuilMaximal: '',
     dateExpiration: '', categorie: '', actif: true,
+    partenaireNom: '', partenaireLogoUrl: '', partenaireContact: '', partenaireReseauxUrl: '',
+    montantDuPartenaire: '', montantPayePartenaire: '', delaiConfirmationReceptionJours: '3', messageNotificationLivraison: '',
   })
   const [paliers, setPaliers]             = useState([{ ...PALIER_VIDE }])
   const [specs, setSpecs]                 = useState({ pointsForts: '', casUsage: '', finePrint: '' })
@@ -1018,6 +1103,14 @@ function NouvelleOpportuniteModal({ onClose, onSaved }) {
         dateExpiration: new Date(form.dateExpiration).toISOString(),
         categorie: form.categorie || undefined,
         actif: form.actif,
+        partenaireNom: form.partenaireNom || undefined,
+        partenaireLogoUrl: form.partenaireLogoUrl || undefined,
+        partenaireContact: form.partenaireContact || undefined,
+        partenaireReseauxUrl: form.partenaireReseauxUrl || undefined,
+        montantDuPartenaire: Number(form.montantDuPartenaire || 0),
+        montantPayePartenaire: Number(form.montantPayePartenaire || 0),
+        delaiConfirmationReceptionJours: Number(form.delaiConfirmationReceptionJours || 3),
+        messageNotificationLivraison: form.messageNotificationLivraison || undefined,
         paliers: calculerPaliers(paliers).map(p => ({
           seuilMin: Number(p.seuilMin), seuilMax: Number(p.seuilMax), prix: Number(p.prix),
         })),
@@ -1102,6 +1195,20 @@ function NouvelleOpportuniteModal({ onClose, onSaved }) {
 
           <PaliersEditor paliers={paliers} setPaliers={setPaliers} />
 
+          <details className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <summary className="cursor-pointer text-sm font-black text-slate-800">Partenaire fournisseur (optionnel)</summary>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div><label className={labelCls}>Nom</label><input value={form.partenaireNom} onChange={e => setField('partenaireNom', e.target.value)} className={inputCls} /></div>
+              <div><label className={labelCls}>Logo (URL)</label><input type="url" value={form.partenaireLogoUrl} onChange={e => setField('partenaireLogoUrl', e.target.value)} className={inputCls} /></div>
+              <div><label className={labelCls}>Contact privé</label><input value={form.partenaireContact} onChange={e => setField('partenaireContact', e.target.value)} className={inputCls} /></div>
+              <div><label className={labelCls}>Site / réseau social</label><input type="url" value={form.partenaireReseauxUrl} onChange={e => setField('partenaireReseauxUrl', e.target.value)} className={inputCls} /></div>
+              <div><label className={labelCls}>Montant dû</label><input type="number" min="0" value={form.montantDuPartenaire} onChange={e => setField('montantDuPartenaire', e.target.value)} className={inputCls} /></div>
+              <div><label className={labelCls}>Montant payé</label><input type="number" min="0" value={form.montantPayePartenaire} onChange={e => setField('montantPayePartenaire', e.target.value)} className={inputCls} /></div>
+              <div><label className={labelCls}>Alerte après (jours)</label><input type="number" min="1" value={form.delaiConfirmationReceptionJours} onChange={e => setField('delaiConfirmationReceptionJours', e.target.value)} className={inputCls} /></div>
+              <div className="sm:col-span-2"><label className={labelCls}>Notification de livraison</label><textarea rows={2} maxLength={500} value={form.messageNotificationLivraison} onChange={e => setField('messageNotificationLivraison', e.target.value)} className={`${inputCls} resize-none`} /></div>
+            </div>
+          </details>
+
           <SpecsEditor titre={form.titre} description={form.description} categorie={form.categorie}
             specs={specs} setSpecs={setSpecs} />
 
@@ -1177,6 +1284,14 @@ function ModifierOpportuniteModal({ item, onClose, onSaved }) {
     seuilMaximal: item.seuilMaximal != null ? String(item.seuilMaximal) : '',
     dateExpiration: item.dateExpiration ? item.dateExpiration.slice(0, 16) : '',
     categorie: item.categorie || '',
+    partenaireNom: item.partenaireNom || '',
+    partenaireLogoUrl: item.partenaireLogoUrl || '',
+    partenaireContact: item.partenaireContact || '',
+    partenaireReseauxUrl: item.partenaireReseauxUrl || '',
+    montantDuPartenaire: String(item.montantDuPartenaire ?? 0),
+    montantPayePartenaire: String(item.montantPayePartenaire ?? 0),
+    delaiConfirmationReceptionJours: String(item.delaiConfirmationReceptionJours ?? 3),
+    messageNotificationLivraison: item.messageNotificationLivraison || '',
   })
   const [paliers, setPaliers] = useState(
     [...(item.paliers || [])]
@@ -1212,6 +1327,14 @@ function ModifierOpportuniteModal({ item, onClose, onSaved }) {
         seuilMaximal: form.seuilMaximal ? Number(form.seuilMaximal) : undefined,
         dateExpiration: form.dateExpiration ? new Date(form.dateExpiration).toISOString() : undefined,
         categorie: form.categorie || undefined,
+        partenaireNom: form.partenaireNom,
+        partenaireLogoUrl: form.partenaireLogoUrl,
+        partenaireContact: form.partenaireContact,
+        partenaireReseauxUrl: form.partenaireReseauxUrl,
+        montantDuPartenaire: Number(form.montantDuPartenaire || 0),
+        montantPayePartenaire: Number(form.montantPayePartenaire || 0),
+        delaiConfirmationReceptionJours: Number(form.delaiConfirmationReceptionJours || 3),
+        messageNotificationLivraison: form.messageNotificationLivraison,
         paliers: calculerPaliers(paliers).map(p => ({
           seuilMin: Number(p.seuilMin), seuilMax: Number(p.seuilMax), prix: Number(p.prix),
         })),
@@ -1233,8 +1356,8 @@ function ModifierOpportuniteModal({ item, onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
-      <div className="my-8 w-full max-w-2xl rounded-xl bg-white p-6 shadow-2xl border border-slate-200">
+    <div className="mx-auto w-full max-w-4xl py-2">
+      <div className="w-full rounded-2xl bg-white p-6 shadow-sm border border-slate-200">
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h3 className="text-base font-bold text-slate-900">Modifier l'opportunité</h3>
@@ -1287,6 +1410,23 @@ function ModifierOpportuniteModal({ item, onClose, onSaved }) {
 
           <PaliersEditor paliers={paliers} setPaliers={setPaliers} />
 
+          <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="mb-4">
+              <h4 className="text-sm font-black text-slate-900">Partenaire et engagement financier</h4>
+              <p className="mt-1 text-xs text-slate-500">Le partenaire est facultatif. Son contact reste réservé à l'administration ; son nom, logo et lien public peuvent apparaître côté client.</p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div><label className={labelCls}>Nom du partenaire</label><input value={form.partenaireNom} onChange={e => setField('partenaireNom', e.target.value)} className={inputCls} /></div>
+              <div><label className={labelCls}>Logo (URL)</label><input type="url" value={form.partenaireLogoUrl} onChange={e => setField('partenaireLogoUrl', e.target.value)} className={inputCls} /></div>
+              <div><label className={labelCls}>Contact privé</label><input value={form.partenaireContact} onChange={e => setField('partenaireContact', e.target.value)} className={inputCls} /></div>
+              <div><label className={labelCls}>Réseau social / site public</label><input type="url" value={form.partenaireReseauxUrl} onChange={e => setField('partenaireReseauxUrl', e.target.value)} className={inputCls} /></div>
+              <div><label className={labelCls}>Montant dû au partenaire</label><input type="number" min="0" value={form.montantDuPartenaire} onChange={e => setField('montantDuPartenaire', e.target.value)} className={inputCls} /></div>
+              <div><label className={labelCls}>Montant déjà payé</label><input type="number" min="0" value={form.montantPayePartenaire} onChange={e => setField('montantPayePartenaire', e.target.value)} className={inputCls} /></div>
+              <div><label className={labelCls}>Délai avant alerte (jours)</label><input type="number" min="1" value={form.delaiConfirmationReceptionJours} onChange={e => setField('delaiConfirmationReceptionJours', e.target.value)} className={inputCls} /></div>
+              <div className="sm:col-span-2"><label className={labelCls}>Message envoyé quand une date est promise</label><textarea rows={3} maxLength={500} value={form.messageNotificationLivraison} onChange={e => setField('messageNotificationLivraison', e.target.value)} placeholder="Votre campagne a été validée. Votre livraison est prévue…" className={`${inputCls} resize-none`} /></div>
+            </div>
+          </section>
+
           <SpecsEditor titre={form.titre} description={form.description} categorie={form.categorie}
             specs={specs} setSpecs={setSpecs} />
 
@@ -1317,14 +1457,57 @@ function ModifierOpportuniteModal({ item, onClose, onSaved }) {
   )
 }
 
+export function OpportuniteDetailPage() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const [item, setItem] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [actionId, setActionId] = useState(null)
+
+  const refresh = useCallback(() => {
+    setLoading(true)
+    getAdminOpportunite(id).then(setItem).finally(() => setLoading(false))
+  }, [id])
+  useEffect(() => { refresh() }, [refresh])
+
+  const activer = async (opportuniteId) => {
+    setActionId(opportuniteId)
+    try { await activerOpportunite(opportuniteId); refresh() } finally { setActionId(null) }
+  }
+  const cloturer = async (opportuniteId) => {
+    setActionId(opportuniteId)
+    try { await cloturerOpportunite(opportuniteId); refresh() } finally { setActionId(null) }
+  }
+
+  if (loading) return <Spinner py="py-24" />
+  if (!item) return <EmptyState icon={Package} title="Opportunité introuvable" sub="Revenez à la liste et choisissez une autre campagne." />
+  return <DetailDrawer item={item} onClose={() => navigate('/opportunites')} onActiver={activer} onCloturer={cloturer} onModifier={() => navigate(`/opportunites/${id}/modifier`)} actionId={actionId} />
+}
+
+export function ModifierOpportunitePage() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const [item, setItem] = useState(null)
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    getAdminOpportunite(id).then(setItem).finally(() => setLoading(false))
+  }, [id])
+  if (loading) return <Spinner py="py-24" />
+  if (!item) return <EmptyState icon={Package} title="Opportunité introuvable" />
+  return <ModifierOpportuniteModal item={item} onClose={() => navigate(`/opportunites/${id}`)} onSaved={() => navigate(`/opportunites/${id}`)} />
+}
+
 export default function Opportunites() {
+  const navigate = useNavigate()
   const [opportunites, setOpportunites] = useState([])
   const [loading, setLoading]           = useState(true)
   const [actionId, setActionId]         = useState(null)
   const [showModal, setShowModal]       = useState(false)
-  const [detailItem, setDetailItem]     = useState(null)
-  const [editItem, setEditItem]         = useState(null)
   const [categorieFiltre, setCategorieFiltre] = useState('TOUTES')
+  const [statutListeFiltre, setStatutListeFiltre] = useState('TOUS')
+  const [recherche, setRecherche] = useState('')
+  const [triListe, setTriListe] = useState('RECENTES')
+  const [filtresOuverts, setFiltresOuverts] = useState(false)
 
   const fetchData = () => {
     setLoading(true)
@@ -1349,18 +1532,39 @@ export default function Opportunites() {
   const handleActiver  = async (id) => {
     setActionId(id)
     try { await activerOpportunite(id); fetchData() } catch { } finally { setActionId(null) }
-    setDetailItem(prev => prev?.id === id ? { ...prev, statut: 'ACTIVE' } : prev)
   }
   const handleCloturer = async (id) => {
     setActionId(id)
     try { await cloturerOpportunite(id); fetchData() } catch { } finally { setActionId(null) }
-    setDetailItem(prev => prev?.id === id ? { ...prev, statut: 'CLOTUREE' } : prev)
   }
 
   const categories = Array.from(new Set(opportunites.map(o => o.categorie).filter(Boolean))).sort()
-  const opportunitesFiltrees = categorieFiltre === 'TOUTES'
-    ? opportunites
-    : opportunites.filter(o => o.categorie === categorieFiltre)
+  const termesRecherche = normaliserRecherche(recherche).split(/\s+/).filter(Boolean)
+  const opportunitesFiltrees = opportunites
+    .filter(o => categorieFiltre === 'TOUTES' || o.categorie === categorieFiltre)
+    .filter(o => statutListeFiltre === 'TOUS' || o.statut === statutListeFiltre)
+    .filter(o => {
+      if (termesRecherche.length === 0) return true
+      const contenu = normaliserRecherche([
+        o.titre, o.description, o.categorie, o.partenaireNom, o.partenaireContact, o.statut,
+        o.prixNormal, o.participantsActuels,
+      ].filter(Boolean).join(' '))
+      return termesRecherche.every(terme => contenu.includes(terme))
+    })
+    .sort((a, b) => {
+      if (triListe === 'EXPIRATION') return new Date(a.dateExpiration || 0) - new Date(b.dateExpiration || 0)
+      if (triListe === 'PARTICIPANTS') return Number(b.participantsActuels || 0) - Number(a.participantsActuels || 0)
+      if (triListe === 'PRIX_ASC') return Number(a.prixNormal || 0) - Number(b.prixNormal || 0)
+      if (triListe === 'PRIX_DESC') return Number(b.prixNormal || 0) - Number(a.prixNormal || 0)
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    })
+  const nombreFiltresActifs = (categorieFiltre !== 'TOUTES' ? 1 : 0) + (statutListeFiltre !== 'TOUS' ? 1 : 0) + (recherche.trim() ? 1 : 0)
+  const reinitialiserFiltres = () => {
+    setCategorieFiltre('TOUTES')
+    setStatutListeFiltre('TOUS')
+    setRecherche('')
+    setTriListe('RECENTES')
+  }
 
   return (
     <div className="space-y-4">
@@ -1370,22 +1574,6 @@ export default function Opportunites() {
           onSaved={() => { setShowModal(false); fetchData() }}
         />
       )}
-      {editItem && (
-        <ModifierOpportuniteModal
-          item={editItem}
-          onClose={() => setEditItem(null)}
-          onSaved={() => { setEditItem(null); fetchData() }}
-        />
-      )}
-      <DetailDrawer
-        item={detailItem}
-        onClose={() => setDetailItem(null)}
-        onActiver={handleActiver}
-        onCloturer={handleCloturer}
-        onModifier={(item) => { setDetailItem(null); setEditItem(item) }}
-        actionId={actionId}
-      />
-
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <p className="text-[13px] font-bold text-slate-900">Opportunités</p>
@@ -1401,26 +1589,78 @@ export default function Opportunites() {
         </button>
       </div>
 
-      {categories.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <FilterPill label={`Toutes (${opportunites.length})`} active={categorieFiltre === 'TOUTES'}
-            onClick={() => setCategorieFiltre('TOUTES')} />
-          {categories.map(cat => (
-            <FilterPill key={cat}
-              label={`${cat} (${opportunites.filter(o => o.categorie === cat).length})`}
-              active={categorieFiltre === cat}
-              onClick={() => setCategorieFiltre(cat)} />
-          ))}
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative min-w-0 flex-1">
+            <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input value={recherche} onChange={e => setRecherche(e.target.value)}
+              placeholder="Rechercher par produit, catégorie, partenaire…"
+              className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50" />
+            {recherche && (
+              <button onClick={() => setRecherche('')} aria-label="Effacer la recherche"
+                className="absolute right-2.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          <button onClick={() => setFiltresOuverts(v => !v)}
+            className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-bold transition ${filtresOuverts || nombreFiltresActifs > 0 ? 'border-violet-200 bg-violet-50 text-violet-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
+            <SlidersHorizontal size={16} /> Filtres
+            {nombreFiltresActifs > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-700 px-1 text-[10px] text-white">{nombreFiltresActifs}</span>}
+          </button>
+          <div className="text-right lg:min-w-28">
+            <p className="text-lg font-black tabular-nums text-slate-900">{opportunitesFiltrees.length}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">résultat{opportunitesFiltrees.length !== 1 ? 's' : ''}</p>
+          </div>
         </div>
-      )}
+
+        {filtresOuverts && (
+          <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2 xl:grid-cols-3">
+            <label className="block">
+              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-400">Catégorie</span>
+              <select value={categorieFiltre} onChange={e => setCategorieFiltre(e.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
+                <option value="TOUTES">Toutes les catégories ({opportunites.length})</option>
+                {categories.map(cat => <option key={cat} value={cat}>{cat} ({opportunites.filter(o => o.categorie === cat).length})</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-400">Statut</span>
+              <select value={statutListeFiltre} onChange={e => setStatutListeFiltre(e.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
+                <option value="TOUS">Tous les statuts</option>
+                {Object.entries(STATUT_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+            <label className="block sm:col-span-2 xl:col-span-1">
+              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-400">Trier par</span>
+              <select value={triListe} onChange={e => setTriListe(e.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
+                <option value="RECENTES">Création la plus récente</option>
+                <option value="EXPIRATION">Expiration la plus proche</option>
+                <option value="PARTICIPANTS">Plus de participants</option>
+                <option value="PRIX_ASC">Prix croissant</option>
+                <option value="PRIX_DESC">Prix décroissant</option>
+              </select>
+            </label>
+          </div>
+        )}
+
+        {nombreFiltresActifs > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Filtres actifs</span>
+            {recherche.trim() && <button onClick={() => setRecherche('')} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200">Recherche : “{recherche.trim()}” <X size={12} /></button>}
+            {categorieFiltre !== 'TOUTES' && <button onClick={() => setCategorieFiltre('TOUTES')} className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100">Catégorie : {categorieFiltre} <X size={12} /></button>}
+            {statutListeFiltre !== 'TOUS' && <button onClick={() => setStatutListeFiltre('TOUS')} className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-100">Statut : {STATUT_LABEL[statutListeFiltre]} <X size={12} /></button>}
+            <button onClick={reinitialiserFiltres} className="ml-auto inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-800"><RotateCcw size={12} /> Tout effacer</button>
+          </div>
+        )}
+      </div>
 
       <Card noPad>
         {loading ? (
           <Spinner py="py-12" />
         ) : opportunitesFiltrees.length === 0 ? (
           <EmptyState icon={Package}
-            title={categorieFiltre === 'TOUTES' ? 'Aucune opportunité' : 'Aucune opportunité dans cette catégorie'}
-            sub={categorieFiltre === 'TOUTES' ? 'Créez votre première opportunité.' : undefined} />
+            title={opportunites.length === 0 ? 'Aucune opportunité' : 'Aucun résultat'}
+            sub={opportunites.length === 0 ? 'Créez votre première opportunité.' : 'Modifiez la recherche ou retirez certains filtres.'} />
         ) : (
           <Table>
             <thead>
@@ -1465,11 +1705,11 @@ export default function Opportunites() {
                     <Td><Badge color={STATUT_COLOR[item.statut] || 'gray'}>{STATUT_LABEL[item.statut] || item.statut}</Badge></Td>
                     <Td>
                       <div className="flex gap-1.5 items-center">
-                        <button onClick={() => setDetailItem(item)}
+                        <button onClick={() => navigate(`/opportunites/${item.id}`)}
                           className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 transition">
                           <Eye size={11} /> Détails
                         </button>
-                        <button onClick={() => setEditItem(item)}
+                        <button onClick={() => navigate(`/opportunites/${item.id}/modifier`)}
                           className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 transition">
                           <Edit2 size={11} /> Modifier
                         </button>
