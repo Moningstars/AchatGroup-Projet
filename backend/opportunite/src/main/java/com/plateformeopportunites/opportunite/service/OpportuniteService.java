@@ -840,13 +840,13 @@ public class OpportuniteService {
 
     private BigDecimal calculerPrixActuel(Opportunite opp) {
         List<PalierPrix> paliers = palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(opp.getId());
+        PalierPrix premier = paliers.isEmpty() ? null : paliers.get(0);
         return paliers.stream()
                 .filter(p -> opp.getParticipantsActuels() >= p.getSeuilMin()
                         && opp.getParticipantsActuels() <= p.getSeuilMax())
                 .map(PalierPrix::getPrix)
                 .findFirst()
                 .orElseGet(() -> {
-                    PalierPrix premier = paliers.isEmpty() ? null : paliers.get(0);
                     // Avant le seuil du premier palier (y compris à 0 participant) : le prix
                     // dégressif du premier palier s'applique déjà, prixNormal ne sert plus
                     // que de référence barrée pour afficher la réduction.

@@ -11,14 +11,21 @@
 export function calculerProgression({ participantsActuels = 0, seuilMinimum, seuilMaximal, paliers }) {
   const valide = seuilMinimum > 0 && participantsActuels >= seuilMinimum
 
-  if (!valide) {
-    const pct = seuilMinimum > 0 ? Math.min(100, Math.round((participantsActuels / seuilMinimum) * 100)) : 0
-    return { pct, phase: 'validation', valide: false }
+  // Déterminer l'objectif final pour la barre de progression (le plafond, ou le max du dernier palier)
+  let objectifFinal = seuilMaximal
+  if (!objectifFinal && paliers && paliers.length > 0) {
+    const dernierPalier = paliers[paliers.length - 1]
+    // Si le dernier palier n'a pas de max, on utilise son seuilMin pour que la barre n'atteigne 100% qu'à ce stade
+    objectifFinal = dernierPalier.seuilMax || dernierPalier.seuilMin
+  }
+  if (!objectifFinal) {
+    objectifFinal = seuilMinimum
   }
 
+  const pct = objectifFinal > 0 ? Math.min(100, Math.round((participantsActuels / objectifFinal) * 100)) : (valide ? 100 : 0)
+
   if (seuilMaximal != null) {
-    const pct = seuilMaximal > 0 ? Math.min(100, Math.round((participantsActuels / seuilMaximal) * 100)) : 100
-    return { pct, phase: 'plafond', valide: true, placesRestantes: Math.max(0, seuilMaximal - participantsActuels) }
+    return { pct, phase: 'plafond', valide, placesRestantes: Math.max(0, seuilMaximal - participantsActuels), objectifFinal }
   }
 
   const paliersTries = [...(paliers || [])].sort((a, b) => a.seuilMin - b.seuilMin)
