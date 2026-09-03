@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Loader2, Plus, Trash2, X, ChevronDown, ChevronUp,
   Edit2, CheckCircle2, XCircle, Clock, Users,
@@ -826,6 +826,23 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
   const [expanded, setExpanded] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const actionsRef = useRef(null)
+
+  useEffect(() => {
+    if (!actionsOpen) return undefined
+    const close = (event) => {
+      if (event.key === 'Escape' || (event.type === 'mousedown' && !actionsRef.current?.contains(event.target))) {
+        setActionsOpen(false)
+        setConfirmDelete(false)
+      }
+    }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', close)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('keydown', close)
+    }
+  }, [actionsOpen])
 
   const cfg = STATUT_CONFIG[survey.statut] || { label: survey.statut, color: 'gray', dot: 'bg-slate-400' }
   const progress = survey.quotaVise > 0
@@ -834,9 +851,9 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
   const isActing = (suffix) => actionId === survey.id + suffix
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+    <article className="relative rounded-2xl border border-slate-200 bg-white shadow-sm">
       {/* ── Header ── */}
-      <div className="px-5 pt-5 pb-4">
+      <div className="p-4 sm:p-5">
         <div className="flex flex-wrap items-start gap-3 mb-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -858,12 +875,12 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
           </div>
 
           {/* Action buttons */}
-          <div className="flex flex-wrap gap-2 flex-shrink-0">
-            <button onClick={() => setActionsOpen(v => !v)}
-              className="flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-800 transition">
+          <div className="relative flex-shrink-0" ref={actionsRef}>
+            <button onClick={() => setActionsOpen(v => !v)} aria-expanded={actionsOpen} aria-haspopup="menu"
+              className="flex h-9 items-center gap-1.5 rounded-lg bg-violet-700 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-800">
               Gérer {actionsOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
             </button>
-            {actionsOpen && <>
+            {actionsOpen && <div role="menu" className="absolute right-0 top-11 z-20 w-60 space-y-1.5 rounded-xl border border-slate-200 bg-white p-2 shadow-xl [&>button]:w-full [&>button]:justify-start">
             {/* ⚠️ Pas de test d'éligibilité */}
             {!survey.hasEligibilite && !['CLOTURE', 'ANNULE'].includes(survey.statut) && (
               <button onClick={() => onConfigurerElig(survey)}
@@ -890,7 +907,7 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
                     <Trash2 size={12} /> Supprimer
                   </button>
                 ) : (
-                  <div className="flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5">
+                <div className="flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
                     <AlertTriangle size={12} className="text-rose-500" />
                     <span className="text-xs text-rose-700 font-semibold">Confirmer ?</span>
                     <button onClick={() => { onSupprimer(survey.id); setConfirmDelete(false) }}
@@ -955,29 +972,29 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
                 {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
               </button>
             )}
-            </>}
+            </div>}
           </div>
         </div>
 
         {/* ── Stats row ── */}
-        <div className="flex flex-wrap gap-4 text-xs text-slate-500 mb-3">
-          <span className="flex items-center gap-1">
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+          <span className="flex min-w-0 items-center gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
             <Users size={12} className="text-slate-400" />
             {survey.repondantsActuels} / {survey.quotaVise} répondants
           </span>
-          <span className="flex items-center gap-1 font-semibold text-violet-600">
+          <span className="flex min-w-0 items-center gap-1 rounded-lg bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700">
             {fmt(survey.recompense)} {survey.typeRecompense === 'POINTS' ? 'points' : 'FCFA'} / répondant
           </span>
           {survey.budgetReserve != null && (
-            <span className="flex items-center gap-1 font-semibold text-emerald-700">
-              Budget : {fmt(survey.budgetDistribue || 0)} distribués · {fmt(survey.budgetRestant || 0)} restants
+            <span className="col-span-2 flex min-w-0 items-center gap-1 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 sm:col-span-1">
+              {fmt(survey.budgetRestant || 0)} {survey.typeRecompense === 'POINTS' ? 'points' : 'FCFA'} disponibles
             </span>
           )}
-          <span className="flex items-center gap-1">
+          <span className="flex min-w-0 items-center gap-1 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
             <Clock size={12} className="text-slate-400" />
             Expire {formatDate(survey.dateExpiration)}
           </span>
-          <span className="text-slate-400">Créé {formatDate(survey.createdAt)}</span>
+          <span className="hidden items-center rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-400 xl:flex">Créé {formatDate(survey.createdAt)}</span>
         </div>
 
         {/* ── Progress bar ── */}
@@ -989,7 +1006,7 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
 
       {/* ── Questions expand ── */}
       {expanded && survey.questions?.length > 0 && (
-        <div className="border-t border-slate-100 bg-slate-50 px-5 py-4">
+        <div className="overflow-hidden rounded-b-2xl border-t border-slate-100 bg-slate-50 px-4 py-4 sm:px-5">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Questions du sondage</p>
           <div className="space-y-3">
             {survey.questions.map((q, i) => (
@@ -1022,7 +1039,7 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
           </div>
         </div>
       )}
-    </div>
+    </article>
   )
 }
 
@@ -1036,6 +1053,7 @@ export default function Sondages() {
   const [modeFilter, setModeFilter] = useState('TOUS')
   const [rewardFilter, setRewardFilter] = useState('TOUS')
   const [sort, setSort] = useState('RECENTS')
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [actionId, setActionId] = useState(null)
   const [actionError, setActionError] = useState(null)
   const [showNouveauModal, setShowNouveauModal] = useState(false)
@@ -1142,8 +1160,8 @@ export default function Sondages() {
       )}
 
       {/* ── En-tête compact ── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3 text-sm text-slate-500">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
           <span><strong className="text-slate-900">{sondages.length}</strong> sondage{sondages.length !== 1 ? 's' : ''}</span>
           <span className="h-1 w-1 rounded-full bg-slate-300" />
           <span><strong className="text-sky-600">{countByStatut('ACTIF')}</strong> en cours</span>
@@ -1170,31 +1188,39 @@ export default function Sondages() {
       )}
 
       {/* ── Recherche et filtres structurés ── */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-        <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_repeat(4,minmax(145px,auto))]">
+      <section aria-label="Recherche et filtres" className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+        <div className="grid gap-2 sm:grid-cols-[minmax(220px,1fr)_auto] lg:grid-cols-[minmax(280px,1fr)_190px_auto]">
           <label className="relative block">
             <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Titre, description ou commanditaire…"
               className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none transition focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100" />
           </label>
-          <select aria-label="Filtrer par statut" value={filtre} onChange={e => setFiltre(e.target.value)} className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
+          <select aria-label="Filtrer par statut" value={filtre} onChange={e => setFiltre(e.target.value)} className="h-11 min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
             {FILTRES.map(f => <option key={f.key} value={f.key}>{f.label}{f.key !== 'TOUS' ? ` (${countByStatut(f.key)})` : ''}</option>)}
           </select>
-          <select aria-label="Filtrer par mode" value={modeFilter} onChange={e => setModeFilter(e.target.value)} className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
+          <button type="button" onClick={() => setFiltersOpen(v => !v)} aria-expanded={filtersOpen}
+            className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold transition ${filtersOpen || hasActiveFilters ? 'border-violet-200 bg-violet-50 text-violet-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
+            <SlidersHorizontal size={16} /> Filtres avancés
+          </button>
+        </div>
+        {filtersOpen && (
+          <div className="mt-3 grid gap-2 border-t border-slate-100 pt-3 sm:grid-cols-3">
+          <select aria-label="Filtrer par mode" value={modeFilter} onChange={e => setModeFilter(e.target.value)} className="h-11 min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
             <option value="TOUS">Tous les modes</option><option value="AUTO">Automatique</option><option value="MANUEL">Manuel</option>
           </select>
-          <select aria-label="Filtrer par récompense" value={rewardFilter} onChange={e => setRewardFilter(e.target.value)} className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
+          <select aria-label="Filtrer par récompense" value={rewardFilter} onChange={e => setRewardFilter(e.target.value)} className="h-11 min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
             <option value="TOUS">Toutes récompenses</option><option value="ARGENT">Paiement FCFA</option><option value="POINTS">Points</option>
           </select>
-          <select aria-label="Trier les sondages" value={sort} onChange={e => setSort(e.target.value)} className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
+          <select aria-label="Trier les sondages" value={sort} onChange={e => setSort(e.target.value)} className="h-11 min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
             <option value="RECENTS">Plus récents</option><option value="EXPIRATION">Expiration proche</option><option value="PROGRESSION">Progression</option>
           </select>
-        </div>
+          </div>
+        )}
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-          <p className="inline-flex items-center gap-2 text-xs font-medium text-slate-500"><SlidersHorizontal size={14} /> {sondagesFiltres.length} résultat{sondagesFiltres.length !== 1 ? 's' : ''}</p>
+          <p className="text-xs font-medium text-slate-500">{sondagesFiltres.length} résultat{sondagesFiltres.length !== 1 ? 's' : ''}</p>
           {hasActiveFilters && <button type="button" onClick={resetFilters} className="text-xs font-semibold text-violet-700 hover:underline">Réinitialiser les filtres</button>}
         </div>
-      </div>
+      </section>
 
       {/* ── Liste ── */}
       {loading ? (
