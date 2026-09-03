@@ -727,12 +727,17 @@ public class OpportuniteService {
 
     private BigDecimal calculerPrixActuel(Opportunite opp) {
         List<PalierPrix> paliers = palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(opp.getId());
+        PalierPrix premier = paliers.isEmpty() ? null : paliers.get(0);
         return paliers.stream()
                 .filter(p -> opp.getParticipantsActuels() >= p.getSeuilMin()
                         && opp.getParticipantsActuels() <= p.getSeuilMax())
                 .map(PalierPrix::getPrix)
                 .findFirst()
                 .orElseGet(() -> {
+                    // Le premier palier s'applique dès l'ouverture, avant la première inscription.
+                    if (premier != null && opp.getParticipantsActuels() < premier.getSeuilMin()) {
+                        return premier.getPrix();
+                    }
                     // Au-delà du dernier palier défini (plafond illimité, ou paliers ne couvrant
                     // pas tout le seuil maximal) : le prix reste au dernier palier atteint, il ne
                     // remonte jamais au plein tarif une fois qu'un tarif dégressif a été franchi.

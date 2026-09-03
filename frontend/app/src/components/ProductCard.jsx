@@ -25,8 +25,7 @@ const ProductCard = ({ opportunity }) => {
   const discount = prixNormal && Number(prixNormal) > Number(prixActuel)
     ? Math.round((1 - Number(prixActuel) / Number(prixNormal)) * 100) : null
 
-  const { pct: progress, valide } = calculerProgression({ participantsActuels, seuilMinimum, seuilMaximal })
-  const isExpired = dateExpiration && new Date(dateExpiration) <= new Date()
+  const { pct: progress, valide } = calculerProgression({ participantsActuels, seuilMinimum, seuilMaximal, paliers: opportunity.paliers })
   const isOpen = opportunity.souscriptionOuverte ?? (opportunity.statut === 'ACTIVE' && !isExpired)
   const isActivated = opportunity.activationAtteinte ?? participantsActuels >= seuilMinimum
 

@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import {
   ShieldCheck, Users, Loader2, ChevronRight, CheckCircle2, AlertCircle, Layers, Sparkles, Timer, Minus, Plus, Copy, Share2, Link2, ShoppingCart, PackageCheck, ExternalLink
 } from 'lucide-react'
+import { FacebookIcon, InstagramIcon, WhatsAppIcon } from '../common/Footer/SocialIcons'
 import { getOpportunite, getOpportunites, getMesParticipationsOpportunites, souscrire, imgUrl } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useCountdown } from '../hooks/useCountdown'
@@ -156,6 +157,21 @@ export default function DetailOpportunite() {
     }
   }
 
+  const handleShareWhatsApp = () => {
+    const url = `${window.location.origin}/opportunity/${id}`
+    const text = `${opportunite?.titre || 'Campagne OpportuniHub'} - ${url}`
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank')
+  }
+
+  const handleShareFacebook = () => {
+    const url = `${window.location.origin}/opportunity/${id}`
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank')
+  }
+
+  const handleShareInstagram = () => {
+    window.open('https://www.instagram.com/', '_blank')
+  }
+
   const handleShare = async () => {
     const url = `${window.location.origin}/opportunity/${id}`
     if (navigator.share) {
@@ -184,10 +200,17 @@ export default function DetailOpportunite() {
     </div>
   )
 
-  const { pct: progress, valide: progressionValidee, phase: phaseProgression, placesRestantes: placesRestantesCalculees } = calculerProgression(opportunite)
-  const discount = opportunite.prixNormal && Number(opportunite.prixNormal) > Number(opportunite.prixActuel)
-    ? Math.round((1 - Number(opportunite.prixActuel) / Number(opportunite.prixNormal)) * 100) : null
   const paliersTries = [...(opportunite.paliers || [])].sort((a, b) => a.seuilMin - b.seuilMin)
+  const palierActif = paliersTries.find((palier, i) => {
+    const dernier = i === paliersTries.length - 1
+    return (opportunite.participantsActuels >= palier.seuilMin || (i === 0 && opportunite.participantsActuels < palier.seuilMin)) &&
+      (dernier || !palier.seuilMax || opportunite.participantsActuels <= palier.seuilMax)
+  })
+  const prixAffiche = palierActif ? palierActif.prix : opportunite.prixActuel
+
+  const { pct: progress, valide: progressionValidee, phase: phaseProgression, placesRestantes: placesRestantesCalculees, objectifFinal } = calculerProgression({ ...opportunite, paliers: paliersTries })
+  const discount = opportunite.prixNormal && Number(opportunite.prixNormal) > Number(prixAffiche)
+    ? Math.round((1 - Number(prixAffiche) / Number(opportunite.prixNormal)) * 100) : null
   const placesRestantes = phaseProgression === 'plafond' ? placesRestantesCalculees : Infinity
   const isComplet = phaseProgression === 'plafond' && placesRestantes <= 0
   const isExpired = opportunite.dateExpiration && new Date(opportunite.dateExpiration) <= new Date()
@@ -196,7 +219,7 @@ export default function DetailOpportunite() {
   const dejaSouscrit = Boolean(maParticipation)
   const maxAjout = Number.isFinite(placesRestantes) ? placesRestantes : 99
   const quantiteEffective = Math.min(quantite, Math.max(maxAjout || 1, 1))
-  const totalCommande = Number(opportunite.prixActuel) * quantiteEffective
+  const totalCommande = Number(prixAffiche) * quantiteEffective
 
   return (
     <div className="min-h-screen bg-bg-light pb-20">
@@ -331,9 +354,9 @@ export default function DetailOpportunite() {
             {/* Prix */}
             <div className="flex flex-wrap items-baseline gap-3">
               <span className="text-3xl md:text-4xl font-heading font-extrabold text-accent tracking-tighter tabular-nums">
-                {fmt(opportunite.prixActuel)} <span className="text-base font-bold">FCFA</span>
+                {fmt(prixAffiche)} <span className="text-base font-bold">FCFA</span>
               </span>
-              {opportunite.prixNormal && Number(opportunite.prixNormal) > Number(opportunite.prixActuel) && (
+              {opportunite.prixNormal && Number(opportunite.prixNormal) > Number(prixAffiche) && (
                 <span className="text-base text-gray-300 line-through">{fmt(opportunite.prixNormal)} FCFA</span>
               )}
               {discount > 0 && (
@@ -351,11 +374,9 @@ export default function DetailOpportunite() {
               <div className="flex justify-between items-center text-[11px] font-black uppercase tracking-widest">
                 <span className="text-gray-400 flex items-center gap-1.5">
                   <Users size={12} />
-                  {progressionValidee
-                    ? phaseProgression === 'plafond'
-                      ? `${opportunite.participantsActuels} / ${opportunite.seuilMaximal} places`
-                      : `${opportunite.participantsActuels} unités · offre validée`
-                    : `${opportunite.participantsActuels} / ${opportunite.seuilMinimum} unités réservées`}
+                  {phaseProgression === 'plafond'
+                    ? `${opportunite.participantsActuels} / ${opportunite.seuilMaximal} places`
+                    : `${opportunite.participantsActuels} / ${objectifFinal || opportunite.seuilMinimum} unités réservées`}
                 </span>
                 <span className={activationAtteinte ? 'text-success' : 'text-accent'}>{progress}%</span>
               </div>
@@ -391,7 +412,7 @@ export default function DetailOpportunite() {
                     .map((palier, i) => {
                       const dernier = i === paliersTries.length - 1
                       const atteint = opportunite.participantsActuels >= palier.seuilMin
-                      const actif = opportunite.participantsActuels >= palier.seuilMin &&
+                      const actif = (opportunite.participantsActuels >= palier.seuilMin || (i === 0 && opportunite.participantsActuels < palier.seuilMin)) &&
                         (dernier || !palier.seuilMax || opportunite.participantsActuels <= palier.seuilMax)
                       return (
                         <div key={i} className={`flex items-center justify-between px-4 py-3 transition-colors ${actif ? 'bg-success/5' : ''}`}>
@@ -488,20 +509,24 @@ export default function DetailOpportunite() {
             <div className="bg-white rounded-2xl border-2 border-gray-100 p-4 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <span className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-primary">
-                  <Link2 size={14} /> Lien de campagne
+                  <Share2 size={14} /> Partager avec vos proche
                 </span>
-                {copied && <span className="text-[10px] font-black text-success uppercase tracking-widest">Copié</span>}
+                {copied && <span className="text-[10px] font-black text-success uppercase tracking-widest">Lien copié</span>}
               </div>
-              <div className="flex gap-2">
-                <input
-                  readOnly
-                  value={`${window.location.origin}/opportunity/${id}`}
-                  className="min-w-0 flex-1 rounded-xl bg-bg-light border-2 border-gray-100 px-3 py-2 text-xs font-bold text-gray-400"
-                />
-                <button type="button" onClick={handleCopyLink} className="w-10 h-10 rounded-xl border-2 border-gray-100 flex items-center justify-center text-primary hover:border-primary/30 transition-colors" title="Copier le lien">
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={handleShareWhatsApp} aria-label="Partager sur WhatsApp" title="Partager sur WhatsApp" className="w-10 h-10 rounded-xl bg-[#25D366]/10 text-[#25D366] flex items-center justify-center hover:bg-[#25D366]/20 transition-colors">
+                  <WhatsAppIcon />
+                </button>
+                <button type="button" onClick={handleShareFacebook} aria-label="Partager sur Facebook" title="Partager sur Facebook" className="w-10 h-10 rounded-xl bg-[#1877F2]/10 text-[#1877F2] flex items-center justify-center hover:bg-[#1877F2]/20 transition-colors">
+                  <FacebookIcon />
+                </button>
+                <button type="button" onClick={handleShareInstagram} aria-label="Partager sur Instagram" title="Partager sur Instagram" className="w-10 h-10 rounded-xl bg-[#E4405F]/10 text-[#E4405F] flex items-center justify-center hover:bg-[#E4405F]/20 transition-colors">
+                  <InstagramIcon />
+                </button>
+                <button type="button" onClick={handleCopyLink} aria-label="Copier le lien" title="Copier le lien" className="w-10 h-10 rounded-xl border-2 border-gray-100 flex items-center justify-center text-primary hover:border-primary/30 transition-colors ml-auto">
                   <Copy size={16} />
                 </button>
-                <button type="button" onClick={handleShare} className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center hover:brightness-105 transition-colors" title="Partager">
+                <button type="button" onClick={handleShare} aria-label="Plus d'options de partage" title="Plus d'options de partage" className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center hover:brightness-105 transition-colors">
                   <Share2 size={16} />
                 </button>
               </div>
