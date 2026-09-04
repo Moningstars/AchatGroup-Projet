@@ -22,7 +22,7 @@ function CountdownBadge({ dateExpiration }) {
 
 const ProductCard = ({ opportunity }) => {
   if (!opportunity) return null
-  const { id, titre, prixActuel, prixNormal, participantsActuels, seuilMinimum, seuilMaximal, images, dateExpiration } = opportunity
+  const { id, titre, prixActuel, prixNormal, participantsActuels, seuilMinimum, seuilMaximal, paliers, images, dateExpiration } = opportunity
 
   const discount = prixNormal && Number(prixNormal) > Number(prixActuel)
     ? Math.round((1 - Number(prixActuel) / Number(prixNormal)) * 100) : null
@@ -31,7 +31,7 @@ const ProductCard = ({ opportunity }) => {
     participantsActuels,
     seuilMinimum,
     seuilMaximal,
-    paliers: opportunity.paliers,
+    paliers,
   })
   const isExpired = dateExpiration && new Date(dateExpiration) <= new Date()
   const isOpen = opportunity.souscriptionOuverte ?? (opportunity.statut === 'ACTIVE' && !isExpired)

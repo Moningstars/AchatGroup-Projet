@@ -1,8 +1,10 @@
 // Calcule la progression d'une opportunité à afficher (barre + pourcentage).
 //
-// La barre utilise un objectif stable pendant toute la campagne afin d'éviter
-// un retour visuel de 100 % à une valeur plus faible au passage du seuil minimum.
-// L'objectif est, dans l'ordre : le plafond, le dernier palier, puis le seuil minimum.
+// Deux phases :
+//  - avant seuilMinimum : progression vers le seuil de validation (0-100%)
+//  - après seuilMinimum :
+//      - plafonnée : progression vers le plafond
+//      - illimitée : progression continue dans les paliers de prix
 export function calculerProgression({ participantsActuels = 0, seuilMinimum, seuilMaximal, paliers = [] }) {
   const participants = Math.max(0, Number(participantsActuels) || 0)
   const minimum = Math.max(0, Number(seuilMinimum) || 0)
@@ -27,6 +29,28 @@ export function calculerProgression({ participantsActuels = 0, seuilMinimum, seu
       phase: 'plafond',
       valide,
       placesRestantes: Math.max(0, maximum - participants),
+      objectifFinal,
+    }
+  }
+
+  if (valide && paliersTries.length > 0) {
+    const n = paliersTries.length
+    let index = paliersTries.findIndex(p =>
+      participants >= Number(p.seuilMin || 0) && participants <= Number(p.seuilMax || 0)
+    )
+    if (index === -1) {
+      index = participants > Number(paliersTries[n - 1].seuilMax || 0) ? n - 1 : 0
+    }
+    const palier = paliersTries[index]
+    const seuilMin = Number(palier.seuilMin) || 0
+    const seuilMax = Number(palier.seuilMax) || seuilMin
+    const local = seuilMax > seuilMin
+      ? Math.min(1, Math.max(0, (participants - seuilMin) / (seuilMax - seuilMin)))
+      : 1
+    return {
+      pct: Math.min(100, Math.round(((index + local) / n) * 100)),
+      phase: 'illimitee',
+      valide,
       objectifFinal,
     }
   }

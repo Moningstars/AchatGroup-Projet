@@ -2,6 +2,7 @@ package com.plateformeopportunites.opportunite.service;
 
 import com.plateformeopportunites.common.enums.StatutOpportunite;
 import com.plateformeopportunites.common.enums.StatutParticipation;
+import com.plateformeopportunites.common.enums.ModePlafond;
 import com.plateformeopportunites.common.event.QuotaAtteintEvent;
 import com.plateformeopportunites.common.event.RemboursementEvent;
 import com.plateformeopportunites.common.redis.RedisService;
@@ -13,7 +14,9 @@ import com.plateformeopportunites.identity.repository.UtilisateurRepository;
 import com.plateformeopportunites.opportunite.entity.Opportunite;
 import com.plateformeopportunites.opportunite.entity.PalierPrix;
 import com.plateformeopportunites.opportunite.entity.Participation;
+import com.plateformeopportunites.opportunite.dto.CreerOpportuniteRequest;
 import com.plateformeopportunites.opportunite.repository.OpportuniteRepository;
+import com.plateformeopportunites.opportunite.repository.OpportuniteImageRepository;
 import com.plateformeopportunites.opportunite.repository.PalierPrixRepository;
 import com.plateformeopportunites.opportunite.repository.ParticipationRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +41,7 @@ import static org.mockito.Mockito.*;
 class OpportuniteServiceTest {
 
     @Mock private OpportuniteRepository opportuniteRepository;
+    @Mock private OpportuniteImageRepository imageRepository;
     @Mock private PalierPrixRepository palierPrixRepository;
     @Mock private ParticipationRepository participationRepository;
     @Mock private UtilisateurRepository utilisateurRepository;
@@ -127,7 +131,7 @@ class OpportuniteServiceTest {
     }
 
     @Test
-    void souscrire_sansParticipant_appliqueLePrixDuPremierPalier() {
+    void souscrire_avantLePremierPalier_appliqueSonPrixPasLePrixNormal() {
         Opportunite opp = opportuniteActive(0, 10);
         PalierPrix premierPalier = PalierPrix.builder()
                 .opportunite(opp)
@@ -176,6 +180,39 @@ class OpportuniteServiceTest {
         opportuniteService.souscrire(PID, OPP_ID, 1);
 
         verify(eventPublisher, never()).publishEvent(any(QuotaAtteintEvent.class));
+    }
+
+    @Test
+    void creer_modePlafonne_sansSeuilMaximal_leveException() {
+        CreerOpportuniteRequest request = requestCreation(ModePlafond.PLAFONNE, null);
+        when(administrateurRepository.findById(any())).thenReturn(Optional.of(
+                com.plateformeopportunites.identity.entity.Administrateur.builder().id(UUID.randomUUID()).build()));
+
+        assertThrows(IllegalArgumentException.class, () -> opportuniteService.creer(UUID.randomUUID(), request));
+    }
+
+    @Test
+    void creer_modePlafonne_seuilMinimumHorsPalier_leveException() {
+        CreerOpportuniteRequest request = requestCreation(ModePlafond.PLAFONNE, 100);
+        request.setSeuilMinimum(10);
+        when(administrateurRepository.findById(any())).thenReturn(Optional.of(
+                com.plateformeopportunites.identity.entity.Administrateur.builder().id(UUID.randomUUID()).build()));
+
+        assertThrows(IllegalArgumentException.class, () -> opportuniteService.creer(UUID.randomUUID(), request));
+    }
+
+    @Test
+    void creer_modeIllimite_ignoreSeuilMaximal() {
+        CreerOpportuniteRequest request = requestCreation(ModePlafond.ILLIMITE, 100);
+        when(administrateurRepository.findById(any())).thenReturn(Optional.of(
+                com.plateformeopportunites.identity.entity.Administrateur.builder().id(UUID.randomUUID()).build()));
+        when(opportuniteRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OpportuniteService service = opportuniteService;
+        assertDoesNotThrow(() -> service.creer(UUID.randomUUID(), request));
+        verify(opportuniteRepository).save(argThat(opportunite ->
+                opportunite.getModePlafond() == ModePlafond.ILLIMITE
+                        && opportunite.getSeuilMaximal() == null));
     }
 
     // ── cloturerAvecSucces ───────────────────────────────────────────────────
@@ -248,5 +285,21 @@ class OpportuniteServiceTest {
 
         assertEquals(StatutOpportunite.ANNULEE, opp.getStatut());
         verify(eventPublisher).publishEvent(any(RemboursementEvent.class));
+    }
+
+    private CreerOpportuniteRequest requestCreation(ModePlafond modePlafond, Integer seuilMaximal) {
+        CreerOpportuniteRequest request = new CreerOpportuniteRequest();
+        request.setTitre("Opportunité test");
+        request.setPrixNormal(new BigDecimal("5000"));
+        request.setSeuilMinimum(10);
+        request.setModePlafond(modePlafond);
+        request.setSeuilMaximal(seuilMaximal);
+        request.setDateExpiration(LocalDateTime.now().plusDays(1));
+        CreerOpportuniteRequest.PalierPrixRequest palier = new CreerOpportuniteRequest.PalierPrixRequest();
+        palier.setSeuilMin(1);
+        palier.setSeuilMax(20);
+        palier.setPrix(new BigDecimal("4500"));
+        request.setPaliers(List.of(palier));
+        return request;
     }
 }

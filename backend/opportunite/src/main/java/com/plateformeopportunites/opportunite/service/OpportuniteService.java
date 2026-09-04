@@ -1,5 +1,6 @@
 package com.plateformeopportunites.opportunite.service;
 
+import com.plateformeopportunites.common.enums.ModePlafond;
 import com.plateformeopportunites.common.enums.StatutOpportunite;
 import org.springframework.security.access.prepost.PreAuthorize;
 import com.plateformeopportunites.common.enums.StatutLivraison;
@@ -89,6 +90,8 @@ public class OpportuniteService {
             if (partenaireReseauxUrl == null) partenaireReseauxUrl = nettoyer(fournisseur.getReseauxUrl());
         }
 
+        ModePlafond modePlafond = modePlafond(req.getModePlafond(), req.getSeuilMaximal());
+        Integer seuilMaximal = modePlafond == ModePlafond.PLAFONNE ? req.getSeuilMaximal() : null;
         Opportunite opportunite = Opportunite.builder()
                 .admin(admin)
                 .categorie(categorie)
@@ -99,7 +102,8 @@ public class OpportuniteService {
                 .specsFinePrint(req.getSpecsFinePrint())
                 .prixNormal(req.getPrixNormal())
                 .seuilMinimum(req.getSeuilMinimum())
-                .seuilMaximal(req.getSeuilMaximal())
+                .seuilMaximal(seuilMaximal)
+                .modePlafond(modePlafond)
                 .fournisseurId(req.getFournisseurId())
                 .partenaireNom(partenaireNom)
                 .partenaireLogoUrl(partenaireLogoUrl)
@@ -119,7 +123,9 @@ public class OpportuniteService {
         validerPaliers(req.getPaliers());
         int maxPalier = req.getPaliers().stream()
                 .mapToInt(CreerOpportuniteRequest.PalierPrixRequest::getSeuilMax).max().orElse(0);
-        validerSeuilMaximal(req.getSeuilMaximal(), req.getSeuilMinimum(), maxPalier);
+        validerSeuilMaximal(modePlafond, seuilMaximal, req.getSeuilMinimum(), maxPalier);
+        validerSeuilMinimumPlafonne(modePlafond, req.getSeuilMinimum(), req.getPaliers().stream()
+            .map(CreerOpportuniteRequest.PalierPrixRequest::getSeuilMax).toList());
 
         for (CreerOpportuniteRequest.PalierPrixRequest p : req.getPaliers()) {
             palierPrixRepository.save(PalierPrix.builder()
@@ -371,7 +377,13 @@ public class OpportuniteService {
         if (req.getSpecsFinePrint() != null) opp.setSpecsFinePrint(req.getSpecsFinePrint());
         if (req.getPrixNormal() != null) opp.setPrixNormal(req.getPrixNormal());
         if (req.getSeuilMinimum() != null) opp.setSeuilMinimum(req.getSeuilMinimum());
-        if (req.getSeuilMaximal() != null) opp.setSeuilMaximal(req.getSeuilMaximal());
+        if (req.getModePlafond() != null) {
+            opp.setModePlafond(req.getModePlafond());
+            opp.setSeuilMaximal(req.getModePlafond() == ModePlafond.PLAFONNE ? req.getSeuilMaximal() : null);
+        } else if (req.getSeuilMaximal() != null) {
+            opp.setModePlafond(ModePlafond.PLAFONNE);
+            opp.setSeuilMaximal(req.getSeuilMaximal());
+        }
         if (req.getDateExpiration() != null) opp.setDateExpiration(req.getDateExpiration());
         if (req.getCategorie() != null && !req.getCategorie().isBlank()) {
             Categorie categorie = categorieRepository.findByNom(req.getCategorie())
@@ -408,7 +420,11 @@ public class OpportuniteService {
                 ? req.getPaliers().stream().mapToInt(CreerOpportuniteRequest.PalierPrixRequest::getSeuilMax).max().orElse(0)
                 : palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(opportuniteId)
                         .stream().mapToInt(PalierPrix::getSeuilMax).max().orElse(0);
-        validerSeuilMaximal(opp.getSeuilMaximal(), opp.getSeuilMinimum(), maxPalier);
+        validerSeuilMaximal(modePlafond(opp.getModePlafond(), opp.getSeuilMaximal()), opp.getSeuilMaximal(), opp.getSeuilMinimum(), maxPalier);
+        if (paliersFournis) {
+            validerSeuilMinimumPlafonne(modePlafond(opp.getModePlafond(), opp.getSeuilMaximal()), opp.getSeuilMinimum(),
+                req.getPaliers().stream().map(CreerOpportuniteRequest.PalierPrixRequest::getSeuilMax).toList());
+        }
 
         opportuniteRepository.save(opp);
 
@@ -781,14 +797,28 @@ public class OpportuniteService {
         }
     }
 
-    private void validerSeuilMaximal(Integer seuilMaximal, Integer seuilMinimum, int maxPalier) {
-        if (seuilMaximal == null) return;
+    private ModePlafond modePlafond(ModePlafond mode, Integer seuilMaximal) {
+        return mode != null ? mode : seuilMaximal == null ? ModePlafond.ILLIMITE : ModePlafond.PLAFONNE;
+    }
+
+    private void validerSeuilMaximal(ModePlafond modePlafond, Integer seuilMaximal, Integer seuilMinimum, int maxPalier) {
+        if (modePlafond == ModePlafond.ILLIMITE) return;
+        if (seuilMaximal == null) {
+            throw new IllegalArgumentException("Un seuil maximal est obligatoire pour une opportunité plafonnée");
+        }
         if (seuilMaximal < maxPalier) {
             throw new IllegalArgumentException(
                 "Le seuil maximal (" + seuilMaximal + ") ne peut pas être inférieur au plafond du dernier palier (" + maxPalier + ")");
         }
         if (seuilMinimum != null && seuilMaximal < seuilMinimum) {
             throw new IllegalArgumentException("Le seuil maximal ne peut pas être inférieur au seuil minimum");
+        }
+    }
+
+    private void validerSeuilMinimumPlafonne(ModePlafond modePlafond, Integer seuilMinimum, List<Integer> seuilsMax) {
+        if (modePlafond != ModePlafond.PLAFONNE || seuilMinimum == null) return;
+        if (!seuilsMax.contains(seuilMinimum)) {
+            throw new IllegalArgumentException("Le seuil minimum doit correspondre au seuil maximal d'un palier");
         }
     }
 
@@ -823,9 +853,9 @@ public class OpportuniteService {
                 .map(PalierPrix::getPrix)
                 .findFirst()
                 .orElseGet(() -> {
-                    // Le tarif du premier palier s'applique dès l'ouverture. Sans ce cas,
-                    // le premier participant serait facturé au prix normal alors que le
-                    // catalogue annonce déjà le tarif de départ de la campagne.
+                    // Avant le seuil du premier palier (y compris à 0 participant) : le prix
+                    // dégressif du premier palier s'applique déjà, prixNormal ne sert plus
+                    // que de référence barrée pour afficher la réduction.
                     if (premier != null && opp.getParticipantsActuels() < premier.getSeuilMin()) {
                         return premier.getPrix();
                     }
@@ -1015,6 +1045,7 @@ public class OpportuniteService {
                 .prixActuel(calculerPrixActuel(opp))
                 .seuilMinimum(opp.getSeuilMinimum())
                 .seuilMaximal(opp.getSeuilMaximal())
+                .modePlafond(modePlafond(opp.getModePlafond(), opp.getSeuilMaximal()))
                 .participantsActuels(compteurRedis)
                 .placesRestantes(opp.getSeuilMaximal() == null ? null : Math.max(opp.getSeuilMaximal() - compteurRedis, 0))
                 .souscriptionOuverte(souscriptionOuverte)

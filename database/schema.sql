@@ -152,6 +152,8 @@ CREATE TABLE public.opportunites (
     participants_actuels integer NOT NULL,
     prix_normal numeric(38,2) NOT NULL,
     seuil_minimum integer NOT NULL,
+    seuil_maximal integer,
+    mode_plafond character varying(255),
     created_at timestamp(6) without time zone NOT NULL,
     date_expiration timestamp(6) without time zone NOT NULL,
     admin_id uuid NOT NULL,
@@ -489,6 +491,7 @@ CREATE TABLE public.utilisateurs (
     profil_complete boolean NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     id uuid NOT NULL,
+    admin_id uuid,
     mot_de_passe character varying(255),
     niveau_verification character varying(255) NOT NULL,
     nom character varying(255),
@@ -1033,6 +1036,14 @@ ALTER TABLE ONLY public.tentatives_souscription
 
 ALTER TABLE ONLY public.tentatives_souscription
     ADD CONSTRAINT tentatives_souscription_utilisateur_fk FOREIGN KEY (utilisateur_id) REFERENCES public.utilisateurs(id);
+
+
+--
+-- Name: utilisateurs fk_utilisateurs_admin_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.utilisateurs
+    ADD CONSTRAINT fk_utilisateurs_admin_id FOREIGN KEY (admin_id) REFERENCES public.administrateurs(id);
 
 
 --

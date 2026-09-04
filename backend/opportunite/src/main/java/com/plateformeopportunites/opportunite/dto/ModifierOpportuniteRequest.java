@@ -1,5 +1,6 @@
 package com.plateformeopportunites.opportunite.dto;
 
+import com.plateformeopportunites.common.enums.ModePlafond;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.Min;
@@ -33,6 +34,8 @@ public class ModifierOpportuniteRequest {
     /** Plafond de participants/quantité (optionnel). null = ne pas modifier. */
     @Min(1)
     private Integer seuilMaximal;
+
+    private ModePlafond modePlafond;
 
     @Future
     private LocalDateTime dateExpiration;

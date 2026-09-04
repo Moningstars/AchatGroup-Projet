@@ -8,7 +8,7 @@ import { firebaseAuth, firebaseConfigured } from '../services/firebase'
 import { AsYouType, isValidPhoneNumber } from 'libphonenumber-js'
 
 const DEV_OTP_CODE = '123456'
-const USE_LOCAL_AUTH = import.meta.env.DEV && !firebaseConfigured
+const USE_LOCAL_AUTH = import.meta.env.VITE_DEV_AUTH_ENABLED === 'true'
 
 const ERREURS_FIREBASE = {
   'auth/invalid-phone-number': 'Numéro de téléphone invalide',
