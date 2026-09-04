@@ -150,6 +150,9 @@ export const alimenterWallet = (montant, description) =>
 export const modifierTauxConversion = (tauxConversionPoints) =>
   api.patch('/admin/wallet/taux-conversion', { tauxConversionPoints }).then(r => r.data)
 
+export const modifierRecompenseParrainage = (recompenseParrainagePoints) =>
+  api.patch('/admin/wallet/parrainage', { recompenseParrainagePoints }).then(r => r.data)
+
 // Transactions (admin — toutes)
 export const getAdminTransactions = () =>
   api.get('/admin/transactions').then(r => r.data)

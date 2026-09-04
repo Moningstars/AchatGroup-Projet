@@ -52,7 +52,7 @@ public class WalletController {
         return ResponseEntity.ok(walletService.getTransactions(UUID.fromString(auth.getName())));
     }
 
-    @Operation(summary = "Convertir des points en FCFA")
+    @Operation(summary = "Conversion désactivée : les points sont réservés aux achats")
     @PostMapping("/convertir-points")
     public ResponseEntity<PortefeuilleResponse> convertirPoints(Authentication auth,
                                                                   @Valid @RequestBody ConvertirPointsRequest req) {

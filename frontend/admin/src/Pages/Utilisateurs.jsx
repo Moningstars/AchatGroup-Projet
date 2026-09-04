@@ -104,7 +104,7 @@ function UserDetailModal({ userId, baseUser, onClose, onDeleted }) {
   const hasKyc = detail && (detail.prenom || detail.numeroPiece || detail.email)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="admin-modal-layer fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
 
         {/* Header */}

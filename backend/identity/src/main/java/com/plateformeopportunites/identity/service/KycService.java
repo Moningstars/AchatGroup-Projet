@@ -98,22 +98,31 @@ public class KycService {
             throw new IllegalArgumentException("Les coordonnées (email, adresse, ville, pays) sont obligatoires");
         }
 
+        String numeroPiece = req.getNumeroPiece().trim().toUpperCase();
+        String email = req.getEmail().trim().toLowerCase();
+        if (infoPersonnelleRepository.existsByNumeroPieceIgnoreCaseAndUtilisateurIdNot(numeroPiece, utilisateurId)) {
+            throw new IllegalArgumentException("Ce numéro de pièce d'identité est déjà utilisé par un autre compte");
+        }
+        if (infoPersonnelleRepository.existsByEmailIgnoreCaseAndUtilisateurIdNot(email, utilisateurId)) {
+            throw new IllegalArgumentException("Cette adresse email est déjà utilisée par un autre compte");
+        }
+
         InfoPersonnelle info = infoPersonnelleRepository.findByUtilisateurId(utilisateurId)
                 .orElseGet(() -> InfoPersonnelle.builder().utilisateur(u).build());
 
-        info.setNom(req.getNom());
-        info.setPrenom(req.getPrenom());
+        info.setNom(req.getNom().trim());
+        info.setPrenom(req.getPrenom().trim());
         info.setDateNaissance(req.getDateNaissance());
-        info.setLieuNaissance(req.getLieuNaissance());
-        info.setNationalite(req.getNationalite());
+        info.setLieuNaissance(req.getLieuNaissance().trim());
+        info.setNationalite(req.getNationalite().trim());
         info.setTypePiece(req.getTypePiece());
-        info.setNumeroPiece(req.getNumeroPiece());
+        info.setNumeroPiece(numeroPiece);
         info.setDateExpirationPiece(req.getDateExpirationPiece());
-        info.setEmail(req.getEmail());
-        info.setAdresse(req.getAdresse());
-        info.setVille(req.getVille());
-        info.setPays(req.getPays());
-        info.setProfession(req.getProfession());
+        info.setEmail(email);
+        info.setAdresse(req.getAdresse().trim());
+        info.setVille(req.getVille().trim());
+        info.setPays(req.getPays().trim());
+        info.setProfession(req.getProfession() == null ? null : req.getProfession().trim());
         info.setSourceRevenus(req.getSourceRevenus());
         infoPersonnelleRepository.save(info);
 

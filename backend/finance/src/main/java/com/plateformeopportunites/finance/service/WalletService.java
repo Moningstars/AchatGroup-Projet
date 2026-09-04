@@ -32,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -39,6 +40,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class WalletService {
+
+    public record GelPointsResult(BigDecimal pointsUtilises, BigDecimal valeurPointsUtilises) {}
 
     private final PortefeuilleRepository portefeuilleRepository;
     private final TransactionRepository transactionRepository;
@@ -207,6 +210,44 @@ public class WalletService {
         notifierDebit(participantId, montant, portefeuille, "SOUSCRIPTION");
     }
 
+    /**
+     * Gèle le prix d'un achat en utilisant d'abord les points, puis le solde disponible.
+     * Les points restent un avoir d'achat interne et ne créditent jamais le solde retirable.
+     */
+    @Transactional
+    public GelPointsResult gelerFondsAvecPoints(UUID participantId, BigDecimal montant, boolean utiliserPoints) {
+        if (!utiliserPoints) {
+            gelerFonds(participantId, montant, null);
+            return new GelPointsResult(BigDecimal.ZERO, BigDecimal.ZERO);
+        }
+        if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Le montant à geler doit être strictement positif");
+        }
+
+        Portefeuille portefeuille = getPortefeuille(participantId);
+        BigDecimal valeurPoint = getWalletPlateforme().getTauxConversionPoints();
+        if (valeurPoint == null || valeurPoint.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("La valeur d'achat des points n'est pas configurée");
+        }
+
+        BigDecimal pointsNecessaires = montant.divide(valeurPoint, 2, RoundingMode.UP);
+        BigDecimal pointsUtilises = portefeuille.getSoldePoints().min(pointsNecessaires);
+        BigDecimal valeurPoints = pointsUtilises.multiply(valeurPoint).min(montant);
+        BigDecimal montantCash = montant.subtract(valeurPoints);
+        if (portefeuille.getSoldeDisponible().compareTo(montantCash) < 0) {
+            throw new IllegalArgumentException("Solde insuffisant, même après utilisation de vos points");
+        }
+
+        portefeuille.setSoldePoints(portefeuille.getSoldePoints().subtract(pointsUtilises));
+        portefeuille.setSoldeDisponible(portefeuille.getSoldeDisponible().subtract(montantCash));
+        portefeuille.setSoldeGele(portefeuille.getSoldeGele().add(montant));
+        portefeuilleRepository.save(portefeuille);
+        if (montantCash.compareTo(BigDecimal.ZERO) > 0) {
+            notifierDebit(participantId, montantCash, portefeuille, "SOUSCRIPTION");
+        }
+        return new GelPointsResult(pointsUtilises, valeurPoints);
+    }
+
     @Transactional
     public void debiterFinal(UUID participantId, BigDecimal montant) {
         if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) {
@@ -233,6 +274,28 @@ public class WalletService {
         portefeuille.setSoldeDisponible(portefeuille.getSoldeDisponible().add(montant));
         portefeuilleRepository.save(portefeuille);
         notifierCredit(participantId, montant, portefeuille, "REMBOURSEMENT");
+    }
+
+    /** Restaure séparément la part monétaire et la part points d'un achat annulé. */
+    @Transactional
+    public void rembourserAvecPoints(UUID participantId, BigDecimal montantTotal,
+                                     BigDecimal pointsARestaurer, BigDecimal valeurPointsARestaurer) {
+        BigDecimal points = pointsARestaurer == null ? BigDecimal.ZERO : pointsARestaurer.max(BigDecimal.ZERO);
+        BigDecimal valeurPoints = valeurPointsARestaurer == null ? BigDecimal.ZERO : valeurPointsARestaurer.max(BigDecimal.ZERO);
+        if (valeurPoints.compareTo(montantTotal) > 0) valeurPoints = montantTotal;
+        BigDecimal montantCash = montantTotal.subtract(valeurPoints);
+
+        Portefeuille portefeuille = getPortefeuille(participantId);
+        if (portefeuille.getSoldeGele().compareTo(montantTotal) < 0) {
+            throw new IllegalStateException("Solde gelé insuffisant pour rembourser");
+        }
+        portefeuille.setSoldeGele(portefeuille.getSoldeGele().subtract(montantTotal));
+        portefeuille.setSoldeDisponible(portefeuille.getSoldeDisponible().add(montantCash));
+        portefeuille.setSoldePoints(portefeuille.getSoldePoints().add(points));
+        portefeuilleRepository.save(portefeuille);
+        if (montantCash.compareTo(BigDecimal.ZERO) > 0) {
+            notifierCredit(participantId, montantCash, portefeuille, "REMBOURSEMENT");
+        }
     }
 
     /**
@@ -264,6 +327,11 @@ public class WalletService {
      */
     @Transactional
     public void crediterPoints(UUID participantId, BigDecimal points) {
+        crediterPoints(participantId, points, "RECOMPENSE_POINTS");
+    }
+
+    @Transactional
+    public void crediterPoints(UUID participantId, BigDecimal points, String reference) {
         Portefeuille portefeuille = getPortefeuille(participantId);
         portefeuille.setSoldePoints(portefeuille.getSoldePoints().add(points));
         portefeuilleRepository.save(portefeuille);
@@ -273,6 +341,7 @@ public class WalletService {
                 .utilisateurId(participantId)
                 .type(TypeTransaction.RECOMPENSE)
                 .montant(points)
+                .reference(reference)
                 .statut(StatutTransaction.SUCCESS)
                 .build();
         transactionRepository.save(tx);
@@ -359,48 +428,10 @@ public class WalletService {
                 .build());
     }
 
-    /**
-     * Convertit des points en FCFA pour un participant.
-     * Le taux de conversion est défini au niveau du wallet plateforme.
-     */
+    /** Les points sont des avoirs d'achat et ne peuvent pas être transformés en argent retirable. */
     @Transactional
     public PortefeuilleResponse convertirPoints(UUID participantId, BigDecimal montantPoints) {
-        WalletPlateforme wp = getWalletPlateforme();
-
-        BigDecimal taux = wp.getTauxConversionPoints();
-        if (taux == null || taux.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalStateException("Taux de conversion points non configuré");
-        }
-
-        // taux = FCFA par point (ex: 10 → 1 pt = 10 FCFA)
-        BigDecimal montantFCFA = montantPoints.multiply(taux).setScale(0, java.math.RoundingMode.DOWN);
-
-        if (wp.getSoldePlateforme().compareTo(montantFCFA) < 0) {
-            throw new IllegalStateException("Fonds insuffisants dans la plateforme pour cette conversion");
-        }
-
-        Portefeuille portefeuille = getPortefeuille(participantId);
-        if (portefeuille.getSoldePoints().compareTo(montantPoints) < 0) {
-            throw new IllegalArgumentException("Solde points insuffisant");
-        }
-
-        portefeuille.setSoldePoints(portefeuille.getSoldePoints().subtract(montantPoints));
-        portefeuille.setSoldeDisponible(portefeuille.getSoldeDisponible().add(montantFCFA));
-        portefeuilleRepository.save(portefeuille);
-        notifierCredit(participantId, montantFCFA, portefeuille, "CONVERSION_POINTS");
-
-        wp.setSoldePlateforme(wp.getSoldePlateforme().subtract(montantFCFA));
-        walletPlateformeRepository.save(wp);
-
-        transactionRepository.save(Transaction.builder()
-                .walletId(portefeuille.getId())
-                .utilisateurId(participantId)
-                .type(TypeTransaction.CONVERSION_POINTS)
-                .montant(montantFCFA)
-                .statut(StatutTransaction.SUCCESS)
-                .build());
-
-        return toResponse(portefeuille);
+        throw new IllegalStateException("Les points servent uniquement à payer des achats sur OpportuniHub et ne sont pas convertibles en argent");
     }
 
     @PreAuthorize("hasAuthority('SUPER_ADMIN')")
@@ -464,6 +495,23 @@ public class WalletService {
         return toWalletPlateformeResponse(wp);
     }
 
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @Transactional
+    public WalletPlateformeResponse modifierRecompenseParrainage(BigDecimal points) {
+        if (points == null || points.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("La récompense de parrainage doit être supérieure à zéro");
+        }
+        WalletPlateforme wp = getWalletPlateforme();
+        wp.setRecompenseParrainagePoints(points);
+        walletPlateformeRepository.save(wp);
+        return toWalletPlateformeResponse(wp);
+    }
+
+    public BigDecimal getRecompenseParrainagePoints() {
+        BigDecimal points = getWalletPlateforme().getRecompenseParrainagePoints();
+        return points == null || points.compareTo(BigDecimal.ZERO) <= 0 ? BigDecimal.valueOf(100) : points;
+    }
+
     public WalletPlateforme getWalletPlateforme() {
         return walletPlateformeRepository.findAll()
                 .stream().findFirst()
@@ -477,6 +525,7 @@ public class WalletService {
                 .soldeReserve(wp.getSoldeReserve())
                 .soldePoints(wp.getSoldePoints())
                 .tauxConversionPoints(wp.getTauxConversionPoints())
+                .recompenseParrainagePoints(wp.getRecompenseParrainagePoints())
                 .devise(wp.getDevise())
                 .updatedAt(wp.getUpdatedAt())
                 .build();
@@ -497,11 +546,18 @@ public class WalletService {
     }
 
     private PortefeuilleResponse toResponse(Portefeuille p) {
+        WalletPlateforme configuration = walletPlateformeRepository.findAll().stream().findFirst().orElse(null);
+        BigDecimal valeurPoint = configuration != null && configuration.getTauxConversionPoints() != null
+                ? configuration.getTauxConversionPoints() : BigDecimal.ONE;
+        BigDecimal recompenseParrainage = configuration != null && configuration.getRecompenseParrainagePoints() != null
+                ? configuration.getRecompenseParrainagePoints() : BigDecimal.valueOf(100);
         return PortefeuilleResponse.builder()
                 .id(p.getId())
                 .soldeDisponible(p.getSoldeDisponible())
                 .soldeGele(p.getSoldeGele())
                 .soldePoints(p.getSoldePoints())
+                .valeurPointFcfa(valeurPoint)
+                .recompenseParrainagePoints(recompenseParrainage)
                 .devise(p.getDevise())
                 .build();
     }

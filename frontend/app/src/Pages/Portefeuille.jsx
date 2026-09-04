@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, Eye, EyeOff, ArrowDownLeft, ArrowUpRight, TrendingUp, ShoppingBag, Wallet, Lock } from 'lucide-react'
+import { Loader2, Eye, EyeOff, ArrowDownLeft, ArrowUpRight, TrendingUp, ShoppingBag, Wallet, Lock, Coins, Gift } from 'lucide-react'
 import RechargeModal from './RechargeModal'
 import RetraitModal from './RetraitModal'
-import ConversionModal from './ConversionModal'
-import { getSolde, recharger, demanderRetrait, getTransactions, getKycStatus, convertirPoints } from '../services/api'
+import { getSolde, demanderRetrait, getTransactions, getKycStatus } from '../services/api'
 import { usePusher } from '../context/PusherContext'
 
 function fmt(val) { return Number(val || 0).toLocaleString('fr-FR') }
@@ -23,6 +22,7 @@ const TX_ICON    = {
 
 function isEntree(type) { return ['DEPOT', 'RECOMPENSE', 'CONVERSION_POINTS'].includes(type) }
 function isCredit(type) { return ['DEPOT', 'RECOMPENSE', 'REMBOURSEMENT', 'CONVERSION_POINTS'].includes(type) }
+function isPointReward(transaction) { return transaction.type === 'RECOMPENSE' && transaction.reference?.startsWith('PARRAINAGE_') }
 
 const TX_FILTERS = [
   { key: '',                  label: 'Tout' },
@@ -31,7 +31,7 @@ const TX_FILTERS = [
   { key: 'RETRAIT',           label: 'Retraits' },
   { key: 'REMBOURSEMENT',     label: 'Remb.' },
   { key: 'RECOMPENSE',        label: 'Récomp.' },
-  { key: 'CONVERSION_POINTS', label: 'Points' },
+  { key: 'POINTS',            label: 'Points' },
 ]
 
 export default function Portefeuille() {
@@ -43,13 +43,24 @@ export default function Portefeuille() {
   const [loading, setLoading]             = useState(true)
   const [isRechargeOpen, setRechargeOpen] = useState(false)
   const [isWithdrawOpen, setWithdrawOpen] = useState(false)
-  const [isConvertOpen, setConvertOpen]   = useState(false)
   const [actionError, setActionError]     = useState('')
   const [retraitLoading, setRetraitLoading] = useState(false)
   const [kycNiveau, setKycNiveau]         = useState(null)
   const [showKycGate, setShowKycGate]     = useState(false)
   const [hideBalance, setHideBalance]     = useState(false)
   const [txFilter, setTxFilter]           = useState('')
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [solde, txs] = await Promise.all([getSolde(), getTransactions()])
+      setPortefeuille(solde)
+      setTransactions(txs)
+    } catch { /* silent */ }
+    finally { setLoading(false) }
+    getKycStatus()
+      .then(kyc => setKycNiveau(kyc?.niveauVerification || 'AUCUN'))
+      .catch(() => setKycNiveau('AUCUN'))
+  }, [])
 
   useEffect(() => {
     on('wallet.credited', fetchData)
@@ -60,33 +71,12 @@ export default function Portefeuille() {
       off('wallet.debited', fetchData)
       off('RETRAIT', fetchData)
     }
-  }, [])
+  }, [fetchData, off, on])
 
-  const fetchData = async () => {
-    try {
-      const [solde, txs] = await Promise.all([getSolde(), getTransactions()])
-      setPortefeuille(solde)
-      setTransactions(txs)
-    } catch { /* silent */ }
-    finally { setLoading(false) }
-    getKycStatus()
-      .then(kyc => setKycNiveau(kyc?.niveauVerification || 'AUCUN'))
-      .catch(() => setKycNiveau('AUCUN'))
-  }
-
-  useEffect(() => { fetchData() }, [])
-
-  const handleRecharge = async (amount, moyenPaiement) => {
-    const val = parseFloat(amount)
-    if (!val || val < 500) { setActionError('Montant minimum 500 FCFA'); return }
-    setActionError('')
-    try {
-      const updated = await recharger(val, moyenPaiement, null)
-      setPortefeuille(updated)
-      await getTransactions().then(setTransactions)
-      setRechargeOpen(false)
-    } catch (e) { setActionError(e.response?.data?.message || 'Erreur recharge') }
-  }
+  useEffect(() => {
+    const timer = window.setTimeout(fetchData, 0)
+    return () => window.clearTimeout(timer)
+  }, [fetchData])
 
   const handleRetrait = async (amount, coordonnees) => {
     if (retraitLoading) return
@@ -101,12 +91,6 @@ export default function Portefeuille() {
       setWithdrawOpen(false)
     } catch (e) { setActionError(e.response?.data?.message || 'Erreur retrait') }
     finally { setRetraitLoading(false) }
-  }
-
-  const handleConvertirPoints = async (pts) => {
-    await convertirPoints(pts)
-    await fetchData()
-    setConvertOpen(false)
   }
 
   const openRetrait = () => {
@@ -125,7 +109,7 @@ export default function Portefeuille() {
   const soldePoints = Number(portefeuille?.soldePoints || 0)
 
   const totalEntrees = transactions
-    .filter(t => ['DEPOT', 'RECOMPENSE'].includes(t.type) && t.statut === 'SUCCESS')
+    .filter(t => ['DEPOT', 'RECOMPENSE'].includes(t.type) && !isPointReward(t) && t.statut === 'SUCCESS')
     .reduce((s, t) => s + Number(t.montant || 0), 0)
 
   const totalSorties = transactions
@@ -136,7 +120,7 @@ export default function Portefeuille() {
     .filter(t => t.type === 'DEBIT' || (t.type === 'RETRAIT' && t.statut === 'SUCCESS'))
     .length
 
-  const filteredTx = transactions.filter(t => !txFilter || t.type === txFilter)
+  const filteredTx = transactions.filter(t => !txFilter || (txFilter === 'POINTS' ? isPointReward(t) : t.type === txFilter && !isPointReward(t)))
 
   return (
     <div className="min-h-screen bg-bg-light pb-28">
@@ -211,22 +195,23 @@ export default function Portefeuille() {
                     {hideBalance ? '••••' : `${soldeGele.toLocaleString('fr-FR')} FCFA`}
                   </p>
                 </div>
-                {soldePoints > 0 && (
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-1">Points</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-bold tabular-nums text-yellow-300">
-                        {hideBalance ? '••••' : `${fmt(soldePoints)} pts`}
-                      </p>
-                      <button
-                        onClick={() => setConvertOpen(true)}
-                        className="text-[9px] font-black uppercase tracking-widest text-yellow-300 underline underline-offset-2 hover:text-yellow-200 transition-colors"
-                      >
-                        Convertir
-                      </button>
-                    </div>
+              </div>
+            </div>
+
+            {/* Portefeuille points — volontairement séparé du solde monétaire. */}
+            <div className="rounded-[2rem] border-2 border-amber-100 bg-gradient-to-br from-amber-50 to-orange-50 p-5">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-400 text-primary shadow-lg shadow-amber-200/70">
+                  <Coins size={22} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">Portefeuille de points</p>
+                    <Gift size={13} className="text-amber-600" />
                   </div>
-                )}
+                  <p className="mt-1 font-heading text-2xl font-black tabular-nums text-primary">{hideBalance ? '••••' : fmt(soldePoints)} <span className="text-xs text-amber-700">pts</span></p>
+                  <p className="mt-1 text-[10px] font-semibold leading-4 text-amber-800/70">Gagnés par vos liens de partage · utilisables uniquement pour vos achats.</p>
+                </div>
               </div>
             </div>
 
@@ -357,6 +342,7 @@ export default function Portefeuille() {
                   <div className="divide-y divide-gray-50">
                     {filteredTx.map(t => {
                       const ico = TX_ICON[t.type] || { cls: 'bg-gray-100', icon: 'ti-circle text-gray-400' }
+                      const pointReward = isPointReward(t)
                       return (
                         <div key={t.id} className="px-6 lg:px-8 py-4 flex items-center gap-4 hover:bg-gray-50/50 transition-colors group">
 
@@ -367,7 +353,7 @@ export default function Portefeuille() {
 
                           {/* Type + date */}
                           <div className="flex-1 min-w-0">
-                            <p className="font-extrabold text-sm text-primary leading-tight">{TYPE_LABEL[t.type] || t.type}</p>
+                            <p className="font-extrabold text-sm text-primary leading-tight">{pointReward ? 'Points de parrainage' : TYPE_LABEL[t.type] || t.type}</p>
                             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                               <span className="text-[10px] text-gray-400 font-bold">
                                 {new Date(t.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -396,7 +382,7 @@ export default function Portefeuille() {
                               : 'text-primary'
                             }`}>
                               {isCredit(t.type) ? '+' : t.type === 'GEL' ? '~' : '-'}{fmt(t.montant)}
-                              <span className="text-[9px] font-bold opacity-60 ml-1">FCFA</span>
+                              <span className="text-[9px] font-bold opacity-60 ml-1">{pointReward ? 'pts' : 'FCFA'}</span>
                             </p>
                             <div className="flex items-center justify-end gap-1 mt-0.5">
                               <span className={`w-1.5 h-1.5 rounded-full ${TYPE_DOT[t.type] || 'bg-gray-300'}`} />
@@ -428,7 +414,6 @@ export default function Portefeuille() {
         onSuccess={() => { fetchData() }}
       />
       <RetraitModal open={isWithdrawOpen} onClose={() => setWithdrawOpen(false)} onConfirm={handleRetrait} balance={solde} loading={retraitLoading} error={isWithdrawOpen ? actionError : ''} />
-      <ConversionModal open={isConvertOpen} onClose={() => setConvertOpen(false)} points={soldePoints} onConvert={handleConvertirPoints} />
 
       {/* KYC Gate Modal */}
       {showKycGate && (

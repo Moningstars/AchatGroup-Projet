@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
+import java.math.BigDecimal;
 
 @RestController
 @RequestMapping("/api/admin/wallet")
@@ -34,6 +35,11 @@ public class AdminWalletController {
     public ResponseEntity<WalletPlateformeResponse> modifierTauxConversion(
             @Valid @RequestBody ModifierTauxConversionRequest req) {
         return ResponseEntity.ok(walletService.modifierTauxConversion(req.getTauxConversionPoints()));
+    }
+
+    @PatchMapping("/parrainage")
+    public ResponseEntity<WalletPlateformeResponse> modifierParrainage(@RequestBody java.util.Map<String, BigDecimal> req) {
+        return ResponseEntity.ok(walletService.modifierRecompenseParrainage(req.get("recompenseParrainagePoints")));
     }
 
     @PatchMapping("/utilisateurs/{id}/ajuster")

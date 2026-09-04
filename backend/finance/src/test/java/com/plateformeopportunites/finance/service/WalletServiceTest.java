@@ -10,6 +10,7 @@ import com.plateformeopportunites.finance.dto.RetraitRequest;
 import com.plateformeopportunites.finance.entity.Portefeuille;
 import com.plateformeopportunites.finance.repository.PortefeuilleRepository;
 import com.plateformeopportunites.finance.repository.TransactionRepository;
+import com.plateformeopportunites.finance.repository.WalletPlateformeRepository;
 import com.plateformeopportunites.identity.entity.Utilisateur;
 import com.plateformeopportunites.identity.repository.UtilisateurRepository;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,6 +34,7 @@ class WalletServiceTest {
 
     @Mock private PortefeuilleRepository portefeuilleRepository;
     @Mock private TransactionRepository transactionRepository;
+    @Mock private WalletPlateformeRepository walletPlateformeRepository;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private UtilisateurRepository utilisateurRepository;
     @Mock private PusherNotificationService pusherNotificationService;
@@ -60,6 +63,7 @@ class WalletServiceTest {
         Portefeuille p = wallet("5000");
         when(portefeuilleRepository.findByUtilisateurId(PID)).thenReturn(Optional.of(p));
         when(portefeuilleRepository.save(any())).thenReturn(p);
+        when(walletPlateformeRepository.findAll()).thenReturn(List.of());
 
         RechargeRequest req = new RechargeRequest();
         req.setMontant(new BigDecimal("2000"));

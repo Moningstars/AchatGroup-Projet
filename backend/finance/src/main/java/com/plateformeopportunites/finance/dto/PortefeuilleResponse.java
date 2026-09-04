@@ -12,5 +12,7 @@ public class PortefeuilleResponse {
     private BigDecimal soldeDisponible;
     private BigDecimal soldeGele;
     private BigDecimal soldePoints;
+    private BigDecimal valeurPointFcfa;
+    private BigDecimal recompenseParrainagePoints;
     private String devise;
 }

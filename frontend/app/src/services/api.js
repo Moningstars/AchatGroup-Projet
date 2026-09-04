@@ -60,8 +60,14 @@ export const getOpportunites = (params = {}) =>
 export const getOpportunite = (id) =>
   api.get(`/opportunites/${id}`).then((r) => r.data)
 
-export const souscrire = (id, quantite = 1) =>
-  api.post(`/opportunites/${id}/souscrire`, null, { params: { quantite } }).then((r) => r.data)
+export const souscrire = (id, quantite = 1, options = {}) =>
+  api.post(`/opportunites/${id}/souscrire`, null, {
+    params: {
+      quantite,
+      parrainId: options.parrainId || undefined,
+      utiliserPoints: Boolean(options.utiliserPoints),
+    },
+  }).then((r) => r.data)
 
 export const getMesParticipationsOpportunites = () =>
   api.get('/opportunites/mes-participations').then((r) => r.data)

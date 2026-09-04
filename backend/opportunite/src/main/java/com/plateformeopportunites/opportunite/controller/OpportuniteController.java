@@ -45,8 +45,10 @@ public class OpportuniteController {
     @PostMapping("/{id}/souscrire")
     public ResponseEntity<Void> souscrire(Authentication auth,
                                           @PathVariable UUID id,
-                                          @RequestParam(defaultValue = "1") @Min(1) Integer quantite) {
-        opportuniteService.souscrire(UUID.fromString(auth.getName()), id, quantite);
+                                          @RequestParam(defaultValue = "1") @Min(1) Integer quantite,
+                                          @RequestParam(required = false) UUID parrainId,
+                                          @RequestParam(defaultValue = "false") boolean utiliserPoints) {
+        opportuniteService.souscrire(UUID.fromString(auth.getName()), id, quantite, parrainId, utiliserPoints);
         return ResponseEntity.ok().build();
     }
 

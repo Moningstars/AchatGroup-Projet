@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, X, Edit2, Trash2, Eye, EyeOff, Image, Loader2, Calendar, Search, SlidersHorizontal, RotateCcw } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Plus, Edit2, Trash2, Eye, EyeOff, Image, Loader2, Calendar, Search, SlidersHorizontal, RotateCcw, ChevronDown, Check, ArrowLeft } from 'lucide-react'
 import {
   getAdminBannieres, creerBanniere, modifierBanniere,
   toggleBanniere, supprimerBanniere,
@@ -32,9 +33,71 @@ function imgSrc(url) {
   return BASE_URL + url
 }
 
-// ── Modal formulaire ─────────────────────────────────────────────────────────
+function FilterDropdown({ label, value, onChange, options, icon: Icon }) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef(null)
+  const selected = options.find(option => option.value === value) || options[0]
 
-function BanniereModal({ banniere, onClose, onSaved }) {
+  useEffect(() => {
+    const closeOnOutsideClick = event => {
+      if (rootRef.current && !rootRef.current.contains(event.target)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    return () => document.removeEventListener('pointerdown', closeOnOutsideClick)
+  }, [])
+
+  return (
+    <div ref={rootRef} className="relative min-w-0" onKeyDown={event => event.key === 'Escape' && setOpen(false)}>
+      <button
+        type="button"
+        aria-label={label}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen(current => !current)}
+        className={`group flex h-11 w-full items-center gap-3 rounded-xl border px-3 text-left outline-none transition ${open ? 'border-violet-400 bg-white ring-4 ring-violet-100' : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white'}`}
+      >
+        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition ${open ? 'bg-violet-100 text-violet-700' : 'bg-white text-slate-400 group-hover:text-slate-600'}`}>
+          <Icon size={15} aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[9px] font-black uppercase tracking-[0.13em] text-slate-400">{label}</span>
+          <span className="block truncate text-[12px] font-bold text-slate-700">{selected?.label}</span>
+        </span>
+        <ChevronDown size={15} aria-hidden="true" className={`shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180 text-violet-600' : ''}`} />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          aria-label={label}
+          className="absolute left-0 top-full z-50 mt-2 w-full min-w-[13rem] overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_50px_-16px_rgba(15,23,42,0.35)]"
+        >
+          {options.map(option => {
+            const active = option.value === value
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={active}
+                onClick={() => { onChange(option.value); setOpen(false) }}
+                className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-[12px] font-semibold transition ${active ? 'bg-violet-50 text-violet-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'}`}
+              >
+                {option.dot && <span className={`h-2 w-2 shrink-0 rounded-full ${option.dot}`} />}
+                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                {active && <Check size={14} aria-hidden="true" className="shrink-0" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Formulaire pleine page ──────────────────────────────────────────────────
+
+function BanniereForm({ banniere, onClose, onSaved }) {
   const isEdit = !!banniere
   const fileRef = useRef(null)
 
@@ -53,21 +116,6 @@ function BanniereModal({ banniere, onClose, onSaved }) {
   const [preview, setPreview] = useState(banniere?.imageUrl ? imgSrc(banniere.imageUrl) : null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape' && !loading) onClose()
-    }
-
-    document.body.style.overflow = 'hidden'
-    window.addEventListener('keydown', handleKeyDown)
-
-    return () => {
-      document.body.style.overflow = previousOverflow
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [loading, onClose])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -112,34 +160,30 @@ function BanniereModal({ banniere, onClose, onSaved }) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-2 backdrop-blur-[2px] sm:p-4"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !loading) onClose()
-      }}
-    >
+    <div className="mx-auto w-full max-w-4xl pb-8">
       <section
-        role="dialog"
-        aria-modal="true"
         aria-labelledby="banniere-modal-title"
-        className="flex max-h-[calc(100dvh-1rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
+        className="w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
       >
         <header className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3 sm:px-6 sm:py-4">
-          <div>
+          <div className="flex min-w-0 items-center gap-3">
+            <button type="button" onClick={onClose} disabled={loading} aria-label="Retour aux bannières" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-50">
+              <ArrowLeft size={18} />
+            </button>
+            <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-violet-600">
               {isEdit ? 'Édition' : 'Création'}
             </p>
             <h3 id="banniere-modal-title" className="mt-0.5 text-lg font-bold text-slate-950">
             {isEdit ? 'Modifier la bannière' : 'Nouvelle bannière'}
             </h3>
+            <p className="mt-1 text-xs text-slate-500">Configurez le visuel, sa destination et sa période d'affichage.</p>
+            </div>
           </div>
-          <button type="button" onClick={onClose} disabled={loading} aria-label="Fermer" className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50">
-            <X size={20} />
-          </button>
         </header>
 
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-5 px-4 py-5 sm:px-6 lg:px-8">
           {/* Image */}
           <div>
             <label className={labelCls}>Image de fond *</label>
@@ -233,7 +277,7 @@ function BanniereModal({ banniere, onClose, onSaved }) {
           {error && <div className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
           </div>
 
-          <footer className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 bg-white px-4 py-3 sm:flex-row sm:justify-end sm:px-6 sm:py-4">
+          <footer className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50 px-4 py-4 sm:flex-row sm:justify-end sm:px-6 lg:px-8">
             <button type="button" onClick={onClose} disabled={loading} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50">
               Annuler
             </button>
@@ -245,6 +289,53 @@ function BanniereModal({ banniere, onClose, onSaved }) {
         </form>
       </section>
     </div>
+  )
+}
+
+export function BanniereEditorPage() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const [banniere, setBanniere] = useState(null)
+  const [loading, setLoading] = useState(Boolean(id))
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!id) return undefined
+    let cancelled = false
+    getAdminBannieres()
+      .then(items => {
+        if (cancelled) return
+        const trouvee = items.find(item => item.id === id)
+        if (trouvee) setBanniere(trouvee)
+        else setError('Cette bannière est introuvable ou a été supprimée.')
+      })
+      .catch(() => { if (!cancelled) setError("Impossible de charger la bannière.") })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [id])
+
+  if (loading) {
+    return <div className="flex min-h-64 items-center justify-center"><Loader2 size={28} className="animate-spin text-violet-600" /></div>
+  }
+
+  if (error) {
+    return (
+      <div className="mx-auto max-w-xl rounded-2xl border border-rose-100 bg-white p-8 text-center shadow-sm">
+        <Image size={36} className="mx-auto text-rose-300" />
+        <p className="mt-3 font-bold text-slate-900">{error}</p>
+        <button type="button" onClick={() => navigate('/bannieres')} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white">
+          <ArrowLeft size={16} /> Retour aux bannières
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <BanniereForm
+      banniere={id ? banniere : null}
+      onClose={() => navigate('/bannieres')}
+      onSaved={() => navigate('/bannieres', { replace: true })}
+    />
   )
 }
 
@@ -332,6 +423,7 @@ function BanniereCard({ b, onEdit, onToggle, onDelete, pending }) {
 // ── Page principale ───────────────────────────────────────────────────────────
 
 export default function Bannieres() {
+  const navigate = useNavigate()
   const [bannieres, setBannieres] = useState([])
   const [loading, setLoading] = useState(true)
   const [filtre, setFiltre] = useState('TOUS')
@@ -339,17 +431,15 @@ export default function Bannieres() {
   const [recherche, setRecherche] = useState('')
   const [pendingId, setPendingId] = useState(null)
   const [feedback, setFeedback] = useState('')
-  const [modal, setModal] = useState(null) // null | 'new' | <banniere>
 
-  const fetchData = () => {
-    setLoading(true)
+  useEffect(() => {
+    let cancelled = false
     getAdminBannieres()
-      .then(setBannieres)
+      .then(items => { if (!cancelled) setBannieres(items) })
       .catch(() => {})
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => { fetchData() }, [])
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
 
   const handleToggle = async (b) => {
     setPendingId(b.id)
@@ -405,6 +495,19 @@ export default function Bannieres() {
     setRecherche('')
   }
 
+  const destinationOptions = [
+    { value: 'TOUS', label: `Toutes les destinations (${counts.TOUS || 0})` },
+    ...PAGE_OPTS.map(option => ({
+      value: option.value,
+      label: `${option.value === 'TOUTES' ? 'Globales · toutes les pages' : option.label} (${counts[option.value] || 0})`,
+    })),
+  ]
+  const statusOptions = [
+    { value: 'TOUS', label: 'Tous les statuts', dot: 'bg-violet-500' },
+    { value: 'ACTIF', label: `Visibles (${activeCount})`, dot: 'bg-emerald-500' },
+    { value: 'INACTIF', label: `Masquées (${bannieres.length - activeCount})`, dot: 'bg-slate-400' },
+  ]
+
   return (
     <div className="space-y-5 pb-8">
       {/* Header */}
@@ -419,7 +522,7 @@ export default function Bannieres() {
           </div>
         </div>
         <button
-          onClick={() => setModal('new')}
+          onClick={() => navigate('/bannieres/nouvelle')}
           className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-700 sm:w-auto"
         >
           <Plus size={16} /> Nouvelle bannière
@@ -428,29 +531,15 @@ export default function Bannieres() {
 
       {/* Recherche et filtres */}
       <section aria-label="Filtres des bannières" className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-        <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_220px_180px_auto]">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(300px,1fr)_minmax(220px,0.65fr)_minmax(190px,0.5fr)_auto]">
           <label className="relative block">
             <span className="sr-only">Rechercher une bannière</span>
             <Search size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input value={recherche} onChange={event => setRecherche(event.target.value)} placeholder="Rechercher par titre, tag ou description…" className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100" />
           </label>
-          <label className="relative block">
-            <span className="sr-only">Filtrer par page</span>
-            <SlidersHorizontal size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <select value={filtre} onChange={event => setFiltre(event.target.value)} className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-10 pr-8 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
-              <option value="TOUS">Toutes les destinations ({counts.TOUS || 0})</option>
-              {PAGE_OPTS.map(option => <option key={option.value} value={option.value}>{option.value === 'TOUTES' ? 'Globales (toutes les pages)' : option.label} ({counts[option.value] || 0})</option>)}
-            </select>
-          </label>
-          <label className="block">
-            <span className="sr-only">Filtrer par statut</span>
-            <select value={statut} onChange={event => setStatut(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
-              <option value="TOUS">Tous les statuts</option>
-              <option value="ACTIF">Visibles</option>
-              <option value="INACTIF">Masquées</option>
-            </select>
-          </label>
-          <button type="button" onClick={resetFilters} disabled={!hasFilters} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+          <FilterDropdown label="Destination" value={filtre} onChange={setFiltre} options={destinationOptions} icon={SlidersHorizontal} />
+          <FilterDropdown label="Visibilité" value={statut} onChange={setStatut} options={statusOptions} icon={Eye} />
+          <button type="button" onClick={resetFilters} disabled={!hasFilters} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:opacity-60 md:col-span-2 xl:col-span-1">
             <RotateCcw size={15} /> Réinitialiser
           </button>
         </div>
@@ -475,7 +564,7 @@ export default function Bannieres() {
             <BanniereCard
               key={b.id}
               b={b}
-              onEdit={setModal}
+              onEdit={item => navigate(`/bannieres/${item.id}/modifier`)}
               onToggle={handleToggle}
               onDelete={handleDelete}
               pending={pendingId === b.id}
@@ -490,14 +579,6 @@ export default function Bannieres() {
         </div>
       )}
 
-      {/* Modal */}
-      {modal && (
-        <BanniereModal
-          banniere={modal === 'new' ? null : modal}
-          onClose={() => setModal(null)}
-          onSaved={() => { setModal(null); fetchData() }}
-        />
-      )}
     </div>
   )
 }

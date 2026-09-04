@@ -11,8 +11,10 @@ import com.plateformeopportunites.common.redis.RedisService;
 import com.plateformeopportunites.common.service.PusherNotificationService;
 import com.plateformeopportunites.finance.service.WalletService;
 import com.plateformeopportunites.identity.entity.Administrateur;
+import com.plateformeopportunites.identity.entity.Commanditaire;
 import com.plateformeopportunites.identity.entity.Utilisateur;
 import com.plateformeopportunites.identity.repository.AdministrateurRepository;
+import com.plateformeopportunites.identity.repository.CommanditaireRepository;
 import com.plateformeopportunites.identity.repository.UtilisateurRepository;
 import com.plateformeopportunites.opportunite.dto.CreerOpportuniteRequest;
 import com.plateformeopportunites.opportunite.dto.ConfirmerReceptionRequest;
@@ -53,6 +55,7 @@ public class OpportuniteService {
     private final ParticipationRepository participationRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final AdministrateurRepository administrateurRepository;
+    private final CommanditaireRepository commanditaireRepository;
     private final OpportuniteImageRepository imageRepository;
     private final CategorieRepository categorieRepository;
     private final WalletService walletService;
@@ -74,6 +77,13 @@ public class OpportuniteService {
         }
 
         StatutOpportunite statut = req.isActif() ? StatutOpportunite.ACTIVE : StatutOpportunite.BROUILLON;
+        Commanditaire commanditaire = trouverCommanditaire(req.getCommanditaireId());
+        String partenaireNom = nettoyer(req.getPartenaireNom());
+        String partenaireContact = nettoyer(req.getPartenaireContact());
+        if (commanditaire != null) {
+            if (partenaireNom == null) partenaireNom = nomPublicCommanditaire(commanditaire);
+            if (partenaireContact == null) partenaireContact = contactCommanditaire(commanditaire);
+        }
 
         Opportunite opportunite = Opportunite.builder()
                 .admin(admin)
@@ -86,14 +96,16 @@ public class OpportuniteService {
                 .prixNormal(req.getPrixNormal())
                 .seuilMinimum(req.getSeuilMinimum())
                 .seuilMaximal(req.getSeuilMaximal())
-                .partenaireNom(nettoyer(req.getPartenaireNom()))
+                .commanditaireId(req.getCommanditaireId())
+                .partenaireNom(partenaireNom)
                 .partenaireLogoUrl(nettoyer(req.getPartenaireLogoUrl()))
-                .partenaireContact(nettoyer(req.getPartenaireContact()))
+                .partenaireContact(partenaireContact)
                 .partenaireReseauxUrl(nettoyer(req.getPartenaireReseauxUrl()))
                 .montantDuPartenaire(valeurPositiveOuZero(req.getMontantDuPartenaire()))
                 .montantPayePartenaire(valeurPositiveOuZero(req.getMontantPayePartenaire()))
                 .delaiConfirmationReceptionJours(req.getDelaiConfirmationReceptionJours() == null ? 3 : req.getDelaiConfirmationReceptionJours())
                 .messageNotificationLivraison(nettoyer(req.getMessageNotificationLivraison()))
+                .messagePartage(nettoyer(req.getMessagePartage()))
                 .dateExpiration(req.getDateExpiration())
                 .statut(statut)
                 .participantsActuels(0)
@@ -363,6 +375,12 @@ public class OpportuniteService {
                             Categorie.builder().nom(req.getCategorie()).build()));
             opp.setCategorie(categorie);
         }
+        if (req.getCommanditaireId() != null) {
+            Commanditaire commanditaire = trouverCommanditaire(req.getCommanditaireId());
+            opp.setCommanditaireId(commanditaire.getId());
+            if (req.getPartenaireNom() == null) opp.setPartenaireNom(nomPublicCommanditaire(commanditaire));
+            if (req.getPartenaireContact() == null) opp.setPartenaireContact(contactCommanditaire(commanditaire));
+        }
         if (req.getPartenaireNom() != null) opp.setPartenaireNom(nettoyer(req.getPartenaireNom()));
         if (req.getPartenaireLogoUrl() != null) opp.setPartenaireLogoUrl(nettoyer(req.getPartenaireLogoUrl()));
         if (req.getPartenaireContact() != null) opp.setPartenaireContact(nettoyer(req.getPartenaireContact()));
@@ -376,6 +394,7 @@ public class OpportuniteService {
         }
         if (req.getDelaiConfirmationReceptionJours() != null) opp.setDelaiConfirmationReceptionJours(req.getDelaiConfirmationReceptionJours());
         if (req.getMessageNotificationLivraison() != null) opp.setMessageNotificationLivraison(nettoyer(req.getMessageNotificationLivraison()));
+        if (req.getMessagePartage() != null) opp.setMessagePartage(nettoyer(req.getMessagePartage()));
         validerPaiementPartenaire(opp.getMontantDuPartenaire(), opp.getMontantPayePartenaire());
 
         boolean paliersFournis = req.getPaliers() != null && !req.getPaliers().isEmpty();
@@ -415,6 +434,11 @@ public class OpportuniteService {
 
     @Transactional
     public void souscrire(UUID participantId, UUID opportuniteId, Integer quantite) {
+        souscrire(participantId, opportuniteId, quantite, null, false);
+    }
+
+    @Transactional
+    public void souscrire(UUID participantId, UUID opportuniteId, Integer quantite, UUID parrainId, boolean utiliserPoints) {
         if (quantite == null || quantite <= 0) {
             throw new IllegalArgumentException("La quantité doit être supérieure ou égale à 1");
         }
@@ -445,7 +469,20 @@ public class OpportuniteService {
         BigDecimal prixActuel = calculerPrixActuel(opp);
         BigDecimal montantTotal = prixActuel.multiply(BigDecimal.valueOf(quantite));
 
-        walletService.gelerFonds(participantId, montantTotal, null);
+        boolean nouvelleParticipation = participationExistante == null;
+        UUID parrainValide = null;
+        if (nouvelleParticipation && parrainId != null && !parrainId.equals(participantId)
+                && participationRepository.existsByUtilisateurIdAndOpportuniteId(parrainId, opportuniteId)) {
+            parrainValide = parrainId;
+        }
+
+        WalletService.GelPointsResult paiement;
+        if (utiliserPoints) {
+            paiement = walletService.gelerFondsAvecPoints(participantId, montantTotal, true);
+        } else {
+            walletService.gelerFonds(participantId, montantTotal, null);
+            paiement = new WalletService.GelPointsResult(BigDecimal.ZERO, BigDecimal.ZERO);
+        }
 
         Participation participation = participationExistante != null
                 ? participationExistante
@@ -454,10 +491,24 @@ public class OpportuniteService {
                         .opportunite(opp)
                         .quantite(0)
                         .montantGele(BigDecimal.ZERO)
+                        .parrainId(parrainValide)
+                        .recompenseParrainageAttribuee(false)
+                        .pointsUtilises(BigDecimal.ZERO)
+                        .valeurPointsUtilises(BigDecimal.ZERO)
                         .build();
         participation.setQuantite(participation.getQuantite() + quantite);
         participation.setMontantGele(participation.getMontantGele().add(montantTotal));
+        BigDecimal pointsDejaUtilises = participation.getPointsUtilises() == null ? BigDecimal.ZERO : participation.getPointsUtilises();
+        BigDecimal valeurPointsDejaUtilises = participation.getValeurPointsUtilises() == null ? BigDecimal.ZERO : participation.getValeurPointsUtilises();
+        participation.setPointsUtilises(pointsDejaUtilises.add(paiement.pointsUtilises()));
+        participation.setValeurPointsUtilises(valeurPointsDejaUtilises.add(paiement.valeurPointsUtilises()));
         participationRepository.save(participation);
+
+        if (nouvelleParticipation && parrainValide != null && !Boolean.TRUE.equals(participation.getRecompenseParrainageAttribuee())) {
+            walletService.crediterPoints(parrainValide, walletService.getRecompenseParrainagePoints(), "PARRAINAGE_OPPORTUNITE:" + opportuniteId);
+            participation.setRecompenseParrainageAttribuee(true);
+            participationRepository.save(participation);
+        }
 
         opp.setParticipantsActuels(opp.getParticipantsActuels() + quantite);
         opportuniteRepository.save(opp);
@@ -547,7 +598,7 @@ public class OpportuniteService {
             }
             BigDecimal difference = montantGele.subtract(montantFinal);
             if (difference.compareTo(BigDecimal.ZERO) > 0) {
-                walletService.rembourser(p.getUtilisateur().getId(), difference);
+                rembourserParticipation(p, difference);
                 p.setMontantGele(montantFinal);
             }
             walletService.debiterFinal(p.getUtilisateur().getId(), montantFinal);
@@ -580,7 +631,7 @@ public class OpportuniteService {
         List<Participation> participations = participationRepository
                 .findByOpportuniteIdAndStatut(opportuniteId, StatutParticipation.EN_ATTENTE);
         for (Participation p : participations) {
-            walletService.rembourser(p.getUtilisateur().getId(), p.getMontantGele());
+            rembourserParticipation(p, p.getMontantGele());
             p.setStatut(StatutParticipation.REMBOURSEE);
             p.setStatutLivraison(StatutLivraison.ANNULE);
             participationRepository.save(p);
@@ -595,10 +646,22 @@ public class OpportuniteService {
         if (participation.getStatut() != StatutParticipation.EN_ATTENTE) {
             throw new IllegalStateException("Seules les participations EN_ATTENTE peuvent être remboursées individuellement");
         }
-        walletService.rembourser(participation.getUtilisateur().getId(), participation.getMontantGele());
+        rembourserParticipation(participation, participation.getMontantGele());
         participation.setStatut(StatutParticipation.REMBOURSEE);
         participation.setStatutLivraison(StatutLivraison.ANNULE);
         participationRepository.save(participation);
+    }
+
+    private void rembourserParticipation(Participation participation, BigDecimal montant) {
+        BigDecimal points = participation.getPointsUtilises() == null ? BigDecimal.ZERO : participation.getPointsUtilises();
+        BigDecimal valeurPoints = participation.getValeurPointsUtilises() == null ? BigDecimal.ZERO : participation.getValeurPointsUtilises();
+        BigDecimal valeurPointsARestaurer = valeurPoints.min(montant);
+        BigDecimal pointsARestaurer = valeurPoints.compareTo(BigDecimal.ZERO) > 0
+                ? points.multiply(valeurPointsARestaurer).divide(valeurPoints, 8, java.math.RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+        walletService.rembourserAvecPoints(participation.getUtilisateur().getId(), montant, pointsARestaurer, valeurPointsARestaurer);
+        participation.setPointsUtilises(points.subtract(pointsARestaurer).max(BigDecimal.ZERO));
+        participation.setValeurPointsUtilises(valeurPoints.subtract(valeurPointsARestaurer).max(BigDecimal.ZERO));
     }
 
     public void cloturerExpirees() {
@@ -724,6 +787,26 @@ public class OpportuniteService {
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────
+
+    private Commanditaire trouverCommanditaire(UUID commanditaireId) {
+        if (commanditaireId == null) return null;
+        return commanditaireRepository.findById(commanditaireId)
+                .orElseThrow(() -> new IllegalArgumentException("Commanditaire introuvable"));
+    }
+
+    private String nomPublicCommanditaire(Commanditaire commanditaire) {
+        String societe = nettoyer(commanditaire.getSociete());
+        if (societe != null) return societe;
+        return (commanditaire.getPrenom() + " " + commanditaire.getNom()).trim();
+    }
+
+    private String contactCommanditaire(Commanditaire commanditaire) {
+        String telephone = nettoyer(commanditaire.getTelephone());
+        String email = nettoyer(commanditaire.getEmail());
+        if (telephone == null) return email;
+        if (email == null) return telephone;
+        return telephone + " · " + email;
+    }
 
     private BigDecimal calculerPrixActuel(Opportunite opp) {
         List<PalierPrix> paliers = palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(opp.getId());
@@ -914,6 +997,7 @@ public class OpportuniteService {
                 .createdAt(opp.getCreatedAt())
                 .categorie(opp.getCategorie() != null ? opp.getCategorie().getNom() : null)
                 .categorieIcone(opp.getCategorie() != null ? opp.getCategorie().getIcone() : null)
+                .commanditaireId(opp.getCommanditaireId())
                 .partenaireNom(opp.getPartenaireNom())
                 .partenaireLogoUrl(opp.getPartenaireLogoUrl())
                 .partenaireContact(opp.getPartenaireContact())
@@ -925,6 +1009,7 @@ public class OpportuniteService {
                 .dateConfirmationPartenaire(opp.getDateConfirmationPartenaire())
                 .delaiConfirmationReceptionJours(opp.getDelaiConfirmationReceptionJours() == null ? 3 : opp.getDelaiConfirmationReceptionJours())
                 .messageNotificationLivraison(opp.getMessageNotificationLivraison())
+                .messagePartage(opp.getMessagePartage())
                 .paliers(paliers)
                 .images(images)
                 .build();
