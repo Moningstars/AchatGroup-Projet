@@ -1,5 +1,6 @@
 package com.plateformeopportunites.opportunite.entity;
 
+import com.plateformeopportunites.common.enums.ModePlafond;
 import com.plateformeopportunites.common.enums.StatutOpportunite;
 import com.plateformeopportunites.identity.entity.Administrateur;
 import jakarta.persistence.*;
@@ -52,6 +53,10 @@ public class Opportunite {
 
     /** Plafond de participants/quantité (ex: stock fournisseur limité). NULL = pas de plafond. */
     private Integer seuilMaximal;
+
+    @Enumerated(EnumType.STRING)
+    @Column
+    private ModePlafond modePlafond;
 
     @Column(nullable = false)
     private Integer participantsActuels;

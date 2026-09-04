@@ -134,6 +134,8 @@ CREATE TABLE public.opportunites (
     participants_actuels integer NOT NULL,
     prix_normal numeric(38,2) NOT NULL,
     seuil_minimum integer NOT NULL,
+    seuil_maximal integer,
+    mode_plafond character varying(255),
     created_at timestamp(6) without time zone NOT NULL,
     date_expiration timestamp(6) without time zone NOT NULL,
     admin_id uuid NOT NULL,

@@ -322,8 +322,8 @@ export default function DetailOpportunite() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 lg:items-start">
 
-          {/* Gallery */}
-          <div className="lg:col-span-7 space-y-6">
+          {/* Media : photos + miniatures — toujours en premier, y compris sur mobile */}
+          <div className="order-1 lg:order-none lg:col-start-1 lg:col-span-7 lg:row-start-1 space-y-6">
 
             {/* Image principale — hauteur fixe, clic = lightbox */}
             <div
@@ -373,8 +373,10 @@ export default function DetailOpportunite() {
                 ))}
               </div>
             )}
+          </div>
 
-            {/* Contenu produit : reste sous la galerie pour occuper naturellement la colonne gauche. */}
+          {/* Détails : infos produit + fournisseur — passent après le bloc info sur mobile */}
+          <div className="order-3 lg:order-none lg:col-start-1 lg:col-span-7 lg:row-start-2 space-y-6">
             <section className="rounded-3xl border-2 border-gray-100 bg-white p-5 sm:p-6">
               <div className="flex items-center gap-2">
                 <PackageCheck size={16} className="text-primary" />
@@ -468,8 +470,8 @@ export default function DetailOpportunite() {
             </div>
           )}
 
-          {/* Info */}
-          <div className="lg:col-span-5 flex flex-col gap-5 lg:sticky lg:top-24">
+          {/* Info : titre, prix, progression, quantité, CTA — passe avant les détails produit/fournisseur sur mobile */}
+          <div className="order-2 lg:order-none lg:col-start-8 lg:col-span-5 lg:row-start-1 lg:row-span-2 flex flex-col gap-5 lg:sticky lg:top-24">
 
             {/* Status + catégorie */}
             <div className="flex items-center gap-2 flex-wrap">

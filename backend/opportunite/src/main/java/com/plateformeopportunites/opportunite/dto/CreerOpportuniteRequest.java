@@ -1,5 +1,6 @@
 package com.plateformeopportunites.opportunite.dto;
 
+import com.plateformeopportunites.common.enums.ModePlafond;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -32,6 +33,8 @@ public class CreerOpportuniteRequest {
     /** Plafond de participants/quantité (optionnel, ex: stock fournisseur limité). */
     @Min(1)
     private Integer seuilMaximal;
+
+    private ModePlafond modePlafond;
 
     @NotNull
     @Future
