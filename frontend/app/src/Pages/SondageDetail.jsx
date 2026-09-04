@@ -7,6 +7,7 @@ import {
 import {
   getSondage, getEligibiliteQuestions, getMonEligibilite,
   passerEligibilite, repondreASondage, getKycStatus, getMesParticipationsSondages,
+  imgUrl,
 } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useSSE } from '../hooks/useSSE'
@@ -131,15 +132,24 @@ function SondageCard({ sondage }) {
     : 0
 
   return (
-    <div className="bg-primary rounded-3xl p-6 text-white shadow-2xl shadow-primary/25 relative overflow-hidden">
-      <div className="absolute -right-12 -top-12 w-40 h-40 bg-accent/10 rounded-full blur-2xl pointer-events-none" />
-      <div className="relative z-10">
-        <div className="inline-flex items-center gap-2 bg-success/20 text-success px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-success/30 mb-4">
+    <div className="bg-primary rounded-3xl text-white shadow-2xl shadow-primary/25 relative overflow-hidden">
+      {/* Image de couverture en fond */}
+      {sondage.imageUrl && (
+        <div className="absolute inset-0 z-0">
+          <img src={imgUrl(sondage.imageUrl)} alt="" className="w-full h-full object-cover opacity-30" />
+          <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/90 to-primary/60" />
+        </div>
+      )}
+      
+      <div className="absolute -right-12 -top-12 w-40 h-40 bg-accent/10 rounded-full blur-2xl pointer-events-none z-0" />
+      
+      <div className="relative z-10 p-6">
+        <div className="inline-flex items-center gap-2 bg-success/20 text-success px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-success/30 mb-4 shadow-sm shadow-success/10">
           <i className="ti ti-forms text-[10px]" /> Sondage rémunéré
         </div>
         <h1 className="text-xl font-heading font-extrabold mb-2 leading-tight">{sondage.titre}</h1>
         {sondage.description && (
-          <p className="text-sm text-white/55 mb-5 leading-relaxed">{sondage.description}</p>
+          <p className="text-sm text-white/70 mb-5 leading-relaxed font-medium">{sondage.description}</p>
         )}
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="rounded-2xl bg-white/10 p-3.5 border border-white/10">

@@ -204,9 +204,17 @@ function SurveyCardFeatured({ survey: s, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="w-full text-left bg-primary rounded-3xl p-7 text-white relative overflow-hidden shadow-2xl shadow-primary/30 active:scale-[0.98] transition-transform"
+      className="w-full text-left bg-primary rounded-3xl text-white relative overflow-hidden shadow-2xl shadow-primary/30 active:scale-[0.98] transition-transform"
     >
-      <div className="relative z-10">
+      {/* Image de couverture */}
+      {s.imageUrl && (
+        <div className="absolute inset-0 z-0">
+          <img src={imgUrl(s.imageUrl)} alt="" className="w-full h-full object-cover opacity-20" />
+          <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/80 to-primary/50" />
+        </div>
+      )}
+
+      <div className="relative z-10 p-7">
         <div className="flex justify-between items-center mb-6">
           <div className="bg-success/20 text-success text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest border border-success/30">
             {statut.label}
@@ -264,19 +272,32 @@ function SurveyCardCompact({ survey: s, onClick }) {
       onClick={onClick}
       className="w-full text-left bg-white border-2 border-gray-100 hover:border-primary/30 hover:shadow-md overflow-hidden group active:scale-[0.98] transition-all"
     >
-      {/* Bande couleur statut */}
-      <div className={`h-1 w-full ${isActif ? 'bg-success' : 'bg-gray-200'}`} />
-
-      <div className="p-3 space-y-2.5">
-        {/* Icône + badge */}
-        <div className="flex items-start justify-between gap-1">
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActif ? 'bg-primary/10' : 'bg-gray-100'}`}>
-            <i className={`ti ti-forms text-base ${isActif ? 'text-primary' : 'text-gray-400'}`} />
-          </div>
-          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-tight border shrink-0 ${statut.cls}`}>
+      {/* Image de couverture */}
+      {s.imageUrl ? (
+        <div className="relative h-24 w-full overflow-hidden">
+          <img src={imgUrl(s.imageUrl)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+          <span className={`absolute top-1.5 right-1.5 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-tight border ${statut.cls} bg-white/90`}>
             {statut.label}
           </span>
         </div>
+      ) : (
+        /* Bande couleur statut si pas d'image */
+        <div className={`h-1 w-full ${isActif ? 'bg-success' : 'bg-gray-200'}`} />
+      )}
+
+      <div className="p-3 space-y-2.5">
+        {/* Icône + badge (si pas d'image) */}
+        {!s.imageUrl && (
+          <div className="flex items-start justify-between gap-1">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActif ? 'bg-primary/10' : 'bg-gray-100'}`}>
+              <i className={`ti ti-forms text-base ${isActif ? 'text-primary' : 'text-gray-400'}`} />
+            </div>
+            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-tight border shrink-0 ${statut.cls}`}>
+              {statut.label}
+            </span>
+          </div>
+        )}
 
         {/* Titre */}
         <h3 className="font-heading font-bold text-[11px] text-primary leading-tight line-clamp-2 min-h-[2.4em]">{s.titre}</h3>

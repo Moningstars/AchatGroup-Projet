@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom'
 import {
-  ShieldCheck, Users, Loader2, ChevronRight, ChevronDown, CheckCircle2, AlertCircle, Layers, Timer, Minus, Plus, Copy, Share2, ShoppingCart, PackageCheck, ExternalLink, Gift, Store, Coins
+  ShieldCheck, Users, Loader2, ChevronRight, ChevronDown, CheckCircle2, AlertCircle, Layers, Timer, Minus, Plus, Copy, Share2, ShoppingCart, PackageCheck, ExternalLink, Gift, Store, Coins, Sparkles
 } from 'lucide-react'
 import { getOpportunite, getOpportunites, getMesParticipationsOpportunites, getSolde, souscrire, imgUrl } from '../services/api'
 import { useAuth } from '../context/AuthContext'
@@ -289,16 +289,17 @@ export default function DetailOpportunite() {
     </div>
   )
 
-  const {
-    pct: progress,
-    valide: progressionValidee,
-    phase: phaseProgression,
-    placesRestantes: placesRestantesCalculees,
-    objectifFinal,
-  } = calculerProgression(opportunite)
-  const discount = opportunite.prixNormal && Number(opportunite.prixNormal) > Number(opportunite.prixActuel)
-    ? Math.round((1 - Number(opportunite.prixActuel) / Number(opportunite.prixNormal)) * 100) : null
   const paliersTries = [...(opportunite.paliers || [])].sort((a, b) => a.seuilMin - b.seuilMin)
+  const palierActif = paliersTries.find((palier, i) => {
+    const dernier = i === paliersTries.length - 1
+    return (opportunite.participantsActuels >= palier.seuilMin || (i === 0 && opportunite.participantsActuels < palier.seuilMin)) &&
+      (dernier || !palier.seuilMax || opportunite.participantsActuels <= palier.seuilMax)
+  })
+  const prixAffiche = palierActif ? palierActif.prix : opportunite.prixActuel
+
+  const { pct: progress, valide: progressionValidee, phase: phaseProgression, placesRestantes: placesRestantesCalculees, objectifFinal } = calculerProgression({ ...opportunite, paliers: paliersTries })
+  const discount = opportunite.prixNormal && Number(opportunite.prixNormal) > Number(prixAffiche)
+    ? Math.round((1 - Number(prixAffiche) / Number(opportunite.prixNormal)) * 100) : null
   const placesRestantes = phaseProgression === 'plafond' ? placesRestantesCalculees : Infinity
   const isComplet = phaseProgression === 'plafond' && placesRestantes <= 0
   const isExpired = opportunite.dateExpiration && new Date(opportunite.dateExpiration) <= new Date()
@@ -307,7 +308,7 @@ export default function DetailOpportunite() {
   const dejaSouscrit = Boolean(maParticipation)
   const maxAjout = Number.isFinite(placesRestantes) ? placesRestantes : 99
   const quantiteEffective = Math.min(quantite, Math.max(maxAjout || 1, 1))
-  const totalCommande = Number(opportunite.prixActuel) * quantiteEffective
+  const totalCommande = Number(prixAffiche) * quantiteEffective
   const soldePoints = Number(wallet?.soldePoints || 0)
   const valeurPoint = Number(wallet?.valeurPointFcfa || 1)
   const recompenseParrainage = Number(wallet?.recompenseParrainagePoints || 100)
@@ -498,9 +499,9 @@ export default function DetailOpportunite() {
             {/* Prix */}
             <div className="flex flex-wrap items-baseline gap-3">
               <span className="text-3xl md:text-4xl font-heading font-extrabold text-accent tracking-tighter tabular-nums">
-                {fmt(opportunite.prixActuel)} <span className="text-base font-bold">FCFA</span>
+                {fmt(prixAffiche)} <span className="text-base font-bold">FCFA</span>
               </span>
-              {opportunite.prixNormal && Number(opportunite.prixNormal) > Number(opportunite.prixActuel) && (
+              {opportunite.prixNormal && Number(opportunite.prixNormal) > Number(prixAffiche) && (
                 <span className="text-base text-gray-300 line-through">{fmt(opportunite.prixNormal)} FCFA</span>
               )}
               {discount > 0 && (
@@ -553,7 +554,7 @@ export default function DetailOpportunite() {
                     .map((palier, i) => {
                       const dernier = i === paliersTries.length - 1
                       const atteint = opportunite.participantsActuels >= palier.seuilMin
-                      const actif = opportunite.participantsActuels >= palier.seuilMin &&
+                      const actif = (opportunite.participantsActuels >= palier.seuilMin || (i === 0 && opportunite.participantsActuels < palier.seuilMin)) &&
                         (dernier || !palier.seuilMax || opportunite.participantsActuels <= palier.seuilMax)
                       return (
                         <div key={i} className={`flex items-center justify-between px-4 py-3 transition-colors ${actif ? 'bg-success/5' : ''}`}>
@@ -707,6 +708,32 @@ export default function DetailOpportunite() {
               {joinError && <p className="text-urgency text-xs font-bold text-center bg-urgency/5 p-3 rounded-xl border border-urgency/10">{joinError}</p>}
             </div>
           </div>
+
+          {/* Fiche produit enrichie — sous la galerie en desktop, tout en bas en mobile */}
+          {(opportunite.specsPointsForts || opportunite.specsCasUsage || opportunite.specsFinePrint) && (
+            <div className="lg:col-span-7 bg-white rounded-2xl border-2 border-gray-100 p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles size={14} className="text-primary" />
+                <span className="text-[10px] font-black text-primary uppercase tracking-widest">Points clés</span>
+              </div>
+              {opportunite.specsPointsForts && (
+                <ul className="space-y-1.5">
+                  {opportunite.specsPointsForts.split('\n').filter(Boolean).map((line, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                      <CheckCircle2 size={14} className="text-success shrink-0 mt-0.5" />
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {opportunite.specsCasUsage && (
+                <p className="text-sm text-gray-500 leading-relaxed">{opportunite.specsCasUsage}</p>
+              )}
+              {opportunite.specsFinePrint && (
+                <p className="text-[11px] text-gray-400 italic border-t border-gray-50 pt-2.5">{opportunite.specsFinePrint}</p>
+              )}
+            </div>
+          )}
 
         </div>
 

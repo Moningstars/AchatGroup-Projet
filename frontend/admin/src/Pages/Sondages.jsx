@@ -12,7 +12,7 @@ import {
   getAdminSondages, activerSondage, distribuerSondage, creerSondage,
   creerEligibilite, modifierSondage, supprimerSondage, cloturerSondage,
   getReponsesAValider, validerReponse, getAdminCommanditaires,
-  getSondageResultats, getRepondantsSondage,
+  getSondageResultats, getRepondantsSondage, uploadSondageImage,
 } from '../services/api'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -182,7 +182,7 @@ const ELIG_Q_VIDE = {
 
 function NouveauSondageForm({ onClose, onSaved, modal = false }) {
   const [form, setForm] = useState({
-    titre: '', description: '',
+    titre: '', description: '', imageUrl: '',
     quotaVise: '', recompense: '', typeRecompense: 'ARGENT',
     seuilEligibilite: '80', niveauVerification: 'AUCUN',
     modeDistribution: 'AUTO', dateExpiration: '',
@@ -192,6 +192,7 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
   const [questions, setQuestions] = useState([{ ...QUESTION_VIDE }])
   const [eligTitre, setEligTitre] = useState('')
   const [eligQuestions, setEligQuestions] = useState([{ ...ELIG_Q_VIDE }])
+  const [imageFile, setImageFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [step, setStep] = useState(1)
@@ -265,6 +266,7 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
       const sondage = await creerSondage({
         commanditaireId: form.commanditaireId || undefined,
         titre: form.titre,
+        imageUrl: imageFile ? undefined : (form.imageUrl || undefined),
         description: form.description || undefined,
         quotaVise: Number(form.quotaVise),
         recompense: Number(form.recompense),
@@ -283,6 +285,10 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
             : [],
         })),
       })
+
+      if (imageFile) {
+        await uploadSondageImage(sondage.id, imageFile)
+      }
 
       await creerEligibilite(sondage.id, {
         titre: eligTitre || `Test d'éligibilité — ${form.titre}`,
@@ -360,6 +366,40 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
               <div className="sm:col-span-2">
                 <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
                 <textarea value={form.description} onChange={e => setField('description', e.target.value)} rows={2} className={inputCls + ' resize-none'} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-sm font-medium text-slate-700">Image de couverture</label>
+                {form.imageUrl && (
+                  <img src={form.imageUrl} alt="Aperçu" className="mb-2 h-28 w-full rounded-xl object-cover border border-slate-200" />
+                )}
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    placeholder="https://..."
+                    value={form.imageUrl}
+                    onChange={e => {
+                      setField('imageUrl', e.target.value)
+                      setImageFile(null)
+                    }}
+                    className={inputCls}
+                  />
+                  <div className="relative overflow-hidden rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 cursor-pointer flex-shrink-0 transition-colors">
+                    <span className="flex items-center gap-1"><Plus size={16} /> Fichier</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="absolute inset-0 cursor-pointer opacity-0"
+                      onChange={e => {
+                        const file = e.target.files[0]
+                        if (file) {
+                          setImageFile(file)
+                          setField('imageUrl', URL.createObjectURL(file))
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+                <p className="mt-1 text-xs text-slate-400">Collez un lien direct ou uploadez un fichier image.</p>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">Quota visé *</label>
@@ -597,10 +637,12 @@ function ModifierSondageForm({ sondage, onClose, onSaved }) {
   const [form, setForm] = useState({
     titre: sondage.titre || '',
     description: sondage.description || '',
+    imageUrl: sondage.imageUrl || '',
     quotaVise: String(sondage.quotaVise || ''),
     recompense: String(sondage.recompense || ''),
     dateExpiration: sondage.dateExpiration ? sondage.dateExpiration.slice(0, 16) : '',
   })
+  const [imageFile, setImageFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -613,11 +655,15 @@ function ModifierSondageForm({ sondage, onClose, onSaved }) {
     try {
       await modifierSondage(sondage.id, {
         titre: form.titre || undefined,
+        imageUrl: imageFile ? undefined : (form.imageUrl || undefined),
         description: form.description || undefined,
         quotaVise: form.quotaVise ? Number(form.quotaVise) : undefined,
         recompense: form.recompense ? Number(form.recompense) : undefined,
         dateExpiration: form.dateExpiration ? new Date(form.dateExpiration).toISOString() : undefined,
       })
+      if (imageFile) {
+        await uploadSondageImage(sondage.id, imageFile)
+      }
       onSaved()
     } catch (err) {
       setError(err.response?.data?.message || 'Erreur lors de la modification')
@@ -642,6 +688,40 @@ function ModifierSondageForm({ sondage, onClose, onSaved }) {
             <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
             <textarea value={form.description} onChange={e => setField('description', e.target.value)} rows={3}
               className={inputCls + ' resize-none'} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Image de couverture</label>
+            {form.imageUrl && (
+              <img src={form.imageUrl} alt="Aperçu" className="mb-2 h-24 w-full rounded-xl object-cover border border-slate-200" />
+            )}
+            <div className="flex gap-2">
+              <input
+                type="url"
+                placeholder="https://..."
+                value={form.imageUrl}
+                onChange={e => {
+                  setField('imageUrl', e.target.value)
+                  setImageFile(null)
+                }}
+                className={inputCls}
+              />
+              <div className="relative overflow-hidden rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 cursor-pointer flex-shrink-0 transition-colors">
+                <span className="flex items-center gap-1"><Plus size={16} /> Fichier</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  onChange={e => {
+                    const file = e.target.files[0]
+                    if (file) {
+                      setImageFile(file)
+                      setField('imageUrl', URL.createObjectURL(file))
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">Collez un lien direct ou uploadez un fichier image.</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
