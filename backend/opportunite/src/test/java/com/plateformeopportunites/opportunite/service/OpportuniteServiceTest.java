@@ -193,6 +193,16 @@ class OpportuniteServiceTest {
     }
 
     @Test
+    void creer_modePlafonne_seuilMinimumHorsPalier_leveException() {
+        CreerOpportuniteRequest request = requestCreation(ModePlafond.PLAFONNE, 100);
+        request.setSeuilMinimum(10);
+        when(administrateurRepository.findById(any())).thenReturn(Optional.of(
+                com.plateformeopportunites.identity.entity.Administrateur.builder().id(UUID.randomUUID()).build()));
+
+        assertThrows(IllegalArgumentException.class, () -> opportuniteService.creer(UUID.randomUUID(), request));
+    }
+
+    @Test
     void creer_modeIllimite_ignoreSeuilMaximal() {
         CreerOpportuniteRequest request = requestCreation(ModePlafond.ILLIMITE, 100);
         when(administrateurRepository.findById(any())).thenReturn(Optional.of(

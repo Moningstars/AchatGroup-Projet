@@ -429,7 +429,7 @@ export default function Opportunites() {
         </section>
 
         {/* ── Product Grid ── */}
-        <section id="catalogue" className="space-y-6">
+        <section id="catalogue" className="mx-auto w-[92%] space-y-6 xl:w-[90%]">
           {filtered.length === 0 ? (
             <div className="py-24 text-center bg-white border-4 border-dashed border-gray-50 flex flex-col items-center gap-4">
               <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center">
@@ -445,7 +445,7 @@ export default function Opportunites() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                 {filtered.slice(0, 10).map(op => <ProductCard key={op.id} opportunity={op} />)}
               </div>
 

@@ -120,6 +120,8 @@ public class OpportuniteService {
         int maxPalier = req.getPaliers().stream()
                 .mapToInt(CreerOpportuniteRequest.PalierPrixRequest::getSeuilMax).max().orElse(0);
         validerSeuilMaximal(modePlafond, seuilMaximal, req.getSeuilMinimum(), maxPalier);
+        validerSeuilMinimumPlafonne(modePlafond, req.getSeuilMinimum(), req.getPaliers().stream()
+            .map(CreerOpportuniteRequest.PalierPrixRequest::getSeuilMax).toList());
 
         for (CreerOpportuniteRequest.PalierPrixRequest p : req.getPaliers()) {
             palierPrixRepository.save(PalierPrix.builder()
@@ -413,6 +415,10 @@ public class OpportuniteService {
                 : palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(opportuniteId)
                         .stream().mapToInt(PalierPrix::getSeuilMax).max().orElse(0);
         validerSeuilMaximal(modePlafond(opp.getModePlafond(), opp.getSeuilMaximal()), opp.getSeuilMaximal(), opp.getSeuilMinimum(), maxPalier);
+        if (paliersFournis) {
+            validerSeuilMinimumPlafonne(modePlafond(opp.getModePlafond(), opp.getSeuilMaximal()), opp.getSeuilMinimum(),
+                req.getPaliers().stream().map(CreerOpportuniteRequest.PalierPrixRequest::getSeuilMax).toList());
+        }
 
         opportuniteRepository.save(opp);
 
@@ -800,6 +806,13 @@ public class OpportuniteService {
         }
         if (seuilMinimum != null && seuilMaximal < seuilMinimum) {
             throw new IllegalArgumentException("Le seuil maximal ne peut pas être inférieur au seuil minimum");
+        }
+    }
+
+    private void validerSeuilMinimumPlafonne(ModePlafond modePlafond, Integer seuilMinimum, List<Integer> seuilsMax) {
+        if (modePlafond != ModePlafond.PLAFONNE || seuilMinimum == null) return;
+        if (!seuilsMax.contains(seuilMinimum)) {
+            throw new IllegalArgumentException("Le seuil minimum doit correspondre au seuil maximal d'un palier");
         }
     }
 

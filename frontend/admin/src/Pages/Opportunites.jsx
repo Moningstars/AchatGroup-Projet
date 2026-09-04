@@ -1194,11 +1194,16 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
     if (index === 0 && !form.titre.trim()) return 'Renseignez le titre de l’opportunité.'
     if (index === 1) {
       if (!form.prixNormal || Number(form.prixNormal) <= 0) return 'Renseignez un prix normal supérieur à zéro.'
-      if (!form.seuilMinimum || Number(form.seuilMinimum) < 1) return 'Renseignez le nombre minimum de participants.'
       if (form.modePlafond === 'PLAFONNE' && (!form.seuilMaximal || Number(form.seuilMaximal) < 1)) return 'Renseignez le stock maximal pour une opportunité plafonnée.'
       if (!form.dateExpiration) return 'Choisissez une date d’expiration.'
       if (new Date(form.dateExpiration) <= new Date()) return 'La date d’expiration doit être située dans le futur.'
-      if (paliers.some(p => !p.seuilMin || !p.seuilMax || !p.prix || Number(p.prix) <= 0)) return 'Complétez tous les paliers de prix.'
+      const paliersCalcules = calculerPaliers(paliers)
+      if (paliersCalcules.some(p => !p.seuilMin || !p.seuilMax || !p.prix || Number(p.prix) <= 0)) return 'Complétez tous les paliers de prix.'
+      if (!form.seuilMinimum || Number(form.seuilMinimum) < 1) return 'Choisissez le seuil minimum après avoir défini les paliers.'
+      if (form.modePlafond === 'PLAFONNE' && !paliersCalcules.some(p => Number(p.seuilMax) === Number(form.seuilMinimum))) return 'Le seuil minimum doit être le seuil max d’un palier.'
+      if (form.modePlafond === 'PLAFONNE' && Number(form.seuilMaximal) < Math.max(...paliersCalcules.map(p => Number(p.seuilMax)))) {
+        return 'Le stock maximal doit être supérieur ou égal au seuil max du dernier palier.'
+      }
     }
     return ''
   }
@@ -1337,12 +1342,25 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
               <div className="space-y-5">
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <div><label className={labelCls}>Prix normal (FCFA) *</label><input type="number" min="1" value={form.prixNormal} onChange={e => setField('prixNormal', e.target.value)} className={inputCls} placeholder="22000" /></div>
-                  <div><label className={labelCls}>Objectif minimum *</label><input type="number" min="1" value={form.seuilMinimum} onChange={e => setField('seuilMinimum', e.target.value)} className={inputCls} placeholder="20" /></div>
                   <div><label className={labelCls}>Type de stock *</label><select value={form.modePlafond} onChange={e => setField('modePlafond', e.target.value)} className={inputCls}><option value="ILLIMITE">Sans plafond</option><option value="PLAFONNE">Avec plafond</option></select><p className="mt-1 text-[10px] text-slate-400">Sans plafond : le seuil minimum reste libre et l'offre continue après validation.</p></div>
                   {form.modePlafond === 'PLAFONNE' && <div><label className={labelCls}>Stock maximal *</label><input type="number" min="1" value={form.seuilMaximal} onChange={e => setField('seuilMaximal', e.target.value)} className={inputCls} placeholder="100" /></div>}
                   <div className="sm:col-span-2 lg:col-span-3"><label className={labelCls}>Fin des souscriptions *</label><input type="datetime-local" value={form.dateExpiration} onChange={e => setField('dateExpiration', e.target.value)} className={inputCls} /></div>
                 </div>
                 <PaliersEditor paliers={paliers} setPaliers={setPaliers} />
+                <div>
+                  <label className={labelCls}>Objectif minimum *</label>
+                  {form.modePlafond === 'PLAFONNE' ? (
+                    <select value={form.seuilMinimum} onChange={e => setField('seuilMinimum', e.target.value)} className={inputCls}>
+                      <option value="">Choisissez un seuil max de palier</option>
+                      {[...new Set(calculerPaliers(paliers).map(p => Number(p.seuilMax)).filter(Number.isFinite))].sort((a, b) => a - b).map(seuil => (
+                        <option key={seuil} value={seuil}>{seuil} participants</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input type="number" min="1" value={form.seuilMinimum} onChange={e => setField('seuilMinimum', e.target.value)} className={inputCls} placeholder="20" />
+                  )}
+                  <p className="mt-1 text-[10px] text-slate-400">Avec plafond, ce seuil doit correspondre au seuil max d’un palier.</p>
+                </div>
               </div>
             )}
 
@@ -1506,6 +1524,11 @@ function ModifierOpportuniteModal({ item, onClose, onSaved }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    const paliersCalcules = calculerPaliers(paliers)
+    if (form.modePlafond === 'PLAFONNE' && (!form.seuilMaximal || Number(form.seuilMaximal) < Math.max(...paliersCalcules.map(p => Number(p.seuilMax)))) ) {
+      setError('Le stock maximal doit être supérieur ou égal au seuil max du dernier palier.')
+      return
+    }
     setLoading(true)
     try {
       await modifierOpportunite(item.id, {
