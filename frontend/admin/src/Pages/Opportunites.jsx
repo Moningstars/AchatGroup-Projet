@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Loader2, Plus, Trash2, X, Upload, Package, Eye, Users, CalendarClock, Layers, Edit2, Sparkles, Search, Download, Clock, CheckSquare, CalendarDays, UserCheck, ArrowLeft, ArrowRight, ClipboardList, Truck, PackageCheck, AlertTriangle, Flag, Route, SlidersHorizontal, RotateCcw, ChevronDown, Check, FileText, BadgeDollarSign, Building2, ImagePlus, CircleCheck } from 'lucide-react'
 import { Badge, Card, Table, Th, Td, Tr, Spinner, EmptyState, ProgressBar, Pagination } from '../components/ui'
@@ -1755,6 +1755,12 @@ const MOTIF_TENTATIVE_LABEL = {
   VALIDATION: 'Données invalides',
   ERREUR_TECHNIQUE: 'Erreur technique',
 }
+const MOTIF_TENTATIVE_COLOR = {
+  SOLDE_INSUFFISANT: '#f59e0b',
+  OFFRE_INDISPONIBLE: '#8b5cf6',
+  VALIDATION: '#0ea5e9',
+  ERREUR_TECHNIQUE: '#f43f5e',
+}
 
 const TRAITEMENT_LABEL = { A_TRAITER: 'À traiter', EN_COURS: 'Traitement en cours', TERMINE: 'Traité' }
 const TRAITEMENT_COLOR = { A_TRAITER: 'rose', EN_COURS: 'amber', TERMINE: 'emerald' }
@@ -1849,6 +1855,52 @@ export default function Opportunites({ mode = 'encours' }) {
   }
   const echecsSolde = tentatives.filter(item => item.motif === 'SOLDE_INSUFFISANT').length
   const echecsTechniques = tentatives.filter(item => item.motif === 'ERREUR_TECHNIQUE').length
+  const montantEchecs = tentatives.reduce((sum, item) => sum + Number(item.montantTransaction || 0), 0)
+  const quantitesEchouees = tentatives.reduce((sum, item) => sum + Number(item.quantite || 0), 0)
+  const clientsTouches = new Set(tentatives.map(item => item.utilisateurId).filter(Boolean)).size
+  const repartitionEchecs = useMemo(() => Object.keys(MOTIF_TENTATIVE_LABEL).map(motif => ({
+    motif,
+    name: MOTIF_TENTATIVE_LABEL[motif],
+    value: tentatives.filter(item => item.motif === motif).length,
+    color: MOTIF_TENTATIVE_COLOR[motif],
+  })).filter(item => item.value > 0), [tentatives])
+  const evolutionEchecs = useMemo(() => {
+    const jours = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date()
+      date.setDate(date.getDate() - (6 - index))
+      const key = date.toISOString().slice(0, 10)
+      return { key, jour: date.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', ''), tentatives: 0, montant: 0 }
+    })
+    const parJour = Object.fromEntries(jours.map(item => [item.key, item]))
+    tentatives.forEach(item => {
+      const jour = parJour[String(item.createdAt || '').slice(0, 10)]
+      if (!jour) return
+      jour.tentatives += 1
+      jour.montant += Number(item.montantTransaction || 0)
+    })
+    return jours
+  }, [tentatives])
+  const opportunitesImpactees = useMemo(() => {
+    const groupes = new Map()
+    tentatives.forEach(item => {
+      const cle = item.opportuniteId || item.opportuniteTitre
+      const courant = groupes.get(cle) || { name: item.opportuniteTitre || 'Opportunité', tentatives: 0, montant: 0 }
+      courant.tentatives += 1
+      courant.montant += Number(item.montantTransaction || 0)
+      groupes.set(cle, courant)
+    })
+    return [...groupes.values()].sort((a, b) => b.tentatives - a.tentatives).slice(0, 5).map(item => ({ ...item, name: item.name.length > 22 ? `${item.name.slice(0, 22)}…` : item.name }))
+  }, [tentatives])
+  const totalRepartition = repartitionEchecs.reduce((sum, item) => sum + item.value, 0)
+  let angleRepartition = 0
+  const gradientRepartition = repartitionEchecs.length === 0 ? '#e2e8f0 0deg 360deg' : repartitionEchecs.map(item => {
+    const debut = angleRepartition
+    angleRepartition += (item.value / totalRepartition) * 360
+    return `${item.color} ${debut}deg ${angleRepartition}deg`
+  }).join(', ')
+  const maximumJournalier = Math.max(1, ...evolutionEchecs.map(item => item.tentatives))
+  const pointsEvolution = evolutionEchecs.map((item, index) => `${index * 50},${92 - (item.tentatives / maximumJournalier) * 72}`).join(' ')
+  const maximumOpportunite = Math.max(1, ...opportunitesImpactees.map(item => item.tentatives))
   useEffect(() => setPage(1), [categorieFiltre, statutListeFiltre, recherche, triListe, mode])
   const opportunitesPage = opportunitesFiltrees.slice((page - 1) * 10, page * 10)
   const tentativesPageItems = tentatives.slice((tentativesPage - 1) * 10, tentativesPage * 10)
@@ -1867,10 +1919,11 @@ export default function Opportunites({ mode = 'encours' }) {
           </button>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total</p>
             <p className="mt-2 text-2xl font-black text-slate-950">{tentatives.length}</p>
+            <p className="mt-1 text-[10px] text-slate-400">{clientsTouches} client{clientsTouches > 1 ? 's' : ''} concerné{clientsTouches > 1 ? 's' : ''}</p>
           </div>
           <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 shadow-sm">
             <p className="text-[10px] font-black uppercase tracking-wider text-amber-600">Solde insuffisant</p>
@@ -1880,23 +1933,59 @@ export default function Opportunites({ mode = 'encours' }) {
             <p className="text-[10px] font-black uppercase tracking-wider text-rose-600">Erreurs techniques</p>
             <p className="mt-2 text-2xl font-black text-rose-800">{echecsTechniques}</p>
           </div>
+          <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4 shadow-sm">
+            <p className="text-[10px] font-black uppercase tracking-wider text-violet-600">Valeur non convertie</p>
+            <p className="mt-2 text-2xl font-black text-violet-900">{formatMontant(montantEchecs)} <span className="text-[10px]">FCFA</span></p>
+            <p className="mt-1 text-[10px] text-violet-600">{quantitesEchouees} unité{quantitesEchouees > 1 ? 's' : ''} non achetée{quantitesEchouees > 1 ? 's' : ''}</p>
+          </div>
         </div>
+
+        <section className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3"><p className="text-sm font-black text-slate-900">Causes des échecs</p><p className="text-[10px] text-slate-400">Répartition des tentatives par origine</p></div>
+            {repartitionEchecs.length === 0 ? <div className="flex h-44 items-center justify-center text-xs text-slate-400">Aucune donnée à analyser</div> : (
+              <div className="grid grid-cols-[150px_1fr] items-center gap-2">
+                <div className="flex h-44 items-center justify-center"><div className="relative h-32 w-32 rounded-full" style={{ background: `conic-gradient(${gradientRepartition})` }}><div className="absolute inset-6 flex flex-col items-center justify-center rounded-full bg-white"><strong className="text-xl text-slate-900">{tentatives.length}</strong><span className="text-[9px] text-slate-400">tentatives</span></div></div></div>
+                <div className="space-y-2">{repartitionEchecs.map(item => <div key={item.motif} className="flex items-center justify-between gap-2 text-[11px]"><span className="flex min-w-0 items-center gap-2 text-slate-600"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color }} /><span className="truncate">{item.name}</span></span><strong className="text-slate-900">{item.value}</strong></div>)}</div>
+              </div>
+            )}
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3"><p className="text-sm font-black text-slate-900">Évolution sur 7 jours</p><p className="text-[10px] text-slate-400">Détectez rapidement une hausse anormale</p></div>
+            <div className="h-44">
+              <svg viewBox="0 0 300 105" className="h-36 w-full overflow-visible" preserveAspectRatio="none" aria-label="Courbe des tentatives sur sept jours">
+                {[20, 44, 68, 92].map(y => <line key={y} x1="0" x2="300" y1={y} y2={y} stroke="#e2e8f0" strokeDasharray="3 4" />)}
+                <polygon points={`0,100 ${pointsEvolution} 300,100`} fill="#ede9fe" opacity="0.8" />
+                <polyline points={pointsEvolution} fill="none" stroke="#7c3aed" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                {evolutionEchecs.map((item, index) => <circle key={item.key} cx={index * 50} cy={92 - (item.tentatives / maximumJournalier) * 72} r="3.5" fill="#7c3aed"><title>{item.tentatives} tentative(s)</title></circle>)}
+              </svg>
+              <div className="grid grid-cols-7 text-center text-[9px] font-bold text-slate-400">{evolutionEchecs.map(item => <span key={item.key}>{item.jour}</span>)}</div>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2 xl:col-span-1">
+            <div className="mb-3"><p className="text-sm font-black text-slate-900">Opportunités à surveiller</p><p className="text-[10px] text-slate-400">Classement par nombre d’échecs</p></div>
+            {opportunitesImpactees.length === 0 ? <div className="flex h-44 items-center justify-center text-xs text-slate-400">Aucune opportunité impactée</div> : <div className="space-y-3 py-1">{opportunitesImpactees.map(item => <div key={item.name}><div className="mb-1 flex items-center justify-between gap-3 text-[10px]"><span className="truncate font-bold text-slate-600" title={item.name}>{item.name}</span><span className="shrink-0 font-black text-slate-900">{item.tentatives}</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-sky-500" style={{ width: `${Math.max(8, (item.tentatives / maximumOpportunite) * 100)}%` }} /></div></div>)}</div>}
+          </div>
+        </section>
 
         <Card noPad>
           {tentatives.length === 0 ? (
             <EmptyState icon={AlertTriangle} title="Aucune tentative échouée enregistrée" sub="Les souscriptions non abouties apparaîtront ici sans encombrer la liste principale." />
           ) : (
             <>
-              <Table>
-                <thead><tr><Th>Client</Th><Th>Opportunité</Th><Th>Cause</Th><Th>Date</Th><Th>Décision</Th></tr></thead>
+              <div className="divide-y divide-slate-100 lg:hidden">{tentativesPageItems.map(item => <article key={item.id} className="space-y-3 p-4"><div className="flex items-start justify-between gap-3"><Link to={`/utilisateurs?focus=${item.utilisateurId}`} className="font-black text-slate-900 hover:text-violet-700">{item.utilisateurNom || 'Client'} →</Link><Badge color={item.motif === 'ERREUR_TECHNIQUE' ? 'rose' : item.motif === 'SOLDE_INSUFFISANT' ? 'amber' : 'gray'}>{MOTIF_TENTATIVE_LABEL[item.motif] || item.motif}</Badge></div><p className="text-[10px] text-slate-400">ID : {item.utilisateurId}</p><button onClick={() => navigate(`/opportunites/${item.opportuniteId}`)} className="text-left text-xs font-bold text-violet-700 hover:underline">{item.opportuniteTitre}</button><div className="grid grid-cols-2 gap-2"><div className="rounded-xl bg-slate-50 p-2.5 text-xs"><span className="text-slate-400">Montant</span><p className="font-black">{formatMontant(item.montantTransaction)} FCFA</p></div><div className="rounded-xl bg-slate-50 p-2.5 text-xs"><span className="text-slate-400">Quantité</span><p className="font-black">×{item.quantite || 0}</p></div></div><p className="text-[11px] text-slate-500">{item.detail}</p></article>)}</div>
+              <div className="hidden overflow-x-auto lg:block"><Table>
+                <thead><tr><Th>Client / identifiant</Th><Th>Opportunité</Th><Th>Cause</Th><Th>Montant</Th><Th>Quantité</Th><Th>Date</Th><Th>Action conseillée</Th></tr></thead>
                 <tbody>{tentativesPageItems.map(item => <Tr key={item.id}>
-                  <Td><p className="font-bold text-slate-800">{item.utilisateurNom || 'Client'}</p><p className="text-[10px] text-slate-400">{item.utilisateurTelephone || '—'}</p></Td>
-                  <Td><button onClick={() => navigate(`/opportunites/${item.opportuniteId}`)} className="max-w-52 truncate text-left text-xs font-bold text-violet-700 hover:underline">{item.opportuniteTitre}</button><p className="text-[10px] text-slate-400">{item.quantite} unité{item.quantite > 1 ? 's' : ''}</p></Td>
-                  <Td><Badge color={item.motif === 'ERREUR_TECHNIQUE' ? 'rose' : item.motif === 'SOLDE_INSUFFISANT' ? 'amber' : 'gray'}>{MOTIF_TENTATIVE_LABEL[item.motif] || item.motif}</Badge><p title={item.detail} className="mt-1 max-w-64 truncate text-[10px] text-slate-400">{item.detail}</p></Td>
-                  <Td><span className="text-[11px] text-slate-500">{formatDate(item.createdAt)}</span></Td>
-                  <Td><span className="text-[10px] font-semibold text-slate-500">{item.motif === 'SOLDE_INSUFFISANT' ? 'Relance / recharge' : item.motif === 'ERREUR_TECHNIQUE' ? 'Vérifier l’incident' : 'Informer le client'}</span></Td>
+                  <Td><Link to={`/utilisateurs?focus=${item.utilisateurId}`} className="font-bold text-slate-800 hover:text-violet-700 hover:underline">{item.utilisateurNom || 'Client'}</Link><p title={item.utilisateurId} className="mt-0.5 max-w-40 truncate font-mono text-[9px] text-slate-400">{item.utilisateurId}</p></Td>
+                  <Td><button onClick={() => navigate(`/opportunites/${item.opportuniteId}`)} className="max-w-48 truncate text-left text-xs font-bold text-violet-700 hover:underline">{item.opportuniteTitre}</button></Td>
+                  <Td><Badge color={item.motif === 'ERREUR_TECHNIQUE' ? 'rose' : item.motif === 'SOLDE_INSUFFISANT' ? 'amber' : 'gray'}>{MOTIF_TENTATIVE_LABEL[item.motif] || item.motif}</Badge><p title={item.detail} className="mt-1 max-w-52 truncate text-[10px] text-slate-400">{item.detail}</p></Td>
+                  <Td><span className="whitespace-nowrap text-xs font-black text-slate-800">{formatMontant(item.montantTransaction)} FCFA</span></Td>
+                  <Td><span className="font-black text-slate-800">×{item.quantite || 0}</span></Td>
+                  <Td><span className="whitespace-nowrap text-[11px] text-slate-500">{formatDateTime(item.createdAt)}</span></Td>
+                  <Td><span className="text-[10px] font-semibold text-slate-500">{item.motif === 'SOLDE_INSUFFISANT' ? 'Relancer pour recharge' : item.motif === 'ERREUR_TECHNIQUE' ? 'Vérifier l’incident' : 'Informer le client'}</span></Td>
                 </Tr>)}</tbody>
-              </Table>
+              </Table></div>
               <Pagination page={tentativesPage} totalItems={tentatives.length} onPageChange={setTentativesPage} />
             </>
           )}

@@ -1,5 +1,23 @@
 package com.plateformeopportunites.finance.service;
 
+import java.math.BigDecimal;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+
 import com.plateformeopportunites.common.enums.StatutTransaction;
 import com.plateformeopportunites.common.enums.TypeTransaction;
 import com.plateformeopportunites.common.event.RetraitDemandeEvent;
@@ -9,27 +27,15 @@ import com.plateformeopportunites.finance.dto.RetraitRequest;
 import com.plateformeopportunites.finance.entity.Portefeuille;
 import com.plateformeopportunites.finance.repository.PortefeuilleRepository;
 import com.plateformeopportunites.finance.repository.TransactionRepository;
+import com.plateformeopportunites.finance.repository.WalletPlateformeRepository;
 import com.plateformeopportunites.identity.repository.UtilisateurRepository;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
-
-import java.math.BigDecimal;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class WalletServiceTest {
 
     @Mock private PortefeuilleRepository portefeuilleRepository;
     @Mock private TransactionRepository transactionRepository;
+    @Mock private WalletPlateformeRepository walletPlateformeRepository;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private UtilisateurRepository utilisateurRepository;
     @Mock private PusherNotificationService pusherNotificationService;
