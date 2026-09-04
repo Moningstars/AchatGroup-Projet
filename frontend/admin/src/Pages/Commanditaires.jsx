@@ -43,7 +43,7 @@ function NouveauCommanditaireModal({ onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="admin-modal-layer fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-200">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <h3 className="text-base font-bold text-slate-900">Nouveau commanditaire</h3>
@@ -52,7 +52,7 @@ function NouveauCommanditaireModal({ onClose, onSaved }) {
           </button>
         </div>
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className={labelCls}>Nom *</label>
               <input required value={form.nom} onChange={e => set('nom', e.target.value)} className={inputCls} />
@@ -75,7 +75,7 @@ function NouveauCommanditaireModal({ onClose, onSaved }) {
             <input required value={form.telephone} onChange={e => set('telephone', e.target.value)} placeholder="+228 90 00 00 00" className={inputCls} />
           </div>
           {error && <div className="rounded-lg bg-rose-50 border border-rose-100 p-3 text-sm text-rose-700">{error}</div>}
-          <div className="flex gap-2.5 pt-1">
+          <div className="flex flex-col gap-2.5 pt-1 sm:flex-row">
             <button type="submit" disabled={loading}
               className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-violet-700 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 transition disabled:opacity-60">
               {loading && <Loader2 size={14} className="animate-spin" />}
@@ -164,7 +164,7 @@ export default function Commanditaires() {
               {commanditaires.length} commanditaire{commanditaires.length !== 1 ? 's' : ''} enregistré{commanditaires.length !== 1 ? 's' : ''}
             </p>
           </div>
-          <div className="flex gap-2 flex-wrap items-center">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             {[
               { key: 'ACTIF',      label: 'Actifs',     cls: 'bg-emerald-50 text-emerald-700' },
               { key: 'EN_ATTENTE', label: 'En attente', cls: 'bg-amber-50 text-amber-700' },
@@ -176,7 +176,7 @@ export default function Commanditaires() {
             ))}
             <button
               onClick={() => setShowNouveauModal(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-violet-700 px-3.5 py-2 text-sm font-semibold text-white hover:bg-violet-800 transition shadow-sm shadow-violet-200"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm shadow-violet-200 transition hover:bg-violet-800 sm:w-auto"
             >
               <Plus size={15} /> Nouveau
             </button>

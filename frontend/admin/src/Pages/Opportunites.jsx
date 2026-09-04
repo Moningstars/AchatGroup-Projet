@@ -1,19 +1,93 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Loader2, Plus, Trash2, X, Upload, Package, Eye, Users, CalendarClock, Layers, Image, Edit2, Sparkles, Search, Download, Clock, CheckSquare, CalendarDays, UserCheck, ArrowLeft, ClipboardList, Truck, PackageCheck, AlertTriangle, Flag, Route, SlidersHorizontal, RotateCcw } from 'lucide-react'
+import { Loader2, Plus, Trash2, X, Upload, Package, Eye, Users, CalendarClock, Layers, Edit2, Sparkles, Search, Download, Clock, CheckSquare, CalendarDays, UserCheck, ArrowLeft, ArrowRight, ClipboardList, Truck, PackageCheck, AlertTriangle, Flag, Route, SlidersHorizontal, RotateCcw, ChevronDown, Check, FileText, BadgeDollarSign, Building2, ImagePlus, CircleCheck } from 'lucide-react'
 import { Badge, Card, Table, Th, Td, Tr, Spinner, EmptyState, ProgressBar } from '../components/ui'
 import { useSSE } from '../hooks/useSSE'
 import {
   getAdminOpportunites, getAdminOpportunite, activerOpportunite, cloturerOpportunite,
   creerOpportunite, modifierOpportunite, uploadOpportuniteImage, deleteOpportuniteImage,
   genererSpecsOpportunite, getParticipantsOpportunite, planifierParticipantsOpportunite, mettreAJourLivraisonParticipants,
+  getAdminCommanditaires,
 } from '../services/api'
 import { calculerProgression } from '../utils/progression'
 
 const BACKEND = `http://${window.location.hostname}:8080`
 const imgUrl = (url) => url ? (url.startsWith('http') ? url : BACKEND + url) : null
 
+function useCommanditairesDisponibles() {
+  const [commanditaires, setCommanditaires] = useState([])
+
+  useEffect(() => {
+    let cancelled = false
+    getAdminCommanditaires()
+      .then(items => {
+        if (!cancelled) setCommanditaires(items.filter(item => item.statut !== 'SUSPENDU'))
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  return commanditaires
+}
+
+function nomPublicCommanditaire(commanditaire) {
+  return commanditaire?.societe?.trim()
+    || [commanditaire?.prenom, commanditaire?.nom].filter(Boolean).join(' ')
+}
+
+function contactCommanditaire(commanditaire) {
+  return [commanditaire?.telephone, commanditaire?.email].filter(Boolean).join(' · ')
+}
+
 const CATEGORIES = ['Mode', 'Électronique', 'Véhicules', 'Maison', 'Alimentaire', 'Informatique', 'Beauté', 'Mobilier', 'Sport']
+const MESSAGE_PARTAGE_DEFAUT = "🔥 Bon plan OpportuniHub !\n\nDécouvrez « {titre} » à partir de {prix} FCFA grâce à l’achat groupé.\n⏳ Rejoignez l’offre avant sa clôture et profitez du meilleur tarif.\n\n👉 Voir l’offre et participer :"
+const CREATION_STEPS = [
+  { label: 'Présentation', short: 'Produit', icon: FileText },
+  { label: 'Tarification', short: 'Prix', icon: BadgeDollarSign },
+  { label: 'Fournisseur', short: 'Partenaire', icon: Building2 },
+  { label: 'Contenu', short: 'Médias', icon: ImagePlus },
+  { label: 'Vérification', short: 'Validation', icon: CircleCheck },
+]
+
+function FilterSelect({ label, value, onChange, options, className = '' }) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef(null)
+  const selected = options.find(option => option.value === value) || options[0]
+
+  useEffect(() => {
+    const closeOnOutsideClick = event => {
+      if (rootRef.current && !rootRef.current.contains(event.target)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    return () => document.removeEventListener('pointerdown', closeOnOutsideClick)
+  }, [])
+
+  return (
+    <div ref={rootRef} className={`relative ${className}`} onKeyDown={event => event.key === 'Escape' && setOpen(false)}>
+      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">{label}</span>
+      <button type="button" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(current => !current)}
+        className={`flex h-10 w-full items-center justify-between gap-3 rounded-xl border px-3 text-left text-[12px] font-semibold outline-none transition ${open ? 'border-violet-300 bg-white ring-4 ring-violet-50' : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white'}`}>
+        <span className="truncate text-slate-700">{selected?.label}</span>
+        <ChevronDown size={14} className={`shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180 text-violet-600' : ''}`} />
+      </button>
+      {open && (
+        <div role="listbox" aria-label={label} className="absolute left-0 right-0 top-full z-40 mt-1.5 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-lift">
+          {options.map(option => {
+            const active = option.value === value
+            return (
+              <button key={option.value} type="button" role="option" aria-selected={active}
+                onClick={() => { onChange(option.value); setOpen(false) }}
+                className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-[12px] font-semibold transition ${active ? 'bg-violet-50 text-violet-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'}`}>
+                <span>{option.label}</span>
+                {active && <Check size={13} className="shrink-0" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function formatMontant(val) { return Number(val || 0).toLocaleString('fr-FR') }
 function normaliserRecherche(val) {
@@ -1087,10 +1161,13 @@ function SpecsEditor({ titre, description, categorie, specs, setSpecs }) {
   )
 }
 
-function NouvelleOpportuniteModal({ onClose, onSaved }) {
+function NouvelleOpportuniteWizard({ onClose, onSaved }) {
+  const commanditaires = useCommanditairesDisponibles()
   const [form, setForm] = useState({
     titre: '', description: '', prixNormal: '', seuilMinimum: '', seuilMaximal: '',
     dateExpiration: '', categorie: '', actif: true,
+    commanditaireId: '',
+    messagePartage: MESSAGE_PARTAGE_DEFAUT,
     partenaireNom: '', partenaireLogoUrl: '', partenaireContact: '', partenaireReseauxUrl: '',
     montantDuPartenaire: '', montantPayePartenaire: '', delaiConfirmationReceptionJours: '3', messageNotificationLivraison: '',
   })
@@ -1100,12 +1177,56 @@ function NouvelleOpportuniteModal({ onClose, onSaved }) {
   const [loading, setLoading]             = useState(false)
   const [uploadProgress, setUploadProgress] = useState(null)
   const [error, setError]                 = useState('')
+  const [step, setStep]                   = useState(0)
 
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const handleCommanditaireChange = (commanditaireId) => {
+    const commanditaire = commanditaires.find(item => item.id === commanditaireId)
+    setForm(current => commanditaire ? {
+      ...current,
+      commanditaireId,
+      partenaireNom: nomPublicCommanditaire(commanditaire),
+      partenaireContact: contactCommanditaire(commanditaire),
+    } : { ...current, commanditaireId: '' })
+  }
+
+  const validateStep = (index) => {
+    if (index === 0 && !form.titre.trim()) return 'Renseignez le titre de l’opportunité.'
+    if (index === 1) {
+      if (!form.prixNormal || Number(form.prixNormal) <= 0) return 'Renseignez un prix normal supérieur à zéro.'
+      if (!form.seuilMinimum || Number(form.seuilMinimum) < 1) return 'Renseignez le nombre minimum de participants.'
+      if (!form.dateExpiration) return 'Choisissez une date d’expiration.'
+      if (new Date(form.dateExpiration) <= new Date()) return 'La date d’expiration doit être située dans le futur.'
+      if (paliers.some(p => !p.seuilMin || !p.seuilMax || !p.prix || Number(p.prix) <= 0)) return 'Complétez tous les paliers de prix.'
+    }
+    return ''
+  }
+
+  const goNext = () => {
+    const validationError = validateStep(step)
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+    setError('')
+    setStep(current => Math.min(CREATION_STEPS.length - 1, current + 1))
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const goBack = () => {
+    setError('')
+    setStep(current => Math.max(0, current - 1))
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    const validationError = validateStep(0) || validateStep(1)
+    if (validationError) {
+      setError(validationError)
+      return
+    }
     setLoading(true)
     try {
       const created = await creerOpportunite({
@@ -1120,6 +1241,8 @@ function NouvelleOpportuniteModal({ onClose, onSaved }) {
         dateExpiration: new Date(form.dateExpiration).toISOString(),
         categorie: form.categorie || undefined,
         actif: form.actif,
+        messagePartage: form.messagePartage || undefined,
+        commanditaireId: form.commanditaireId || undefined,
         partenaireNom: form.partenaireNom || undefined,
         partenaireLogoUrl: form.partenaireLogoUrl || undefined,
         partenaireContact: form.partenaireContact || undefined,
@@ -1148,108 +1271,141 @@ function NouvelleOpportuniteModal({ onClose, onSaved }) {
     }
   }
 
+  const StepIcon = CREATION_STEPS[step].icon
+  const prixLisible = form.prixNormal ? `${Number(form.prixNormal).toLocaleString('fr-FR')} FCFA` : 'Non renseigné'
+
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
-      <div className="my-8 w-full max-w-2xl rounded-xl bg-white p-6 shadow-2xl border border-slate-200">
-        <div className="mb-5 flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-900">Nouvelle opportunité</h3>
-          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 transition">
-            <X size={16} />
-          </button>
-        </div>
+    <div className="mx-auto w-full max-w-5xl pb-8">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <header className="border-b border-slate-100 px-4 py-4 sm:px-6">
+          <div className="flex items-start gap-3">
+            <button type="button" onClick={onClose} disabled={loading} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-50" aria-label="Retour aux opportunités">
+              <ArrowLeft size={18} />
+            </button>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-600">Création guidée</p>
+              <h2 className="mt-0.5 text-xl font-black text-slate-950">Nouvelle opportunité</h2>
+              <p className="mt-1 text-xs text-slate-500">Étape {step + 1} sur {CREATION_STEPS.length} · {CREATION_STEPS[step].label}</p>
+            </div>
+            <div className="hidden rounded-xl bg-violet-50 px-3 py-2 text-right sm:block">
+              <p className="text-[9px] font-black uppercase tracking-wider text-violet-500">Progression</p>
+              <p className="text-sm font-black text-violet-700">{Math.round(((step + 1) / CREATION_STEPS.length) * 100)}%</p>
+            </div>
+          </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <label className={labelCls}>Titre *</label>
-              <input required value={form.titre} onChange={e => setField('titre', e.target.value)} className={inputCls} />
+          <div className="mt-5 grid grid-cols-5 gap-1.5">
+            {CREATION_STEPS.map((item, index) => {
+              const Icon = item.icon
+              const active = index === step
+              const completed = index < step
+              return (
+                <button key={item.label} type="button" disabled={index > step} onClick={() => { setError(''); setStep(index) }} className={`group flex min-w-0 flex-col items-center gap-1.5 rounded-xl px-1 py-2 text-center transition ${active ? 'bg-violet-700 text-white shadow-md shadow-violet-200' : completed ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-slate-50 text-slate-300'}`}>
+                  <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${active ? 'bg-white/15' : completed ? 'bg-emerald-100' : 'bg-white'}`}>
+                    {completed ? <Check size={14} /> : <Icon size={14} />}
+                  </span>
+                  <span className="hidden truncate text-[9px] font-black uppercase tracking-wide sm:block">{item.short}</span>
+                </button>
+              )
+            })}
+          </div>
+        </header>
+
+        <form onSubmit={handleSubmit}>
+          <div className="min-h-[420px] px-4 py-5 sm:px-6 lg:px-8">
+            <div className="mb-5 flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-700"><StepIcon size={19} /></span>
+              <div>
+                <h3 className="text-base font-black text-slate-900">{CREATION_STEPS[step].label}</h3>
+                <p className="text-xs text-slate-500">{
+                  ['Présentez clairement le produit aux futurs participants.', 'Définissez le prix, les objectifs et les remises de groupe.', 'Identifiez le client fournisseur et préparez le suivi de livraison.', 'Enrichissez la fiche avec des arguments et des visuels.', 'Relisez les informations avant de publier.'][step]
+                }</p>
+              </div>
             </div>
-            <div className="sm:col-span-2">
-              <label className={labelCls}>Description</label>
-              <textarea value={form.description} onChange={e => setField('description', e.target.value)}
-                rows={2} className={`${inputCls} resize-none`} />
-            </div>
-            <div>
-              <label className={labelCls}>Catégorie</label>
-              <select value={form.categorie} onChange={e => setField('categorie', e.target.value)} className={inputCls}>
-                <option value="">— Aucune —</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col justify-end">
-              <label className={labelCls}>Publication</label>
-              <button type="button" onClick={() => setField('actif', !form.actif)}
-                className={`inline-flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
-                  form.actif ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600'
-                }`}>
-                <span className={`relative h-4 w-8 rounded-full transition-colors ${form.actif ? 'bg-emerald-400' : 'bg-slate-300'}`}>
-                  <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-all ${form.actif ? 'left-[18px]' : 'left-0.5'}`} />
-                </span>
-                {form.actif ? 'Active immédiatement' : 'Brouillon'}
+
+            {step === 0 && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2"><label className={labelCls}>Titre du produit *</label><input autoFocus value={form.titre} onChange={e => setField('titre', e.target.value)} className={inputCls} placeholder="Ex. Table pliante de marché renforcée" /></div>
+                <div><label className={labelCls}>Catégorie</label><select value={form.categorie} onChange={e => setField('categorie', e.target.value)} className={inputCls}><option value="">— Sélectionner —</option>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                <div className="sm:col-span-2"><label className={labelCls}>Description du produit</label><textarea value={form.description} onChange={e => setField('description', e.target.value)} rows={4} className={`${inputCls} resize-none`} placeholder="Décrivez le produit, ses caractéristiques et ses avantages…" /></div>
+                <div className="sm:col-span-2 rounded-xl border border-violet-100 bg-violet-50/60 p-4"><label className={labelCls}>Message de partage</label><textarea value={form.messagePartage} onChange={e => setField('messagePartage', e.target.value)} rows={6} maxLength={500} className={`${inputCls} resize-none bg-white`} /><p className="mt-1.5 text-[10px] leading-4 text-slate-500">Ajouté automatiquement au lien partagé. Utilisez <strong>{'{titre}'}</strong> et <strong>{'{prix}'}</strong> pour insérer les informations de l’offre.</p></div>
+              </div>
+            )}
+
+            {step === 1 && (
+              <div className="space-y-5">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div><label className={labelCls}>Prix normal (FCFA) *</label><input type="number" min="1" value={form.prixNormal} onChange={e => setField('prixNormal', e.target.value)} className={inputCls} placeholder="22000" /></div>
+                  <div><label className={labelCls}>Objectif minimum *</label><input type="number" min="1" value={form.seuilMinimum} onChange={e => setField('seuilMinimum', e.target.value)} className={inputCls} placeholder="20" /></div>
+                  <div><label className={labelCls}>Stock maximal</label><input type="number" min="1" value={form.seuilMaximal} onChange={e => setField('seuilMaximal', e.target.value)} className={inputCls} placeholder="Illimité" /><p className="mt-1 text-[10px] text-slate-400">Laissez vide pour un stock illimité.</p></div>
+                  <div className="sm:col-span-2 lg:col-span-3"><label className={labelCls}>Fin des souscriptions *</label><input type="datetime-local" value={form.dateExpiration} onChange={e => setField('dateExpiration', e.target.value)} className={inputCls} /></div>
+                </div>
+                <PaliersEditor paliers={paliers} setPaliers={setPaliers} />
+              </div>
+            )}
+
+            {step === 2 && (
+              <div className="space-y-5">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <FilterSelect label="Commanditaire enregistré" value={form.commanditaireId} onChange={handleCommanditaireChange} options={[{ value: '', label: '— Sélectionner un commanditaire —' }, ...commanditaires.map(item => ({ value: item.id, label: nomPublicCommanditaire(item) || item.email }))]} />
+                  <p className="mt-2 text-[10px] text-slate-500">La sélection préremplit l’identité. Les informations publiques restent personnalisables ci-dessous.</p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div><label className={labelCls}>Nom public du fournisseur</label><input value={form.partenaireNom} onChange={e => setField('partenaireNom', e.target.value)} className={inputCls} /></div>
+                  <div><label className={labelCls}>Logo du fournisseur (URL)</label><input type="url" value={form.partenaireLogoUrl} onChange={e => setField('partenaireLogoUrl', e.target.value)} className={inputCls} /></div>
+                  <div><label className={labelCls}>Contact privé</label><input value={form.partenaireContact} onChange={e => setField('partenaireContact', e.target.value)} className={inputCls} /></div>
+                  <div><label className={labelCls}>Site ou réseau social public</label><input type="url" value={form.partenaireReseauxUrl} onChange={e => setField('partenaireReseauxUrl', e.target.value)} className={inputCls} /></div>
+                  <div><label className={labelCls}>Montant dû au fournisseur</label><input type="number" min="0" value={form.montantDuPartenaire} onChange={e => setField('montantDuPartenaire', e.target.value)} className={inputCls} /></div>
+                  <div><label className={labelCls}>Montant déjà payé</label><input type="number" min="0" value={form.montantPayePartenaire} onChange={e => setField('montantPayePartenaire', e.target.value)} className={inputCls} /></div>
+                  <div><label className={labelCls}>Alerte de réception après (jours)</label><input type="number" min="1" value={form.delaiConfirmationReceptionJours} onChange={e => setField('delaiConfirmationReceptionJours', e.target.value)} className={inputCls} /></div>
+                  <div className="sm:col-span-2"><label className={labelCls}>Message de notification de livraison</label><textarea rows={3} maxLength={500} value={form.messageNotificationLivraison} onChange={e => setField('messageNotificationLivraison', e.target.value)} className={`${inputCls} resize-none`} placeholder="Votre commande est prête. La livraison est prévue…" /></div>
+                </div>
+              </div>
+            )}
+
+            {step === 3 && (
+              <div className="space-y-5">
+                <SpecsEditor titre={form.titre} description={form.description} categorie={form.categorie} specs={specs} setSpecs={setSpecs} />
+                <div className="rounded-xl border border-slate-200 p-4"><label className={`${labelCls} mb-2`}>Galerie du produit <span className="font-normal normal-case text-slate-400 tracking-normal">(optionnel)</span></label><ImagePicker images={images} onChange={setImages} /></div>
+              </div>
+            )}
+
+            {step === 4 && (
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Produit</p><p className="mt-2 text-sm font-black text-slate-900">{form.titre}</p><p className="mt-1 text-xs text-slate-500">{form.categorie || 'Sans catégorie'}</p></div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Prix normal</p><p className="mt-2 text-sm font-black text-slate-900">{prixLisible}</p><p className="mt-1 text-xs text-slate-500">Objectif : {form.seuilMinimum || '—'} participant(s)</p></div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Fournisseur</p><p className="mt-2 text-sm font-black text-slate-900">{form.partenaireNom || 'À confirmer'}</p><p className="mt-1 text-xs text-slate-500">{form.commanditaireId ? 'Fiche commanditaire liée' : 'Aucune fiche liée'}</p></div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Contenu</p><p className="mt-2 text-sm font-black text-slate-900">{images.length} image{images.length !== 1 ? 's' : ''}</p><p className="mt-1 text-xs text-slate-500">{paliers.length} palier{paliers.length !== 1 ? 's' : ''} de prix</p></div>
+                </div>
+                <div className="rounded-2xl border border-violet-100 bg-violet-50/50 p-4 sm:p-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div><p className="text-sm font-black text-slate-900">Mode de publication</p><p className="mt-1 text-xs text-slate-500">Vous pourrez modifier et activer un brouillon plus tard.</p></div>
+                    <button type="button" onClick={() => setField('actif', !form.actif)} className={`inline-flex items-center justify-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-black transition ${form.actif ? 'border-emerald-200 bg-emerald-100 text-emerald-800' : 'border-slate-200 bg-white text-slate-600'}`}>
+                      <span className={`relative h-5 w-9 rounded-full transition-colors ${form.actif ? 'bg-emerald-500' : 'bg-slate-300'}`}><span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${form.actif ? 'left-[18px]' : 'left-0.5'}`} /></span>
+                      {form.actif ? 'Publier immédiatement' : 'Enregistrer comme brouillon'}
+                    </button>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-xs font-semibold leading-5 text-amber-900">Vérifiez le prix, la date d’expiration et l’identité du fournisseur. Après création, toutes ces informations resteront modifiables depuis la fiche de l’opportunité.</div>
+              </div>
+            )}
+
+            {error && <div role="alert" className="mt-5 rounded-xl border border-rose-100 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</div>}
+          </div>
+
+          <footer className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+            <button type="button" onClick={step === 0 ? onClose : goBack} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50">
+              <ArrowLeft size={15} /> {step === 0 ? 'Annuler' : 'Étape précédente'}
+            </button>
+            {step < CREATION_STEPS.length - 1 ? (
+              <button type="button" onClick={goNext} className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-700 px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-violet-200 transition hover:bg-violet-800">Continuer <ArrowRight size={15} /></button>
+            ) : (
+              <button type="submit" disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-700 px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-violet-200 transition hover:bg-violet-800 disabled:opacity-60">
+                {loading ? <Loader2 size={15} className="animate-spin" /> : <CircleCheck size={16} />}
+                {loading ? (uploadProgress ? `Envoi image ${uploadProgress}…` : 'Création…') : (form.actif ? "Créer et publier" : 'Enregistrer le brouillon')}
               </button>
-            </div>
-            <div>
-              <label className={labelCls}>Prix normal (FCFA) *</label>
-              <input required type="number" min="0" value={form.prixNormal}
-                onChange={e => setField('prixNormal', e.target.value)} className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Seuil minimum *</label>
-              <input required type="number" min="1" value={form.seuilMinimum}
-                onChange={e => setField('seuilMinimum', e.target.value)} className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Seuil maximal <span className="font-normal normal-case text-slate-400 tracking-normal">(optionnel — stock limité)</span></label>
-              <input type="number" min="1" value={form.seuilMaximal}
-                onChange={e => setField('seuilMaximal', e.target.value)} className={inputCls} />
-              <p className="mt-1 text-[10px] text-slate-400">
-                Laisser vide = pas de plafond, l'offre reste ouverte sans limite de participants.
-              </p>
-            </div>
-            <div className="sm:col-span-2">
-              <label className={labelCls}>Date d'expiration *</label>
-              <input required type="datetime-local" value={form.dateExpiration}
-                onChange={e => setField('dateExpiration', e.target.value)} className={inputCls} />
-            </div>
-          </div>
-
-          <PaliersEditor paliers={paliers} setPaliers={setPaliers} />
-
-          <details className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <summary className="cursor-pointer text-sm font-black text-slate-800">Partenaire fournisseur (optionnel)</summary>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div><label className={labelCls}>Nom</label><input value={form.partenaireNom} onChange={e => setField('partenaireNom', e.target.value)} className={inputCls} /></div>
-              <div><label className={labelCls}>Logo (URL)</label><input type="url" value={form.partenaireLogoUrl} onChange={e => setField('partenaireLogoUrl', e.target.value)} className={inputCls} /></div>
-              <div><label className={labelCls}>Contact privé</label><input value={form.partenaireContact} onChange={e => setField('partenaireContact', e.target.value)} className={inputCls} /></div>
-              <div><label className={labelCls}>Site / réseau social</label><input type="url" value={form.partenaireReseauxUrl} onChange={e => setField('partenaireReseauxUrl', e.target.value)} className={inputCls} /></div>
-              <div><label className={labelCls}>Montant dû</label><input type="number" min="0" value={form.montantDuPartenaire} onChange={e => setField('montantDuPartenaire', e.target.value)} className={inputCls} /></div>
-              <div><label className={labelCls}>Montant payé</label><input type="number" min="0" value={form.montantPayePartenaire} onChange={e => setField('montantPayePartenaire', e.target.value)} className={inputCls} /></div>
-              <div><label className={labelCls}>Alerte après (jours)</label><input type="number" min="1" value={form.delaiConfirmationReceptionJours} onChange={e => setField('delaiConfirmationReceptionJours', e.target.value)} className={inputCls} /></div>
-              <div className="sm:col-span-2"><label className={labelCls}>Notification de livraison</label><textarea rows={2} maxLength={500} value={form.messageNotificationLivraison} onChange={e => setField('messageNotificationLivraison', e.target.value)} className={`${inputCls} resize-none`} /></div>
-            </div>
-          </details>
-
-          <SpecsEditor titre={form.titre} description={form.description} categorie={form.categorie}
-            specs={specs} setSpecs={setSpecs} />
-
-          <div>
-            <label className={`${labelCls} mb-2`}>Images <span className="font-normal normal-case text-slate-400 tracking-normal">(optionnel)</span></label>
-            <ImagePicker images={images} onChange={setImages} />
-          </div>
-
-          {error && <div className="rounded-lg bg-rose-50 border border-rose-100 p-3 text-sm text-rose-700">{error}</div>}
-
-          <div className="flex gap-2.5 pt-1">
-            <button type="submit" disabled={loading}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 transition disabled:opacity-60">
-              {loading && <Loader2 size={14} className="animate-spin" />}
-              {loading ? (uploadProgress ? `Envoi image ${uploadProgress}…` : 'Création…') : "Créer l'opportunité"}
-            </button>
-            <button type="button" onClick={onClose}
-              className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">
-              Annuler
-            </button>
-          </div>
+            )}
+          </footer>
         </form>
       </div>
     </div>
@@ -1296,6 +1452,7 @@ function ExistingImages({ opportuniteId, images, setImages }) {
 // ── ModifierOpportuniteModal ─────────────────────────────────────────────────
 
 function ModifierOpportuniteModal({ item, onClose, onSaved }) {
+  const commanditaires = useCommanditairesDisponibles()
   const [form, setForm] = useState({
     titre: item.titre || '',
     description: item.description || '',
@@ -1304,6 +1461,8 @@ function ModifierOpportuniteModal({ item, onClose, onSaved }) {
     seuilMaximal: item.seuilMaximal != null ? String(item.seuilMaximal) : '',
     dateExpiration: item.dateExpiration ? item.dateExpiration.slice(0, 16) : '',
     categorie: item.categorie || '',
+    commanditaireId: item.commanditaireId || '',
+    messagePartage: item.messagePartage || MESSAGE_PARTAGE_DEFAUT,
     partenaireNom: item.partenaireNom || '',
     partenaireLogoUrl: item.partenaireLogoUrl || '',
     partenaireContact: item.partenaireContact || '',
@@ -1330,6 +1489,15 @@ function ModifierOpportuniteModal({ item, onClose, onSaved }) {
   const [error, setError]                 = useState('')
 
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const handleCommanditaireChange = (commanditaireId) => {
+    const commanditaire = commanditaires.find(candidate => candidate.id === commanditaireId)
+    setForm(current => commanditaire ? {
+      ...current,
+      commanditaireId,
+      partenaireNom: nomPublicCommanditaire(commanditaire),
+      partenaireContact: contactCommanditaire(commanditaire),
+    } : { ...current, commanditaireId: '' })
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -1347,6 +1515,8 @@ function ModifierOpportuniteModal({ item, onClose, onSaved }) {
         seuilMaximal: form.seuilMaximal ? Number(form.seuilMaximal) : undefined,
         dateExpiration: form.dateExpiration ? new Date(form.dateExpiration).toISOString() : undefined,
         categorie: form.categorie || undefined,
+        messagePartage: form.messagePartage,
+        commanditaireId: form.commanditaireId || undefined,
         partenaireNom: form.partenaireNom,
         partenaireLogoUrl: form.partenaireLogoUrl,
         partenaireContact: form.partenaireContact,
@@ -1399,6 +1569,12 @@ function ModifierOpportuniteModal({ item, onClose, onSaved }) {
               <textarea value={form.description} onChange={e => setField('description', e.target.value)}
                 rows={2} className={`${inputCls} resize-none`} />
             </div>
+            <div className="sm:col-span-2">
+              <label className={labelCls}>Message de partage</label>
+              <textarea value={form.messagePartage} onChange={e => setField('messagePartage', e.target.value)}
+                rows={5} maxLength={500} className={`${inputCls} resize-none`} />
+              <p className="mt-1 text-[10px] leading-4 text-slate-400">Ce texte accompagne automatiquement le lien partagé. Variables disponibles : <strong>{'{titre}'}</strong> et <strong>{'{prix}'}</strong>.</p>
+            </div>
             <div>
               <label className={labelCls}>Catégorie</label>
               <select value={form.categorie} onChange={e => setField('categorie', e.target.value)} className={inputCls}>
@@ -1439,7 +1615,22 @@ function ModifierOpportuniteModal({ item, onClose, onSaved }) {
               <p className="mt-1 text-xs text-slate-500">Le partenaire est facultatif. Son contact reste réservé à l'administration ; son nom, logo et lien public peuvent apparaître côté client.</p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div><label className={labelCls}>Nom du partenaire</label><input value={form.partenaireNom} onChange={e => setField('partenaireNom', e.target.value)} className={inputCls} /></div>
+              <div className="sm:col-span-2">
+                <FilterSelect
+                  label="Commanditaire enregistré"
+                  value={form.commanditaireId}
+                  onChange={handleCommanditaireChange}
+                  options={[
+                    { value: '', label: '— Sélectionner un commanditaire —' },
+                    ...commanditaires.map(commanditaire => ({
+                      value: commanditaire.id,
+                      label: nomPublicCommanditaire(commanditaire) || commanditaire.email,
+                    })),
+                  ]}
+                />
+                <p className="mt-1.5 text-[10px] leading-4 text-slate-400">Vous pouvez changer le commanditaire lié. Les informations publiques restent modifiables juste en dessous.</p>
+              </div>
+              <div><label className={labelCls}>Nom public du fournisseur</label><input value={form.partenaireNom} onChange={e => setField('partenaireNom', e.target.value)} className={inputCls} /></div>
               <div><label className={labelCls}>Logo (URL)</label><input type="url" value={form.partenaireLogoUrl} onChange={e => setField('partenaireLogoUrl', e.target.value)} className={inputCls} /></div>
               <div><label className={labelCls}>Contact privé</label><input value={form.partenaireContact} onChange={e => setField('partenaireContact', e.target.value)} className={inputCls} /></div>
               <div><label className={labelCls}>Réseau social / site public</label><input type="url" value={form.partenaireReseauxUrl} onChange={e => setField('partenaireReseauxUrl', e.target.value)} className={inputCls} /></div>
@@ -1520,12 +1711,16 @@ export function ModifierOpportunitePage() {
   return <ModifierOpportuniteModal item={item} onClose={() => navigate(`/opportunites/${id}`)} onSaved={() => navigate(`/opportunites/${id}`)} />
 }
 
+export function NouvelleOpportunitePage() {
+  const navigate = useNavigate()
+  return <NouvelleOpportuniteWizard onClose={() => navigate('/opportunites')} onSaved={() => navigate('/opportunites', { replace: true })} />
+}
+
 export default function Opportunites() {
   const navigate = useNavigate()
   const [opportunites, setOpportunites] = useState([])
   const [loading, setLoading]           = useState(true)
   const [actionId, setActionId]         = useState(null)
-  const [showModal, setShowModal]       = useState(false)
   const [categorieFiltre, setCategorieFiltre] = useState('TOUTES')
   const [statutListeFiltre, setStatutListeFiltre] = useState('TOUS')
   const [recherche, setRecherche] = useState('')
@@ -1591,13 +1786,7 @@ export default function Opportunites() {
 
   return (
     <div className="space-y-4">
-      {showModal && (
-        <NouvelleOpportuniteModal
-          onClose={() => setShowModal(false)}
-          onSaved={() => { setShowModal(false); fetchData() }}
-        />
-      )}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
           <p className="text-[13px] font-bold text-slate-900">Opportunités</p>
           <p className="text-[11px] text-slate-400 mt-0.5">
@@ -1605,8 +1794,8 @@ export default function Opportunites() {
           </p>
         </div>
         <button
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-violet-700 px-3.5 py-2 text-sm font-semibold text-white hover:bg-violet-800 transition shadow-sm shadow-violet-200"
+          onClick={() => navigate('/opportunites/nouvelle')}
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-700 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 hover:bg-violet-800 sm:w-auto"
         >
           <Plus size={15} /> Nouvelle opportunité
         </button>
@@ -1639,30 +1828,18 @@ export default function Opportunites() {
 
         {filtresOuverts && (
           <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2 xl:grid-cols-3">
-            <label className="block">
-              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-400">Catégorie</span>
-              <select value={categorieFiltre} onChange={e => setCategorieFiltre(e.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
-                <option value="TOUTES">Toutes les catégories ({opportunites.length})</option>
-                {categories.map(cat => <option key={cat} value={cat}>{cat} ({opportunites.filter(o => o.categorie === cat).length})</option>)}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-400">Statut</span>
-              <select value={statutListeFiltre} onChange={e => setStatutListeFiltre(e.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
-                <option value="TOUS">Tous les statuts</option>
-                {Object.entries(STATUT_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
-            </label>
-            <label className="block sm:col-span-2 xl:col-span-1">
-              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-400">Trier par</span>
-              <select value={triListe} onChange={e => setTriListe(e.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
-                <option value="RECENTES">Création la plus récente</option>
-                <option value="EXPIRATION">Expiration la plus proche</option>
-                <option value="PARTICIPANTS">Plus de participants</option>
-                <option value="PRIX_ASC">Prix croissant</option>
-                <option value="PRIX_DESC">Prix décroissant</option>
-              </select>
-            </label>
+            <FilterSelect label="Catégorie" value={categorieFiltre} onChange={setCategorieFiltre}
+              options={[{ value: 'TOUTES', label: `Toutes les catégories (${opportunites.length})` }, ...categories.map(cat => ({ value: cat, label: `${cat} (${opportunites.filter(o => o.categorie === cat).length})` }))]} />
+            <FilterSelect label="Statut" value={statutListeFiltre} onChange={setStatutListeFiltre}
+              options={[{ value: 'TOUS', label: 'Tous les statuts' }, ...Object.entries(STATUT_LABEL).map(([optionValue, optionLabel]) => ({ value: optionValue, label: optionLabel }))]} />
+            <FilterSelect label="Trier par" value={triListe} onChange={setTriListe} className="sm:col-span-2 xl:col-span-1"
+              options={[
+                { value: 'RECENTES', label: 'Création la plus récente' },
+                { value: 'EXPIRATION', label: 'Expiration la plus proche' },
+                { value: 'PARTICIPANTS', label: 'Plus de participants' },
+                { value: 'PRIX_ASC', label: 'Prix croissant' },
+                { value: 'PRIX_DESC', label: 'Prix décroissant' },
+              ]} />
           </div>
         )}
 

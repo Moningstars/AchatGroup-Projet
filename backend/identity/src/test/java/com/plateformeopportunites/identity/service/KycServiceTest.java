@@ -15,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -30,6 +31,7 @@ class KycServiceTest {
 
     @Mock private UtilisateurRepository utilisateurRepository;
     @Mock private InfoPersonnelleRepository infoPersonnelleRepository;
+    @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private PusherNotificationService pusherNotificationService;
     @InjectMocks private KycService kycService;
 

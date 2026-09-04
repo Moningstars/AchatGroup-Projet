@@ -30,8 +30,11 @@ public class WalletPlateforme {
     @Column(nullable = false)
     private String devise;
 
-    /** Points donnés par FCFA (ex: 10 → 10 pts = 1 FCFA versé). Utilisé pour la conversion retour. */
+    /** Valeur d'achat d'un point en FCFA. Les points ne sont jamais convertibles en argent retirable. */
     private BigDecimal tauxConversionPoints;
+
+    /** Points crédités au parrain après le premier achat confirmé d'un filleul. */
+    private BigDecimal recompenseParrainagePoints;
 
     private LocalDateTime updatedAt;
 
@@ -41,7 +44,8 @@ public class WalletPlateforme {
         if (this.soldeReserve == null) this.soldeReserve = BigDecimal.ZERO;
         if (this.soldePoints == null) this.soldePoints = BigDecimal.ZERO;
         if (this.devise == null) this.devise = "XOF";
-        if (this.tauxConversionPoints == null) this.tauxConversionPoints = BigDecimal.TEN;
+        if (this.tauxConversionPoints == null) this.tauxConversionPoints = BigDecimal.ONE;
+        if (this.recompenseParrainagePoints == null) this.recompenseParrainagePoints = BigDecimal.valueOf(100);
         this.updatedAt = LocalDateTime.now();
     }
 

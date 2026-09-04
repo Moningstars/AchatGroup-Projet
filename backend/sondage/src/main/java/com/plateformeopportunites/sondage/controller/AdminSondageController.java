@@ -7,15 +7,20 @@ import com.plateformeopportunites.sondage.dto.ReponseAValiderDTO;
 import com.plateformeopportunites.sondage.dto.SondageResponse;
 import com.plateformeopportunites.sondage.dto.SondageResultatDTO;
 import com.plateformeopportunites.sondage.service.SondageService;
+import com.plateformeopportunites.sondage.service.SondageImageStorageService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/sondages")
@@ -24,6 +29,7 @@ import java.util.UUID;
 public class AdminSondageController {
 
     private final SondageService sondageService;
+    private final SondageImageStorageService sondageImageStorageService;
 
     @GetMapping
     public ResponseEntity<List<SondageResponse>> lister() {
@@ -35,6 +41,15 @@ public class AdminSondageController {
                                                   @Valid @RequestBody CreerSondageRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(sondageService.creer(UUID.fromString(auth.getName()), req));
+    }
+
+    @PostMapping(value = "/{id}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String, String>> uploadImage(
+            @PathVariable UUID id,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        String url = sondageImageStorageService.stocker(file, id);
+        sondageService.mettreAJourImage(id, url);
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("url", url));
     }
 
     @PatchMapping("/{id}/activer")

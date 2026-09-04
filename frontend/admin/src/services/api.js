@@ -107,6 +107,14 @@ export const getSondageResultats = (id) =>
 export const getRepondantsSondage = (id) =>
   api.get(`/admin/sondages/${id}/repondants`).then(r => r.data)
 
+export const uploadSondageImage = (id, file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return api.post(`/admin/sondages/${id}/image`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then(r => r.data)
+}
+
 // Utilisateurs (admin)
 export const getAdminUtilisateurs = () =>
   api.get('/admin/utilisateurs').then(r => r.data)
@@ -149,6 +157,9 @@ export const alimenterWallet = (montant, description) =>
 
 export const modifierTauxConversion = (tauxConversionPoints) =>
   api.patch('/admin/wallet/taux-conversion', { tauxConversionPoints }).then(r => r.data)
+
+export const modifierRecompenseParrainage = (recompenseParrainagePoints) =>
+  api.patch('/admin/wallet/parrainage', { recompenseParrainagePoints }).then(r => r.data)
 
 // Transactions (admin — toutes)
 export const getAdminTransactions = () =>

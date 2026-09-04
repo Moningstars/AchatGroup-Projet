@@ -37,6 +37,15 @@ public class Participation {
     @Column(nullable = false)
     private BigDecimal montantGele;
 
+    /** Parrain à créditer une seule fois lorsque cette première souscription réussit. */
+    private UUID parrainId;
+
+    private Boolean recompenseParrainageAttribuee;
+
+    private BigDecimal pointsUtilises;
+
+    private BigDecimal valeurPointsUtilises;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private StatutParticipation statut;
@@ -85,5 +94,8 @@ public class Participation {
         this.statut = StatutParticipation.EN_ATTENTE;
         this.statutLivraison = StatutLivraison.EN_ATTENTE_QUOTA;
         this.prioriteTraitement = false;
+        if (this.recompenseParrainageAttribuee == null) this.recompenseParrainageAttribuee = false;
+        if (this.pointsUtilises == null) this.pointsUtilises = BigDecimal.ZERO;
+        if (this.valeurPointsUtilises == null) this.valeurPointsUtilises = BigDecimal.ZERO;
     }
 }

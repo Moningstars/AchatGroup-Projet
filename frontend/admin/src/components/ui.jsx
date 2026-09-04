@@ -16,7 +16,7 @@ const BADGE_CFG = {
 export function Badge({ color = 'gray', children, className = '' }) {
   const cfg = BADGE_CFG[color] || BADGE_CFG.gray
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-bold whitespace-nowrap ${cfg.wrap} ${className}`}>
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10.5px] font-bold ${cfg.wrap} ${className}`}>
       <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
       {children}
     </span>
@@ -27,9 +27,9 @@ export function Badge({ color = 'gray', children, className = '' }) {
 
 export function Card({ children, className = '', noPad = false }) {
   return (
-    <div className={`bg-white border border-slate-200 rounded-xl ${noPad ? '' : 'p-4'} ${className}`}>
+    <section className={`overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft ${noPad ? '' : 'p-3.5 sm:p-4'} ${className}`}>
       {children}
-    </div>
+    </section>
   )
 }
 
@@ -37,9 +37,9 @@ export function Card({ children, className = '', noPad = false }) {
 
 export function StatCard({ icon: Icon, label, value, sub, accentColor, alert, trend, trendLabel }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 relative overflow-hidden">
-      <div className="flex items-start justify-between mb-3">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+    <article className="group relative min-h-28 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3.5 shadow-soft transition duration-200 hover:border-violet-200 sm:p-4">
+      <div className="mb-3 flex items-start justify-between">
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105"
           style={{ background: accentColor + '1A' }}>
           <Icon size={15} style={{ color: accentColor }} />
         </div>
@@ -51,11 +51,11 @@ export function StatCard({ icon: Icon, label, value, sub, accentColor, alert, tr
           </span>
         ) : null}
       </div>
-      <div className="text-[21px] font-black text-slate-900 tabular-nums leading-none">{value}</div>
-      <div className="text-[11px] font-semibold text-slate-700 mt-1">{label}</div>
-      {sub && <div className="text-[10px] text-slate-400 mt-0.5">{sub}</div>}
-      <div className="absolute bottom-0 left-0 right-0 h-[3px]" style={{ background: accentColor }} />
-    </div>
+      <div className="text-xl font-black leading-none tracking-tight text-slate-950 tabular-nums">{value}</div>
+      <div className="mt-1.5 text-[11px] font-bold text-slate-700">{label}</div>
+      {sub && <div className="mt-1 line-clamp-2 text-[10.5px] leading-4 text-slate-400">{sub}</div>}
+      <div className="absolute -bottom-7 -right-7 h-20 w-20 rounded-full opacity-10" style={{ background: accentColor }} />
+    </article>
   )
 }
 
@@ -63,15 +63,15 @@ export function StatCard({ icon: Icon, label, value, sub, accentColor, alert, tr
 
 export function Table({ children }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse">{children}</table>
+    <div className="overflow-x-auto overscroll-x-contain">
+      <table className="w-full min-w-[720px] border-separate border-spacing-0">{children}</table>
     </div>
   )
 }
 
 export function Th({ children, className = '' }) {
   return (
-    <th className={`text-left text-[9.5px] font-bold uppercase tracking-[0.1em] text-slate-400 px-3 py-2.5 border-b border-slate-200 whitespace-nowrap bg-white ${className}`}>
+    <th className={`whitespace-nowrap border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-left text-[9px] font-extrabold uppercase tracking-[0.14em] text-slate-400 ${className}`}>
       {children}
     </th>
   )
@@ -79,7 +79,7 @@ export function Th({ children, className = '' }) {
 
 export function Td({ children, className = '' }) {
   return (
-    <td className={`px-3 py-2.5 border-b border-slate-100 text-[12.5px] align-middle ${className}`}>
+    <td className={`border-b border-slate-100 px-4 py-3 text-[12.5px] align-middle ${className}`}>
       {children}
     </td>
   )
@@ -87,7 +87,7 @@ export function Td({ children, className = '' }) {
 
 export function Tr({ children, className = '' }) {
   return (
-    <tr className={`hover:bg-slate-50/80 transition-colors ${className}`}>
+    <tr className={`transition-colors hover:bg-violet-50/30 ${className}`}>
       {children}
     </tr>
   )
@@ -102,7 +102,7 @@ const PB_COLORS = {
 
 export function ProgressBar({ value = 0, color = 'violet', className = '' }) {
   return (
-    <div className={`h-1.5 rounded-full bg-slate-100 overflow-hidden ${className}`}>
+    <div className={`h-1.5 overflow-hidden rounded-full bg-slate-100 ${className}`}>
       <div
         className={`h-full rounded-full transition-all duration-300 ${PB_COLORS[color] || 'bg-violet-600'}`}
         style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
@@ -116,7 +116,10 @@ export function ProgressBar({ value = 0, color = 'violet', className = '' }) {
 export function Spinner({ size = 28, py = 'py-16' }) {
   return (
     <div className={`flex justify-center ${py}`}>
-      <Loader2 size={size} className="animate-spin text-violet-600" />
+      <div className="flex flex-col items-center gap-3 text-slate-400">
+        <Loader2 size={size} className="animate-spin text-violet-600" />
+        <span className="text-xs font-semibold">Chargement…</span>
+      </div>
     </div>
   )
 }
@@ -125,28 +128,28 @@ export function Spinner({ size = 28, py = 'py-16' }) {
 
 export function EmptyState({ icon: Icon, title, sub, iconClass = '' }) {
   return (
-    <div className="flex flex-col items-center py-14 gap-3 text-center">
-      <div className="w-14 h-14 flex items-center justify-center rounded-2xl bg-slate-100">
+    <div className="flex flex-col items-center gap-2.5 px-4 py-12 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 ring-4 ring-slate-50">
         <Icon size={24} className={`text-slate-300 ${iconClass}`} />
       </div>
-      <p className="font-semibold text-slate-500 text-sm">{title}</p>
-      {sub && <p className="text-xs text-slate-400">{sub}</p>}
+      <p className="mt-2 text-sm font-bold text-slate-700">{title}</p>
+      {sub && <p className="max-w-sm text-xs leading-5 text-slate-400">{sub}</p>}
     </div>
   )
 }
 
 // ── SearchInput ───────────────────────────────────────────────────────────────
 
-export function SearchInput({ value, onChange, placeholder = 'Rechercher…', className = 'w-52' }) {
+export function SearchInput({ value, onChange, placeholder = 'Rechercher…', className = 'w-full sm:w-72' }) {
   return (
     <div className={`relative ${className}`}>
-      <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+      <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
       <input
         type="text"
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full border border-slate-200 rounded-lg py-1.5 pl-8 pr-3 text-[12.5px] bg-slate-50 outline-none focus:border-violet-400 focus:bg-white transition"
+        className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-10 pr-3 text-[12.5px] outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"
       />
     </div>
   )
@@ -158,10 +161,10 @@ export function FilterPill({ label, active, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-1 rounded-full text-[11px] font-semibold border transition ${
+      className={`rounded-xl border px-3 py-2 text-[11px] font-bold transition ${
         active
-          ? 'bg-violet-700 text-white border-violet-700'
-          : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300 hover:text-violet-700'
+          ? 'border-violet-700 bg-violet-700 text-white shadow-sm'
+          : 'border-slate-200 bg-slate-50 text-slate-500 hover:border-violet-300 hover:bg-white hover:text-violet-700'
       }`}
     >
       {label}
@@ -184,7 +187,7 @@ export function ActionBtn({ onClick, disabled, variant = 'default', children, cl
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition disabled:opacity-50 ${AB_VARIANTS[variant] || AB_VARIANTS.default} ${className}`}
+      className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${AB_VARIANTS[variant] || AB_VARIANTS.default} ${className}`}
     >
       {children}
     </button>
@@ -195,12 +198,12 @@ export function ActionBtn({ onClick, disabled, variant = 'default', children, cl
 
 export function Tabs({ tabs, active, onChange }) {
   return (
-    <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
+    <div className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1">
       {tabs.map((tab, i) => (
         <button
           key={i}
           onClick={() => onChange(i)}
-          className={`px-3 py-1.5 rounded-md text-[12px] font-semibold transition ${
+          className={`whitespace-nowrap rounded-lg px-3 py-2 text-[12px] font-bold transition ${
             active === i
               ? 'bg-white text-slate-900 shadow-sm'
               : 'text-slate-500 hover:text-slate-700'
@@ -226,6 +229,7 @@ export function AreaChart({
 }) {
   const containerRef = useRef(null)
   const [width, setWidth] = useState(400)
+  const [hoveredIndex, setHoveredIndex] = useState(null)
   const H = 180
   const pad = { top: 14, right: 16, bottom: 28, left: 40 }
 
@@ -253,6 +257,12 @@ export function AreaChart({
   const cH = H - pad.top - pad.bottom
   const xs = values.map((_, i) => pad.left + (i / Math.max(values.length - 1, 1)) * cW)
   const ys = values.map(v => pad.top + (1 - v / max) * cH)
+  const activePoint = hoveredIndex == null ? null : {
+    x: xs[hoveredIndex],
+    y: ys[hoveredIndex],
+    datum: data[hoveredIndex],
+    value: values[hoveredIndex],
+  }
 
   const linePath = xs.reduce((acc, x, i) => {
     if (i === 0) return `M${x},${ys[i]}`
@@ -263,8 +273,8 @@ export function AreaChart({
   const gradId = `ag-${cat?.replace(/\W/g, '')}`
 
   return (
-    <div ref={containerRef} className={className} style={{ height: H }}>
-      <svg width={width} height={H}>
+    <div ref={containerRef} className={`relative select-none ${className}`} style={{ height: H }}>
+      <svg width={width} height={H} role="img" aria-label={`Graphique ${cat || ''}`} onMouseLeave={() => setHoveredIndex(null)}>
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity="0.15" />
@@ -289,6 +299,14 @@ export function AreaChart({
             : <circle key={i} cx={x} cy={ys[i]} r="2.5" fill={color} />
         ))}
 
+        {activePoint && (
+          <>
+            <line x1={activePoint.x} x2={activePoint.x} y1={pad.top} y2={pad.top + cH}
+              stroke={color} strokeWidth="1" strokeDasharray="3 4" opacity=".45" />
+            <circle cx={activePoint.x} cy={activePoint.y} r="6" fill="white" stroke={color} strokeWidth="2.5" />
+          </>
+        )}
+
         {data.map((d, i) => (
           <text key={i} x={xs[i]} y={H - 7}
             textAnchor={i === 0 ? 'start' : i === xs.length - 1 ? 'end' : 'middle'}
@@ -303,7 +321,34 @@ export function AreaChart({
             {valueFormatter ? valueFormatter(v) : v}
           </text>
         ))}
+
+        {xs.map((x, i) => {
+          const previousX = i === 0 ? pad.left : (xs[i - 1] + x) / 2
+          const nextX = i === xs.length - 1 ? width - pad.right : (x + xs[i + 1]) / 2
+          return (
+            <rect key={`hit-${i}`} x={previousX} y={pad.top} width={Math.max(1, nextX - previousX)} height={cH}
+              fill="transparent" tabIndex="0" role="button"
+              aria-label={`${data[i][index]} : ${values[i]} ${cat || ''}`}
+              onMouseEnter={() => setHoveredIndex(i)} onMouseMove={() => setHoveredIndex(i)}
+              onFocus={() => setHoveredIndex(i)} onBlur={() => setHoveredIndex(null)}
+              onTouchStart={() => setHoveredIndex(i)} />
+          )
+        })}
       </svg>
+
+      {activePoint && (
+        <div className="pointer-events-none absolute z-10 min-w-28 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-lift"
+          style={{
+            left: activePoint.x,
+            top: Math.max(4, activePoint.y - 54),
+            transform: activePoint.x > width - 120 ? 'translateX(-100%)' : activePoint.x < 120 ? 'none' : 'translateX(-50%)',
+          }}>
+          <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{activePoint.datum[index]}</p>
+          <p className="mt-0.5 whitespace-nowrap text-[12px] font-black text-slate-950">
+            {valueFormatter ? valueFormatter(activePoint.value) : activePoint.value} <span className="font-semibold text-slate-500">{cat?.toLowerCase()}</span>
+          </p>
+        </div>
+      )}
     </div>
   )
 }

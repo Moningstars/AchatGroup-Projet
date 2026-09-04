@@ -5,6 +5,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Data
 public class CreerOpportuniteRequest {
@@ -39,6 +40,7 @@ public class CreerOpportuniteRequest {
     /** Nom de la catégorie (optionnel). Créée automatiquement si inconnue. */
     private String categorie;
 
+    private UUID commanditaireId;
     private String partenaireNom;
     private String partenaireLogoUrl;
     private String partenaireContact;
@@ -47,6 +49,7 @@ public class CreerOpportuniteRequest {
     @DecimalMin("0") private BigDecimal montantPayePartenaire;
     @Min(1) private Integer delaiConfirmationReceptionJours;
     @Size(max = 500) private String messageNotificationLivraison;
+    @Size(max = 500) private String messagePartage;
 
     /** true = ACTIVE immédiatement, false (défaut) = BROUILLON */
     private boolean actif = true;

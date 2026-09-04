@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Loader2, ShieldCheck, ShieldX, X,
   User, Phone, Mail, MapPin, Briefcase, CreditCard, Calendar,
   Globe, Home, FileText, CheckCircle,
 } from 'lucide-react'
-import { Badge, Spinner, EmptyState, SearchInput } from '../components/ui'
+import { Badge, Spinner, SearchInput } from '../components/ui'
 import { getKycEnAttente, approuverKyc, rejeterKyc } from '../services/api'
 import { usePusher } from '../context/PusherContext'
 
@@ -43,7 +43,7 @@ function DetailRow({ icon: Icon, label, value }) {
 function DetailPanel({ demande, onClose, onApprouver, onRejeter, actionId }) {
   if (!demande) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+      <div className="flex min-h-72 flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white text-center shadow-soft">
         <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mb-3">
           <FileText size={20} className="text-slate-300" />
         </div>
@@ -54,7 +54,7 @@ function DetailPanel({ demande, onClose, onApprouver, onRejeter, actionId }) {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden">
+    <div className="flex min-h-[520px] flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 flex-shrink-0">
         <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-[12px] font-bold flex-shrink-0 ${avatarColor(demande.nom)}`}>
@@ -140,43 +140,57 @@ export default function Kyc() {
   const [error, setError]         = useState(null)
   const [selected, setSelected]   = useState(null)
   const [actionId, setActionId]   = useState(null)
+  const [actionError, setActionError] = useState('')
   const [search, setSearch]       = useState('')
 
-  const fetchData = () => {
+  const fetchData = useCallback(() => {
     setLoading(true)
     setError(null)
     getKycEnAttente()
       .then(setDemandes)
       .catch(() => setError('Impossible de charger les demandes KYC.'))
       .finally(() => setLoading(false))
-  }
+  }, [])
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    let active = true
+    getKycEnAttente()
+      .then(data => { if (active) setDemandes(data) })
+      .catch(() => { if (active) setError('Impossible de charger les demandes KYC.') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [])
 
   // Nouvelle soumission KYC — apparaît dans la file sans refresh (refetch silencieux, sans spinner plein écran)
   useEffect(() => {
     const onKycSoumis = () => { getKycEnAttente().then(setDemandes).catch(() => {}) }
     on('KYC_SOUMIS', onKycSoumis)
     return () => off('KYC_SOUMIS', onKycSoumis)
-  }, [])
+  }, [off, on])
 
   const handleApprouver = async (userId) => {
+    setActionError('')
     setActionId('approuver')
     try {
       await approuverKyc(userId)
       setSelected(null)
       fetchData()
-    } catch { }
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Impossible d’approuver cette demande. Réessayez.')
+    }
     finally { setActionId(null) }
   }
 
   const handleRejeter = async (userId) => {
+    setActionError('')
     setActionId('rejeter')
     try {
       await rejeterKyc(userId)
       setSelected(null)
       fetchData()
-    } catch { }
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Impossible de rejeter cette demande. Réessayez.')
+    }
     finally { setActionId(null) }
   }
 
@@ -194,7 +208,7 @@ export default function Kyc() {
     <div className="space-y-4">
 
       {/* ── Stats bar ── */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
           <p className="text-[13px] font-bold text-slate-900">Vérification d'identité</p>
           <p className="text-[11px] text-slate-400 mt-0.5">Dossiers soumis par les utilisateurs</p>
@@ -207,10 +221,10 @@ export default function Kyc() {
       </div>
 
       {/* ── Split panel ── */}
-      <div className="flex gap-4" style={{ height: 'calc(100vh - 200px)', maxHeight: 580 }}>
+      <div className="flex min-h-[520px] flex-col gap-4 lg:h-[calc(100vh-210px)] lg:max-h-[720px] lg:flex-row">
 
         {/* Liste */}
-        <div className="w-72 flex-shrink-0 flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="flex max-h-80 w-full flex-shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft lg:max-h-none lg:w-80">
           <div className="p-3 border-b border-slate-100 flex-shrink-0">
             <SearchInput value={search} onChange={setSearch} placeholder="Nom, téléphone…" className="w-full" />
           </div>
@@ -269,6 +283,11 @@ export default function Kyc() {
           actionId={actionId}
         />
       </div>
+      {actionError && (
+        <div role="alert" className="fixed bottom-5 right-5 z-50 max-w-sm rounded-xl border border-rose-200 bg-white px-4 py-3 text-sm font-semibold text-rose-700 shadow-lift">
+          {actionError}
+        </div>
+      )}
     </div>
   )
 }

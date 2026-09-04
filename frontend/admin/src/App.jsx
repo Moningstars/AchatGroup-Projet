@@ -2,14 +2,14 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import AdminShell from './Pages/AdminShell'
 import Dashboard from './Pages/Dashboard'
-import Opportunites, { OpportuniteDetailPage, ModifierOpportunitePage } from './Pages/Opportunites'
+import Opportunites, { OpportuniteDetailPage, ModifierOpportunitePage, NouvelleOpportunitePage } from './Pages/Opportunites'
 import Sondages from './Pages/Sondages'
 import Utilisateurs from './Pages/Utilisateurs'
 import Portefeuilles from './Pages/Portefeuilles'
 import Commanditaires from './Pages/Commanditaires'
 import Parametres from './Pages/Parametres'
 import Kyc from './Pages/Kyc'
-import Bannieres from './Pages/Bannieres'
+import Bannieres, { BanniereEditorPage } from './Pages/Bannieres'
 import Login from './Pages/Login'
 import { useBeams } from './hooks/useBeams'
 import './App.css'
@@ -36,6 +36,7 @@ function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="opportunites" element={<Opportunites />} />
+          <Route path="opportunites/nouvelle" element={<NouvelleOpportunitePage />} />
           <Route path="opportunites/:id" element={<OpportuniteDetailPage />} />
           <Route path="opportunites/:id/modifier" element={<ModifierOpportunitePage />} />
           <Route path="sondages" element={<Sondages />} />
@@ -43,6 +44,8 @@ function App() {
           <Route path="portefeuilles" element={<Portefeuilles />} />
           <Route path="commanditaires" element={<Commanditaires />} />
           <Route path="bannieres" element={<Bannieres />} />
+          <Route path="bannieres/nouvelle" element={<BanniereEditorPage />} />
+          <Route path="bannieres/:id/modifier" element={<BanniereEditorPage />} />
           <Route path="kyc" element={<Kyc />} />
           <Route path="parametres" element={<Parametres />} />
         </Route>
