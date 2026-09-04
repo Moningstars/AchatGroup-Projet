@@ -40,7 +40,7 @@ public class ModifierOpportuniteRequest {
     /** Nom de la catégorie (optionnel). Créée automatiquement si inconnue. */
     private String categorie;
 
-    private UUID commanditaireId;
+    private UUID fournisseurId;
     private String partenaireNom;
     private String partenaireLogoUrl;
     private String partenaireContact;

@@ -11,10 +11,10 @@ import com.plateformeopportunites.common.redis.RedisService;
 import com.plateformeopportunites.common.service.PusherNotificationService;
 import com.plateformeopportunites.finance.service.WalletService;
 import com.plateformeopportunites.identity.entity.Administrateur;
-import com.plateformeopportunites.identity.entity.Commanditaire;
+import com.plateformeopportunites.identity.entity.Fournisseur;
 import com.plateformeopportunites.identity.entity.Utilisateur;
 import com.plateformeopportunites.identity.repository.AdministrateurRepository;
-import com.plateformeopportunites.identity.repository.CommanditaireRepository;
+import com.plateformeopportunites.identity.repository.FournisseurRepository;
 import com.plateformeopportunites.identity.repository.UtilisateurRepository;
 import com.plateformeopportunites.opportunite.dto.CreerOpportuniteRequest;
 import com.plateformeopportunites.opportunite.dto.ConfirmerReceptionRequest;
@@ -55,7 +55,7 @@ public class OpportuniteService {
     private final ParticipationRepository participationRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final AdministrateurRepository administrateurRepository;
-    private final CommanditaireRepository commanditaireRepository;
+    private final FournisseurRepository fournisseurRepository;
     private final OpportuniteImageRepository imageRepository;
     private final CategorieRepository categorieRepository;
     private final WalletService walletService;
@@ -77,12 +77,16 @@ public class OpportuniteService {
         }
 
         StatutOpportunite statut = req.isActif() ? StatutOpportunite.ACTIVE : StatutOpportunite.BROUILLON;
-        Commanditaire commanditaire = trouverCommanditaire(req.getCommanditaireId());
+        Fournisseur fournisseur = trouverFournisseur(req.getFournisseurId());
         String partenaireNom = nettoyer(req.getPartenaireNom());
         String partenaireContact = nettoyer(req.getPartenaireContact());
-        if (commanditaire != null) {
-            if (partenaireNom == null) partenaireNom = nomPublicCommanditaire(commanditaire);
-            if (partenaireContact == null) partenaireContact = contactCommanditaire(commanditaire);
+        String partenaireLogoUrl = nettoyer(req.getPartenaireLogoUrl());
+        String partenaireReseauxUrl = nettoyer(req.getPartenaireReseauxUrl());
+        if (fournisseur != null) {
+            if (partenaireNom == null) partenaireNom = nomPublicFournisseur(fournisseur);
+            if (partenaireContact == null) partenaireContact = contactFournisseur(fournisseur);
+            if (partenaireLogoUrl == null) partenaireLogoUrl = nettoyer(fournisseur.getLogoUrl());
+            if (partenaireReseauxUrl == null) partenaireReseauxUrl = nettoyer(fournisseur.getReseauxUrl());
         }
 
         Opportunite opportunite = Opportunite.builder()
@@ -96,11 +100,11 @@ public class OpportuniteService {
                 .prixNormal(req.getPrixNormal())
                 .seuilMinimum(req.getSeuilMinimum())
                 .seuilMaximal(req.getSeuilMaximal())
-                .commanditaireId(req.getCommanditaireId())
+                .fournisseurId(req.getFournisseurId())
                 .partenaireNom(partenaireNom)
-                .partenaireLogoUrl(nettoyer(req.getPartenaireLogoUrl()))
+                .partenaireLogoUrl(partenaireLogoUrl)
                 .partenaireContact(partenaireContact)
-                .partenaireReseauxUrl(nettoyer(req.getPartenaireReseauxUrl()))
+                .partenaireReseauxUrl(partenaireReseauxUrl)
                 .montantDuPartenaire(valeurPositiveOuZero(req.getMontantDuPartenaire()))
                 .montantPayePartenaire(valeurPositiveOuZero(req.getMontantPayePartenaire()))
                 .delaiConfirmationReceptionJours(req.getDelaiConfirmationReceptionJours() == null ? 3 : req.getDelaiConfirmationReceptionJours())
@@ -375,11 +379,13 @@ public class OpportuniteService {
                             Categorie.builder().nom(req.getCategorie()).build()));
             opp.setCategorie(categorie);
         }
-        if (req.getCommanditaireId() != null) {
-            Commanditaire commanditaire = trouverCommanditaire(req.getCommanditaireId());
-            opp.setCommanditaireId(commanditaire.getId());
-            if (req.getPartenaireNom() == null) opp.setPartenaireNom(nomPublicCommanditaire(commanditaire));
-            if (req.getPartenaireContact() == null) opp.setPartenaireContact(contactCommanditaire(commanditaire));
+        if (req.getFournisseurId() != null) {
+            Fournisseur fournisseur = trouverFournisseur(req.getFournisseurId());
+            opp.setFournisseurId(fournisseur.getId());
+            if (req.getPartenaireNom() == null) opp.setPartenaireNom(nomPublicFournisseur(fournisseur));
+            if (req.getPartenaireContact() == null) opp.setPartenaireContact(contactFournisseur(fournisseur));
+            if (req.getPartenaireLogoUrl() == null) opp.setPartenaireLogoUrl(nettoyer(fournisseur.getLogoUrl()));
+            if (req.getPartenaireReseauxUrl() == null) opp.setPartenaireReseauxUrl(nettoyer(fournisseur.getReseauxUrl()));
         }
         if (req.getPartenaireNom() != null) opp.setPartenaireNom(nettoyer(req.getPartenaireNom()));
         if (req.getPartenaireLogoUrl() != null) opp.setPartenaireLogoUrl(nettoyer(req.getPartenaireLogoUrl()));
@@ -788,21 +794,21 @@ public class OpportuniteService {
 
     // ── Private helpers ──────────────────────────────────────────────────────
 
-    private Commanditaire trouverCommanditaire(UUID commanditaireId) {
-        if (commanditaireId == null) return null;
-        return commanditaireRepository.findById(commanditaireId)
-                .orElseThrow(() -> new IllegalArgumentException("Commanditaire introuvable"));
+    private Fournisseur trouverFournisseur(UUID fournisseurId) {
+        if (fournisseurId == null) return null;
+        return fournisseurRepository.findById(fournisseurId)
+                .orElseThrow(() -> new IllegalArgumentException("Fournisseur introuvable"));
     }
 
-    private String nomPublicCommanditaire(Commanditaire commanditaire) {
-        String societe = nettoyer(commanditaire.getSociete());
+    private String nomPublicFournisseur(Fournisseur fournisseur) {
+        String societe = nettoyer(fournisseur.getSociete());
         if (societe != null) return societe;
-        return (commanditaire.getPrenom() + " " + commanditaire.getNom()).trim();
+        return fournisseur.getNom().trim();
     }
 
-    private String contactCommanditaire(Commanditaire commanditaire) {
-        String telephone = nettoyer(commanditaire.getTelephone());
-        String email = nettoyer(commanditaire.getEmail());
+    private String contactFournisseur(Fournisseur fournisseur) {
+        String telephone = nettoyer(fournisseur.getTelephone());
+        String email = nettoyer(fournisseur.getEmail());
         if (telephone == null) return email;
         if (email == null) return telephone;
         return telephone + " · " + email;
@@ -810,12 +816,19 @@ public class OpportuniteService {
 
     private BigDecimal calculerPrixActuel(Opportunite opp) {
         List<PalierPrix> paliers = palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(opp.getId());
+        PalierPrix premier = paliers.isEmpty() ? null : paliers.get(0);
         return paliers.stream()
                 .filter(p -> opp.getParticipantsActuels() >= p.getSeuilMin()
                         && opp.getParticipantsActuels() <= p.getSeuilMax())
                 .map(PalierPrix::getPrix)
                 .findFirst()
                 .orElseGet(() -> {
+                    // Le tarif du premier palier s'applique dès l'ouverture. Sans ce cas,
+                    // le premier participant serait facturé au prix normal alors que le
+                    // catalogue annonce déjà le tarif de départ de la campagne.
+                    if (premier != null && opp.getParticipantsActuels() < premier.getSeuilMin()) {
+                        return premier.getPrix();
+                    }
                     // Au-delà du dernier palier défini (plafond illimité, ou paliers ne couvrant
                     // pas tout le seuil maximal) : le prix reste au dernier palier atteint, il ne
                     // remonte jamais au plein tarif une fois qu'un tarif dégressif a été franchi.
@@ -976,6 +989,21 @@ public class OpportuniteService {
             raisonIndisponibilite = "Le stock disponible est déjà réservé";
         }
 
+        List<Participation> dossiers = participationRepository.findByOpportuniteId(opp.getId());
+        int dossiersTermines = (int) dossiers.stream().filter(p -> {
+            StatutLivraison statut = statutLivraisonOuDefaut(p);
+            return statut == StatutLivraison.LIVRE_CONFIRME || statut == StatutLivraison.ANNULE;
+        }).count();
+        int dossiersEnCours = (int) dossiers.stream().filter(p -> {
+            StatutLivraison statut = statutLivraisonOuDefaut(p);
+            return statut != StatutLivraison.EN_ATTENTE_QUOTA && statut != StatutLivraison.A_PREPARER
+                    && statut != StatutLivraison.LIVRE_CONFIRME && statut != StatutLivraison.ANNULE;
+        }).count();
+        int dossiersATraiter = Math.max(dossiers.size() - dossiersTermines - dossiersEnCours, 0);
+        String statutTraitement = dossiers.isEmpty() || dossiersTermines == dossiers.size()
+                ? "TERMINE"
+                : dossiersEnCours > 0 ? "EN_COURS" : "A_TRAITER";
+
         return OpportuniteResponse.builder()
                 .id(opp.getId())
                 .titre(opp.getTitre())
@@ -992,12 +1020,16 @@ public class OpportuniteService {
                 .souscriptionOuverte(souscriptionOuverte)
                 .activationAtteinte(compteurRedis >= opp.getSeuilMinimum())
                 .raisonIndisponibilite(raisonIndisponibilite)
+                .statutTraitement(statutTraitement)
+                .dossiersATraiter(dossiersATraiter)
+                .dossiersEnCours(dossiersEnCours)
+                .dossiersTermines(dossiersTermines)
                 .dateExpiration(opp.getDateExpiration())
                 .statut(opp.getStatut())
                 .createdAt(opp.getCreatedAt())
                 .categorie(opp.getCategorie() != null ? opp.getCategorie().getNom() : null)
                 .categorieIcone(opp.getCategorie() != null ? opp.getCategorie().getIcone() : null)
-                .commanditaireId(opp.getCommanditaireId())
+                .fournisseurId(opp.getFournisseurId())
                 .partenaireNom(opp.getPartenaireNom())
                 .partenaireLogoUrl(opp.getPartenaireLogoUrl())
                 .partenaireContact(opp.getPartenaireContact())

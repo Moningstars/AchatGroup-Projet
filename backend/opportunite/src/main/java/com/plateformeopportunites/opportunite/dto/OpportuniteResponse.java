@@ -26,12 +26,16 @@ public class OpportuniteResponse {
     private Boolean souscriptionOuverte;
     private Boolean activationAtteinte;
     private String raisonIndisponibilite;
+    private String statutTraitement;
+    private Integer dossiersATraiter;
+    private Integer dossiersEnCours;
+    private Integer dossiersTermines;
     private LocalDateTime dateExpiration;
     private StatutOpportunite statut;
     private LocalDateTime createdAt;
     private String categorie;
     private String categorieIcone;
-    private UUID commanditaireId;
+    private UUID fournisseurId;
     private String partenaireNom;
     private String partenaireLogoUrl;
     private String partenaireContact;

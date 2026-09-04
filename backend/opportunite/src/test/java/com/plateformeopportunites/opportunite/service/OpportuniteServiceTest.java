@@ -11,6 +11,7 @@ import com.plateformeopportunites.identity.entity.Utilisateur;
 import com.plateformeopportunites.identity.repository.AdministrateurRepository;
 import com.plateformeopportunites.identity.repository.UtilisateurRepository;
 import com.plateformeopportunites.opportunite.entity.Opportunite;
+import com.plateformeopportunites.opportunite.entity.PalierPrix;
 import com.plateformeopportunites.opportunite.entity.Participation;
 import com.plateformeopportunites.opportunite.repository.OpportuniteRepository;
 import com.plateformeopportunites.opportunite.repository.PalierPrixRepository;
@@ -123,6 +124,27 @@ class OpportuniteServiceTest {
         verify(walletService).gelerFonds(PID, new BigDecimal("10000"), null);
         assertEquals(6, opp.getParticipantsActuels()); // 4 + 2
         verify(participationRepository).save(any());
+    }
+
+    @Test
+    void souscrire_sansParticipant_appliqueLePrixDuPremierPalier() {
+        Opportunite opp = opportuniteActive(0, 10);
+        PalierPrix premierPalier = PalierPrix.builder()
+                .opportunite(opp)
+                .seuilMin(1)
+                .seuilMax(40)
+                .prix(new BigDecimal("7360"))
+                .build();
+        when(opportuniteRepository.findById(OPP_ID)).thenReturn(Optional.of(opp));
+        when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
+        when(palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(OPP_ID)).thenReturn(List.of(premierPalier));
+        when(participationRepository.findByUtilisateurIdAndOpportuniteId(PID, OPP_ID)).thenReturn(Optional.empty());
+        when(participationRepository.save(any())).thenReturn(new Participation());
+        when(opportuniteRepository.save(any())).thenReturn(opp);
+
+        opportuniteService.souscrire(PID, OPP_ID, 1);
+
+        verify(walletService).gelerFonds(PID, new BigDecimal("7360"), null);
     }
 
     @Test

@@ -289,7 +289,13 @@ export default function DetailOpportunite() {
     </div>
   )
 
-  const { pct: progress, valide: progressionValidee, phase: phaseProgression, placesRestantes: placesRestantesCalculees } = calculerProgression(opportunite)
+  const {
+    pct: progress,
+    valide: progressionValidee,
+    phase: phaseProgression,
+    placesRestantes: placesRestantesCalculees,
+    objectifFinal,
+  } = calculerProgression(opportunite)
   const discount = opportunite.prixNormal && Number(opportunite.prixNormal) > Number(opportunite.prixActuel)
     ? Math.round((1 - Number(opportunite.prixActuel) / Number(opportunite.prixNormal)) * 100) : null
   const paliersTries = [...(opportunite.paliers || [])].sort((a, b) => a.seuilMin - b.seuilMin)
@@ -411,7 +417,7 @@ export default function DetailOpportunite() {
                 )}
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
-                    {opportunite.commanditaireId ? 'Fournisseur vérifié' : "Fournisseur de l'offre"}
+                    {opportunite.fournisseurId ? 'Fournisseur vérifié' : "Fournisseur de l'offre"}
                   </p>
                   <h2 className="mt-1 font-heading text-lg font-black text-primary">{opportunite.partenaireNom || 'Fournisseur à confirmer'}</h2>
                   {!opportunite.partenaireNom && <p className="mt-1 text-sm font-semibold text-gray-500">Les informations du fournisseur seront renseignées prochainement.</p>}
@@ -505,11 +511,11 @@ export default function DetailOpportunite() {
               <div className="flex justify-between items-center text-[11px] font-black uppercase tracking-widest">
                 <span className="text-gray-400 flex items-center gap-1.5">
                   <Users size={12} />
-                  {progressionValidee
-                    ? phaseProgression === 'plafond'
-                      ? `${opportunite.participantsActuels} / ${opportunite.seuilMaximal} places`
-                      : `${opportunite.participantsActuels} unités · offre validée`
-                    : `${opportunite.participantsActuels} / ${opportunite.seuilMinimum} unités réservées`}
+                  {phaseProgression === 'plafond'
+                    ? `${opportunite.participantsActuels} / ${objectifFinal || opportunite.seuilMaximal} places`
+                    : progressionValidee && objectifFinal === Number(opportunite.seuilMinimum)
+                      ? `${opportunite.participantsActuels} unités · offre validée`
+                      : `${opportunite.participantsActuels} / ${objectifFinal || opportunite.seuilMinimum} unités réservées`}
                 </span>
                 <span className={activationAtteinte ? 'text-success' : 'text-accent'}>{progress}%</span>
               </div>

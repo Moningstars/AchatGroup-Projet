@@ -63,7 +63,7 @@ export default function Parametres() {
           <p className="mt-1 text-xs leading-5 text-slate-400">Informations techniques de la plateforme.</p>
           <dl className="mt-6 space-y-4">
             {[
-              ['Produit', 'OpportuniHub'],
+              ['Application', 'OpportuniHub'],
               ['Version', '1.0.0'],
               ['Backend', 'Spring Boot 3.3'],
             ].map(([label, value]) => (

@@ -1,55 +1,75 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Loader2, Plus, Trash2, X, Upload, Package, Eye, Users, CalendarClock, Layers, Edit2, Sparkles, Search, Download, Clock, CheckSquare, CalendarDays, UserCheck, ArrowLeft, ArrowRight, ClipboardList, Truck, PackageCheck, AlertTriangle, Flag, Route, SlidersHorizontal, RotateCcw, ChevronDown, Check, FileText, BadgeDollarSign, Building2, ImagePlus, CircleCheck } from 'lucide-react'
-import { Badge, Card, Table, Th, Td, Tr, Spinner, EmptyState, ProgressBar } from '../components/ui'
+import { Badge, Card, Table, Th, Td, Tr, Spinner, EmptyState, ProgressBar, Pagination } from '../components/ui'
 import { useSSE } from '../hooks/useSSE'
 import {
   getAdminOpportunites, getAdminOpportunite, activerOpportunite, cloturerOpportunite,
   creerOpportunite, modifierOpportunite, uploadOpportuniteImage, deleteOpportuniteImage,
   genererSpecsOpportunite, getParticipantsOpportunite, planifierParticipantsOpportunite, mettreAJourLivraisonParticipants,
-  getAdminCommanditaires,
+  getAdminFournisseurs, getTentativesSouscriptionEchouees,
 } from '../services/api'
 import { calculerProgression } from '../utils/progression'
 
 const BACKEND = `http://${window.location.hostname}:8080`
 const imgUrl = (url) => url ? (url.startsWith('http') ? url : BACKEND + url) : null
 
-function useCommanditairesDisponibles() {
-  const [commanditaires, setCommanditaires] = useState([])
+function useFournisseursDisponibles() {
+  const [fournisseurs, setFournisseurs] = useState([])
 
   useEffect(() => {
     let cancelled = false
-    getAdminCommanditaires()
+    getAdminFournisseurs()
       .then(items => {
-        if (!cancelled) setCommanditaires(items.filter(item => item.statut !== 'SUSPENDU'))
+        if (!cancelled) setFournisseurs(items.filter(item => item.statut !== 'SUSPENDU'))
       })
       .catch(() => {})
     return () => { cancelled = true }
   }, [])
 
-  return commanditaires
+  return fournisseurs
 }
 
-function nomPublicCommanditaire(commanditaire) {
-  return commanditaire?.societe?.trim()
-    || [commanditaire?.prenom, commanditaire?.nom].filter(Boolean).join(' ')
+function nomPublicFournisseur(fournisseur) {
+  return fournisseur?.societe?.trim() || fournisseur?.nom?.trim()
 }
 
-function contactCommanditaire(commanditaire) {
-  return [commanditaire?.telephone, commanditaire?.email].filter(Boolean).join(' · ')
+function contactFournisseur(fournisseur) {
+  return [fournisseur?.telephone, fournisseur?.email].filter(Boolean).join(' · ')
+}
+
+function ParticipantLink({ participant, compact = false }) {
+  const nom = participant.nom || 'Participant sans nom'
+  return (
+    <span className="group relative inline-flex max-w-full">
+      <Link
+        to={`/utilisateurs?focus=${encodeURIComponent(participant.utilisateurId || '')}`}
+        className="inline-flex max-w-full items-center gap-1 font-bold text-slate-900 decoration-violet-300 underline-offset-4 hover:text-violet-700 hover:underline focus:outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-violet-400"
+      >
+        <span className="truncate">{nom}</span>
+        <ArrowRight size={12} className="shrink-0 text-violet-500" />
+      </Link>
+      <span className={`pointer-events-none absolute left-0 z-30 hidden w-56 rounded-xl border border-slate-200 bg-slate-950 px-3 py-2.5 text-left shadow-xl group-hover:block group-focus-within:block ${compact ? 'top-full mt-2' : 'bottom-full mb-2'}`}>
+        <span className="block text-xs font-black text-white">{nom}</span>
+        <span className="mt-1 block text-[10px] text-slate-300">{participant.telephone || 'Téléphone non renseigné'}</span>
+        <span className="mt-0.5 block text-[10px] text-slate-400">Inscription : {formatDateTime(participant.createdAt)}</span>
+        <span className="mt-1.5 block text-[10px] font-bold text-violet-300">Ouvrir la fiche utilisateur →</span>
+      </span>
+    </span>
+  )
 }
 
 const CATEGORIES = ['Mode', 'Électronique', 'Véhicules', 'Maison', 'Alimentaire', 'Informatique', 'Beauté', 'Mobilier', 'Sport']
 const MESSAGE_PARTAGE_DEFAUT = "🔥 Bon plan OpportuniHub !\n\nDécouvrez « {titre} » à partir de {prix} FCFA grâce à l’achat groupé.\n⏳ Rejoignez l’offre avant sa clôture et profitez du meilleur tarif.\n\n👉 Voir l’offre et participer :"
 const CREATION_STEPS = [
-  { label: 'Présentation', short: 'Produit', icon: FileText },
+  { label: 'Présentation', short: 'Opportunité', icon: FileText },
   { label: 'Tarification', short: 'Prix', icon: BadgeDollarSign },
-  { label: 'Fournisseur', short: 'Partenaire', icon: Building2 },
+  { label: 'Fournisseur', short: 'Fournisseur', icon: Building2 },
   { label: 'Contenu', short: 'Médias', icon: ImagePlus },
   { label: 'Vérification', short: 'Validation', icon: CircleCheck },
 ]
 
-function FilterSelect({ label, value, onChange, options, className = '' }) {
+function FilterSelect({ label, value, onChange, options, className = '', compact = false, icon: Icon }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
   const selected = options.find(option => option.value === value) || options[0]
@@ -64,10 +84,10 @@ function FilterSelect({ label, value, onChange, options, className = '' }) {
 
   return (
     <div ref={rootRef} className={`relative ${className}`} onKeyDown={event => event.key === 'Escape' && setOpen(false)}>
-      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">{label}</span>
+      {!compact && <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">{label}</span>}
       <button type="button" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(current => !current)}
-        className={`flex h-10 w-full items-center justify-between gap-3 rounded-xl border px-3 text-left text-[12px] font-semibold outline-none transition ${open ? 'border-violet-300 bg-white ring-4 ring-violet-50' : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white'}`}>
-        <span className="truncate text-slate-700">{selected?.label}</span>
+        className={`flex w-full items-center justify-between gap-2 rounded-xl border px-3 text-left font-semibold outline-none transition ${compact ? 'h-10 text-[11px]' : 'h-10 text-[12px]'} ${open ? 'border-violet-300 bg-white ring-4 ring-violet-50' : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white'}`}>
+        <span className="flex min-w-0 items-center gap-2 text-slate-700">{Icon && <Icon size={13} className="shrink-0 text-violet-500" />}<span className="truncate">{selected?.label}</span></span>
         <ChevronDown size={14} className={`shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180 text-violet-600' : ''}`} />
       </button>
       {open && (
@@ -151,7 +171,7 @@ const STATUT_LIVRAISON_COLOR = {
 const STATUT_LIVRAISON_LABEL = {
   EN_ATTENTE_QUOTA: 'Campagne en cours',
   A_PREPARER: 'Paiement validé',
-  PREPARATION: 'Lot transmis au partenaire',
+  PREPARATION: 'Lot transmis au fournisseur',
   PRET_LIVRAISON: 'Partenaire confirmé',
   EN_LIVRAISON: 'Date de livraison annoncée',
   LIVRE_A_CONFIRMER: 'Confirmation client attendue',
@@ -163,6 +183,15 @@ const STATUT_LIVRAISON_LABEL = {
 const STATUT_LIVRAISON_OPTIONS = [
   'A_PREPARER',
   'PREPARATION',
+  'EN_LIVRAISON',
+  'LIVRE_A_CONFIRMER',
+  'ECHEC_LIVRAISON',
+  'LITIGE',
+  'ANNULE',
+]
+const STATUT_LIVRAISON_MANUEL_OPTIONS = [
+  'PREPARATION',
+  'PRET_LIVRAISON',
   'EN_LIVRAISON',
   'LIVRE_A_CONFIRMER',
   'ECHEC_LIVRAISON',
@@ -255,20 +284,18 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
   const [bulkLivraison, setBulkLivraison] = useState('PREPARATION')
   const [bulkDeliveryInfo, setBulkDeliveryInfo] = useState({ referenceLivraison: '', dateLivraisonPrevue: '', noteLivraison: '' })
   const [savingLivraison, setSavingLivraison] = useState(false)
+  const [participantsPage, setParticipantsPage] = useState(1)
+  const [dateDebutFiltre, setDateDebutFiltre] = useState('')
+  const [dateFinFiltre, setDateFinFiltre] = useState('')
+
+  useEffect(() => setParticipantsPage(1), [searchParticipant, statutFiltre, planningFiltre, livraisonFiltre, dateDebutFiltre, dateFinFiltre])
 
   useEffect(() => {
     if (!item) return
-    setSelectedIds([])
-    setSearchParticipant('')
-    setStatutFiltre('TOUS')
-    setPlanningFiltre('TOUS')
-    setLivraisonFiltre('A_TRAITER')
-    setBulkSlot(todaySlot())
-    setBulkLivraison('PREPARATION')
-    setBulkDeliveryInfo({ referenceLivraison: '', dateLivraisonPrevue: '', noteLivraison: '' })
-    setLoadingParticipants(true)
+    let cancelled = false
     getParticipantsOpportunite(item.id)
       .then(data => {
+        if (cancelled) return
         setParticipants(data)
         setPlan(Object.fromEntries(
           data
@@ -276,9 +303,10 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
             .map(p => [p.id, { slot: p.creneauTraitement ? p.creneauTraitement.slice(0, 16) : '', note: p.noteTraitement || '' }])
         ))
       })
-      .catch(() => setParticipants([]))
-      .finally(() => setLoadingParticipants(false))
-  }, [item?.id])
+      .catch(() => { if (!cancelled) setParticipants([]) })
+      .finally(() => { if (!cancelled) setLoadingParticipants(false) })
+    return () => { cancelled = true }
+  }, [item])
 
   if (!item) return null
   const { pct, valide: seuilValide, phase: phaseProgression, placesRestantes: placesRestantesCalc } = calculerProgression(item)
@@ -302,14 +330,15 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
   const livraisonEnAttenteConfirmation = livraisonCounts.LIVRE_A_CONFIRMER || 0
   const placesRestantes = phaseProgression === 'plafond' ? placesRestantesCalc : null
   const joursRestants = item.dateExpiration ? Math.ceil((new Date(item.dateExpiration) - new Date()) / 86400000) : null
+  const couvertureUrl = images[0]?.url ? imgUrl(images[0].url) : null
   const prochaineAction = livraisonsProblemes > 0
     ? { icon: AlertTriangle, title: 'Traiter les problèmes', text: `${livraisonsProblemes} livraison(s) en échec ou litige demandent une action humaine.`, color: 'rose' }
     : livraisonEnAttenteConfirmation > 0
       ? { icon: PackageCheck, title: 'Relancer les confirmations', text: `${livraisonEnAttenteConfirmation} participant(s) doivent confirmer la réception.`, color: 'amber' }
       : (livraisonCounts.EN_LIVRAISON || 0) > 0
-        ? { icon: Truck, title: 'Contrôler les dates promises', text: `${livraisonCounts.EN_LIVRAISON} participant(s) ont une livraison annoncée par le partenaire.`, color: 'sky' }
+        ? { icon: Truck, title: 'Contrôler les dates promises', text: `${livraisonCounts.EN_LIVRAISON} participant(s) ont une livraison annoncée par le fournisseur.`, color: 'sky' }
         : (livraisonCounts.A_PREPARER || 0) + (livraisonCounts.PREPARATION || 0) + (livraisonCounts.PRET_LIVRAISON || 0) > 0
-          ? { icon: ClipboardList, title: 'Transmettre le prochain lot', text: 'Sélectionnez les participants, exportez la liste et consignez la réponse du partenaire.', color: 'violet' }
+          ? { icon: ClipboardList, title: 'Transmettre le prochain lot', text: 'Sélectionnez les participants, exportez la liste et consignez la réponse du fournisseur.', color: 'violet' }
           : { icon: CheckSquare, title: 'Suivi à jour', text: 'Aucune action urgente détectée sur cette opportunité.', color: 'emerald' }
 
   const savePlan = (nextPlan) => {
@@ -335,6 +364,8 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
       const matchesLivraison = livraisonFiltre === 'TOUS'
         || p.statutLivraison === livraisonFiltre
         || (livraisonFiltre === 'PRIORITAIRES' && p.prioriteTraitement)
+        || (livraisonFiltre === 'PROBLEMES' && (['ECHEC_LIVRAISON', 'LITIGE'].includes(p.statutLivraison) || p.confirmationEnRetard))
+        || (livraisonFiltre === 'CONFIRMATIONS' && p.statutLivraison === 'LIVRE_A_CONFIRMER')
         || (livraisonFiltre === 'A_TRAITER' && !['LIVRE_CONFIRME', 'ANNULE'].includes(p.statutLivraison))
         || (livraisonFiltre === 'TERMINES' && ['LIVRE_CONFIRME', 'ANNULE'].includes(p.statutLivraison))
       const slot = participantPlan(p.id).slot
@@ -348,7 +379,10 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
         (planningFiltre === 'AUJOURDHUI' && slotDay === today) ||
         (planningFiltre === 'DEMAIN' && slotDay === tomorrow) ||
         (planningFiltre === 'PLANIFIES' && hasSlot)
-      return matchesSearch && matchesStatut && matchesLivraison && matchesPlanning
+      const inscriptionDate = p.createdAt ? new Date(p.createdAt) : null
+      const debutOk = !dateDebutFiltre || (inscriptionDate && inscriptionDate >= new Date(`${dateDebutFiltre}T00:00:00`))
+      const finOk = !dateFinFiltre || (inscriptionDate && inscriptionDate <= new Date(`${dateFinFiltre}T23:59:59`))
+      return matchesSearch && matchesStatut && matchesLivraison && matchesPlanning && debutOk && finOk
     }).sort((a, b) => {
       const quantiteDiff = Number(b.quantite || 0) - Number(a.quantite || 0)
       if (quantiteDiff !== 0) return quantiteDiff
@@ -360,13 +394,14 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
     })
   })()
 
+  const participantsPageItems = filteredParticipants.slice((participantsPage - 1) * 10, participantsPage * 10)
   const selectedParticipants = filteredParticipants.filter(p => selectedIds.includes(p.id))
-  const allVisibleSelected = filteredParticipants.length > 0 && filteredParticipants.every(p => selectedIds.includes(p.id))
+  const allVisibleSelected = participantsPageItems.length > 0 && participantsPageItems.every(p => selectedIds.includes(p.id))
   const toggleAllVisible = () => {
     if (allVisibleSelected) {
-      setSelectedIds(ids => ids.filter(id => !filteredParticipants.some(p => p.id === id)))
+      setSelectedIds(ids => ids.filter(id => !participantsPageItems.some(p => p.id === id)))
     } else {
-      setSelectedIds(ids => Array.from(new Set([...ids, ...filteredParticipants.map(p => p.id)])))
+      setSelectedIds(ids => Array.from(new Set([...ids, ...participantsPageItems.map(p => p.id)])))
     }
   }
   const toggleSelected = (id) => {
@@ -426,7 +461,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
     })
   }
   const exportRows = (rows) => {
-    const header = ['Nom', 'Téléphone', 'Quantité', 'Montant gelé', 'Statut paiement', 'État du dossier', 'Avancement', 'Priorité', 'Inscription', 'Lot prévu', 'Date promise par le partenaire', 'Référence partenaire', 'Note admin', 'Note partenaire', 'Confirmation participant', 'ID participant', 'ID utilisateur']
+    const header = ['Nom', 'Téléphone', 'Quantité', 'Montant gelé', 'Statut paiement', 'État du dossier', 'Avancement', 'Priorité', 'Inscription', 'Lot prévu', 'Date promise par le fournisseur', 'Référence fournisseur', 'Note admin', 'Note fournisseur', 'Confirmation participant', 'ID participant', 'ID utilisateur']
     const body = rows.map(p => {
       const pPlan = participantPlan(p.id)
       return [
@@ -455,29 +490,40 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
   return (
     <div className="min-h-full bg-slate-50">
       <div className="mx-auto flex max-w-[1440px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
-        <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <button onClick={onClose} className="mb-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-400 hover:text-slate-700">
-                <ArrowLeft size={14} /> Retour aux opportunités
+        <div className="border-b border-slate-200 bg-white p-4 sm:px-5">
+          <button onClick={onClose} className="mb-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-400 hover:text-violet-700">
+            <ArrowLeft size={14} /> Retour aux opportunités
+          </button>
+          <div className="grid gap-4 md:grid-cols-[190px_minmax(0,1fr)_auto] md:items-center xl:grid-cols-[210px_minmax(0,1fr)_auto]">
+            <div className="relative h-32 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 sm:h-36 md:h-28">
+              {couvertureUrl ? (
+                <img src={couvertureUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-gradient-to-br from-slate-50 to-slate-100 text-slate-400">
+                  <ImagePlus size={21} />
+                  <span className="text-[11px] font-bold">Aucune photo</span>
+                </div>
+              )}
+              <button onClick={() => onModifier(item)}
+                className="absolute bottom-2 right-2 inline-flex items-center gap-1.5 rounded-lg bg-white/95 px-2.5 py-1.5 text-[10px] font-black text-slate-700 shadow-sm backdrop-blur hover:bg-white">
+                <ImagePlus size={13} /> {couvertureUrl ? 'Changer la photo' : 'Ajouter une photo'}
               </button>
+            </div>
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-xl font-black tracking-tight text-slate-950">{item.titre}</h2>
+                <h2 className="text-xl font-black tracking-tight text-slate-950 sm:text-2xl">{item.titre}</h2>
                 <Badge color={STATUT_COLOR[item.statut] || 'gray'}>{STATUT_LABEL[item.statut] || item.statut}</Badge>
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-              {item.categorie && (
-                  <span className="rounded-full bg-violet-50 px-2.5 py-1 font-bold text-violet-700">{item.categorie}</span>
-              )}
-                <span>Créée le {formatDate(item.createdAt)}</span>
-                <span>Expire le {formatDate(item.dateExpiration)}</span>
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                {item.categorie && (
+                  <span className="rounded-full bg-violet-50 px-2.5 py-1 font-black text-violet-700">{item.categorie}</span>
+                )}
+                <span className="inline-flex items-center gap-1"><CalendarDays size={12} /> Créée le {formatDate(item.createdAt)}</span>
+                <span className="inline-flex items-center gap-1"><Clock size={12} /> Échéance {formatDate(item.dateExpiration)}</span>
               </div>
+              {item.description && <p className="mt-2 line-clamp-2 max-w-2xl text-xs leading-5 text-slate-500">{item.description}</p>}
             </div>
-            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-              <button onClick={() => exportRows(filteredParticipants)}
-                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 sm:flex-none">
-                <Download size={15} /> Exporter la liste
-              </button>
+            <div className="flex w-full flex-wrap items-center gap-2 md:self-start sm:w-auto">
               <button onClick={() => onModifier(item)}
                 className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 sm:flex-none">
                 <Edit2 size={15} /> Modifier
@@ -504,125 +550,114 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
         </div>
 
         <div className="p-4 sm:p-6">
-          <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="grid items-center gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="grid items-center gap-3 xl:grid-cols-[minmax(220px,1fr)_170px_minmax(390px,1.35fr)]">
               <div className="flex items-start gap-3">
-                <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
                   prochaineAction.color === 'rose' ? 'bg-rose-50 text-rose-600'
                     : prochaineAction.color === 'amber' ? 'bg-amber-50 text-amber-600'
                     : prochaineAction.color === 'sky' ? 'bg-sky-50 text-sky-600'
                     : prochaineAction.color === 'violet' ? 'bg-violet-50 text-violet-700'
                     : 'bg-emerald-50 text-emerald-700'
                 }`}>
-                  <prochaineAction.icon size={18} />
+                  <prochaineAction.icon size={17} />
                 </div>
-                <div>
-                  <p className="text-sm font-black text-slate-950">{prochaineAction.title}</p>
-                  <p className="mt-0.5 text-xs text-slate-500">{prochaineAction.text}</p>
+                <div className="min-w-0">
+                  <p className="text-sm font-black leading-5 text-slate-950">{prochaineAction.title}</p>
+                  <p className="truncate text-[11px] text-slate-500" title={prochaineAction.text}>{prochaineAction.text}</p>
                 </div>
               </div>
               <div className="w-full">
-                <div className="mb-1 flex items-center justify-between text-xs font-bold text-slate-500">
-                  <span>Avancement du dossier</span>
-                  <span>{livraisonMoyenne}%</span>
+                <div className="mb-1 flex items-center justify-between text-[10px] font-black uppercase tracking-wide text-slate-400">
+                  <span>Avancement</span>
+                  <span className="text-slate-700">{livraisonMoyenne}%</span>
                 </div>
                 <ProgressBar value={livraisonMoyenne} color={livraisonMoyenne >= 90 ? 'emerald' : livraisonMoyenne >= 50 ? 'sky' : 'amber'} />
               </div>
-            </div>
-            <div className="mx-auto mt-5 grid w-full max-w-3xl gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-3 gap-2">
               {ETAPES_LIVRAISON.map((step, index) => {
                 const count = step.statuses.reduce((sum, status) => sum + (livraisonCounts[status] || 0), 0)
                 const active = count > 0
                 return (
                   <button key={step.key} onClick={() => setLivraisonFiltre(step.key)}
-                    className={`rounded-xl border px-4 py-3 text-center transition ${
+                    title={step.hint}
+                    className={`flex min-w-0 items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition ${
                       active ? 'border-violet-200 bg-violet-50' : 'border-slate-100 bg-slate-50 hover:bg-slate-100'
                     }`}>
-                    <div className="flex items-center justify-center gap-2">
-                      <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black ${
+                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
                         active ? 'bg-violet-700 text-white' : 'bg-white text-slate-400'
                       }`}>{index + 1}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-black tabular-nums ${active ? 'bg-violet-100 text-violet-800' : 'bg-white text-slate-400'}`}>{count}</span>
-                    </div>
-                    <p className={`mt-2 text-xs font-black ${active ? 'text-violet-900' : 'text-slate-600'}`}>{step.label}</p>
-                    <p className="text-[10px] text-slate-400">{step.hint}</p>
+                    <span className="min-w-0">
+                      <span className={`block truncate text-[11px] font-black ${active ? 'text-violet-900' : 'text-slate-600'}`}>{step.label}</span>
+                      <span className={`block text-[10px] font-bold tabular-nums ${active ? 'text-violet-600' : 'text-slate-400'}`}>{count} dossier{count > 1 ? 's' : ''}</span>
+                    </span>
                   </button>
                 )
               })}
+              </div>
             </div>
           </div>
 
           <div className="space-y-4">
-            <aside className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <div className="grid grid-cols-2 gap-3 md:col-span-2 xl:col-span-2">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Prix de base</p>
-                  <p className="mt-2 text-lg font-black text-slate-950 tabular-nums">{formatMontant(item.prixNormal)}</p>
-                  <p className="text-[10px] text-slate-400">FCFA</p>
+            <section aria-label="Indicateurs clés" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="flex items-center justify-between"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Prix de base</p><BadgeDollarSign size={14} className="text-slate-300" /></div>
+                  <p className="mt-1.5 text-lg font-black text-slate-950 tabular-nums">{formatMontant(item.prixNormal)} <span className="text-[9px] font-bold text-slate-400">FCFA</span></p>
                 </div>
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-600">Prix actuel</p>
-                  <p className="mt-2 text-lg font-black text-emerald-800 tabular-nums">{formatMontant(prixActuel)}</p>
-                  <p className="text-[10px] text-emerald-600">-{formatMontant(economies)} FCFA / unité</p>
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+                  <div className="flex items-center justify-between"><p className="text-[9px] font-black uppercase tracking-wider text-emerald-600">Prix actuel</p><Sparkles size={14} className="text-emerald-500" /></div>
+                  <p className="mt-1.5 text-lg font-black text-emerald-800 tabular-nums">{formatMontant(prixActuel)} <span className="text-[9px] font-bold text-emerald-600">FCFA</span></p>
+                  <p className="text-[9px] font-bold text-emerald-600">Économie {formatMontant(economies)}</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Participants</p>
-                  <p className="mt-2 text-lg font-black text-slate-950 tabular-nums">
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="flex items-center justify-between"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Participants</p><Users size={14} className="text-violet-400" /></div>
+                  <p className="mt-1.5 text-lg font-black text-slate-950 tabular-nums">
                     {seuilValide
                       ? phaseProgression === 'plafond' ? `${item.participantsActuels} / ${item.seuilMaximal}` : `${item.participantsActuels} — validé`
                       : `${item.participantsActuels} / ${item.seuilMinimum}`}
                   </p>
-                  <ProgressBar value={pct} color="indigo" className="mt-2" />
+                  <ProgressBar value={pct} color="indigo" className="mt-1.5" />
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Temps restant</p>
-                  <p className="mt-2 text-lg font-black text-slate-950">{joursRestants == null ? '—' : `${Math.max(0, joursRestants)} j`}</p>
-                  <p className="text-[10px] text-slate-400">{formatDate(item.dateExpiration)}</p>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="flex items-center justify-between"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Quantités</p><Package size={14} className="text-sky-400" /></div>
+                  <p className="mt-1.5 text-lg font-black text-slate-950 tabular-nums">{totalQuantites}</p>
+                  <p className="text-[9px] text-slate-400">unités réservées</p>
                 </div>
-              </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="flex items-center justify-between"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Montant gelé</p><ClipboardList size={14} className="text-amber-400" /></div>
+                  <p className="mt-1.5 truncate text-lg font-black text-slate-950 tabular-nums" title={`${formatMontant(totalMontantGele)} FCFA`}>{formatMontant(totalMontantGele)} <span className="text-[9px] font-bold text-slate-400">FCFA</span></p>
+                  <p className="text-[9px] text-slate-400">dépôts validés</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="flex items-center justify-between"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Temps restant</p><Clock size={14} className="text-rose-400" /></div>
+                  <p className="mt-1.5 text-lg font-black text-slate-950">{joursRestants == null ? '—' : `${Math.max(0, joursRestants)} j`}</p>
+                  <p className="text-[9px] text-slate-400">jusqu’au {formatDate(item.dateExpiration)}</p>
+                </div>
+            </section>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">Pilotage rapide</p>
-                  <ClipboardList size={15} className="text-violet-500" />
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Quantités</p>
-                    <p className="font-black text-slate-900 tabular-nums">{totalQuantites}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Montant gelé</p>
-                    <p className="font-black text-slate-900 tabular-nums">{formatMontant(totalMontantGele)} FCFA</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Palier actif</p>
-                    <p className="font-black text-slate-900">{palierActif ? `${palierActif.seuilMin}-${palierActif.seuilMax}` : '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Stock restant</p>
-                    <p className="font-black text-slate-900">{placesRestantes == null ? 'Illimité' : placesRestantes}</p>
-                  </div>
-                </div>
-              </div>
+            <aside className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">Partenaire fournisseur</p>
-                  <Package size={15} className="text-violet-500" />
-                </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-center">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Fournisseur</p>
                 {item.partenaireNom ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      {item.partenaireLogoUrl ? <img src={item.partenaireLogoUrl} alt="" className="h-10 w-10 rounded-xl object-contain" /> : <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 font-black text-violet-700">{item.partenaireNom[0]}</div>}
-                      <div><p className="font-black text-slate-900">{item.partenaireNom}</p><p className="text-xs text-slate-400">{item.partenaireContact || 'Contact non renseigné'}</p></div>
+                  <div className="mt-3">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-violet-50 text-lg font-black text-violet-700 shadow ring-1 ring-slate-200">
+                      {item.partenaireLogoUrl ? <img src={imgUrl(item.partenaireLogoUrl)} alt="" className="h-full w-full object-cover" /> : item.partenaireNom[0]}
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="rounded-xl bg-slate-50 p-3"><p className="font-bold text-slate-400">Montant dû</p><p className="mt-1 font-black text-slate-900">{formatMontant(item.montantDuPartenaire)} FCFA</p></div>
-                      <div className={`rounded-xl p-3 ${item.statutPaiementPartenaire === 'PAYE' ? 'bg-emerald-50' : 'bg-amber-50'}`}><p className="font-bold text-slate-500">Paiement</p><p className="mt-1 font-black text-slate-900">{STATUT_PAIEMENT_LABEL[item.statutPaiementPartenaire] || 'Non configuré'}</p><p className="mt-1 text-[10px] text-slate-500">Reste {formatMontant(item.montantRestantPartenaire)} FCFA</p></div>
+                    <p className="mt-2 truncate text-sm font-black text-slate-900">{item.partenaireNom}</p>
+                    <p className="truncate text-[11px] text-slate-400">{item.partenaireContact || 'Contact non renseigné'}</p>
+                    <div className="mt-3 flex flex-wrap justify-center gap-1.5 text-[10px] font-bold">
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">Dû : {formatMontant(item.montantDuPartenaire)} FCFA</span>
+                      <span className={`rounded-full px-2.5 py-1 ${item.statutPaiementPartenaire === 'PAYE' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{STATUT_PAIEMENT_LABEL[item.statutPaiementPartenaire] || 'Paiement à définir'}</span>
                     </div>
                   </div>
-                ) : <p className="text-sm text-slate-400">Aucun partenaire lié. Ajoutez-le depuis la page de modification.</p>}
+                ) : (
+                  <button type="button" onClick={() => onModifier(item)} className="group mt-3 w-full rounded-xl border border-dashed border-slate-200 px-3 py-3 hover:border-violet-300 hover:bg-violet-50/50">
+                    <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 group-hover:bg-violet-100 group-hover:text-violet-600"><Package size={19} /></span>
+                    <span className="mt-2 block text-xs font-bold text-slate-600">Aucun fournisseur lié</span>
+                    <span className="block text-[10px] text-violet-600">Cliquer pour en ajouter un</span>
+                  </button>
+                )}
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -630,26 +665,25 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                   <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">Suivi des engagements</p>
                   <Truck size={15} className="text-sky-500" />
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-xl bg-slate-50 p-3">
+                <div className="grid grid-cols-4 gap-2 text-sm xl:grid-cols-2">
+                  <div className="rounded-xl bg-slate-50 p-2.5">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Complétion</p>
                     <p className="mt-1 font-black text-slate-900 tabular-nums">{livraisonMoyenne}%</p>
                     <ProgressBar value={livraisonMoyenne} color={livraisonMoyenne >= 90 ? 'emerald' : 'sky'} className="mt-2" />
                   </div>
-                  <div className="rounded-xl bg-emerald-50 p-3">
+                  <div className="rounded-xl bg-emerald-50 p-2.5">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Reçus confirmés</p>
                     <p className="mt-1 font-black text-emerald-800 tabular-nums">{livraisonsConfirmees}/{participants.length}</p>
                   </div>
-                  <div className="rounded-xl bg-violet-50 p-3">
+                  <div className="rounded-xl bg-violet-50 p-2.5">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-violet-600">Prioritaires</p>
                     <p className="mt-1 font-black text-violet-800 tabular-nums">{participants.filter(p => p.prioriteTraitement).length}</p>
                   </div>
-                  <div className="rounded-xl bg-rose-50 p-3">
+                  <div className="rounded-xl bg-rose-50 p-2.5">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600">À résoudre</p>
                     <p className="mt-1 font-black text-rose-700 tabular-nums">{livraisonsProblemes}</p>
                   </div>
                 </div>
-                <p className="mt-3 text-xs leading-relaxed text-slate-500">OpportuniHub ne prépare ni ne transporte les colis. Nous contrôlons l'engagement du partenaire et la confirmation finale du participant.</p>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -704,19 +738,20 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
 
             <section className="space-y-4">
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                   <div>
                     <p className="flex items-center gap-2 text-sm font-black text-slate-950">
                       <Users size={17} className="text-violet-600" /> Participants à traiter
                     </p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      Constituez le lot transmis au partenaire. Les réceptions confirmées quittent automatiquement la file active. {filteredParticipants.length} visible(s), {selectedParticipants.length} sélectionné(s).
+                    <p className="mt-0.5 text-[11px] text-slate-400">
+                      {filteredParticipants.length} dossier{filteredParticipants.length > 1 ? 's' : ''} visible{filteredParticipants.length > 1 ? 's' : ''} · {selectedParticipants.length} sélectionné{selectedParticipants.length > 1 ? 's' : ''}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <button onClick={() => exportRows(selectedParticipants)} disabled={selectedParticipants.length === 0}
+                    <button onClick={() => exportRows(selectedParticipants.length > 0 ? selectedParticipants : filteredParticipants)}
+                      disabled={filteredParticipants.length === 0}
                       className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40">
-                      <Download size={14} /> Export Excel (.csv)
+                      <Download size={14} /> Exporter {selectedParticipants.length > 0 ? 'la sélection' : 'la liste'}
                     </button>
                     <button onClick={() => planSelected(todaySlot())} disabled={selectedParticipants.length === 0}
                       className="inline-flex items-center gap-1.5 rounded-xl bg-violet-700 px-3 py-2 text-xs font-bold text-white hover:bg-violet-800 disabled:opacity-40">
@@ -729,44 +764,50 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                   </div>
                 </div>
 
-                <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_150px_170px_170px]">
+                <div className="mt-4 grid min-w-0 items-end gap-2.5 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_150px_140px_135px_135px]">
                   <div className="relative">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input value={searchParticipant} onChange={e => setSearchParticipant(e.target.value)}
                       placeholder="Rechercher nom, téléphone, ID…"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-violet-400 focus:bg-white" />
+                      className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs outline-none transition focus:border-violet-400 focus:bg-white" />
                   </div>
-                  <select value={statutFiltre} onChange={e => setStatutFiltre(e.target.value)}
-                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400">
-                    <option value="TOUS">Tous statuts</option>
-                    <option value="EN_ATTENTE">En attente</option>
-                    <option value="CONFIRMEE">Confirmée</option>
-                    <option value="REMBOURSEE">Remboursée</option>
-                  </select>
-                  <select value={livraisonFiltre} onChange={e => setLivraisonFiltre(e.target.value)}
-                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400">
-                    <option value="A_TRAITER">File active à traiter</option>
-                    <option value="TERMINES">Terminés / archivés</option>
-                    <option value="TOUS">Tous les dossiers</option>
-                    <option value="PRIORITAIRES">Prioritaires</option>
-                    <option value="EN_ATTENTE_QUOTA">Campagne en cours</option>
-                    <option value="A_PREPARER">Paiement validé</option>
-                    <option value="PREPARATION">Lot transmis au partenaire</option>
-                    <option value="PRET_LIVRAISON">Partenaire confirmé</option>
-                    <option value="EN_LIVRAISON">Date annoncée</option>
-                    <option value="LIVRE_A_CONFIRMER">Confirmation client attendue</option>
-                    <option value="LIVRE_CONFIRME">Reçu confirmé</option>
-                    <option value="LITIGE">Litiges</option>
-                  </select>
-                  <select value={planningFiltre} onChange={e => setPlanningFiltre(e.target.value)}
-                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400">
-                    <option value="TOUS">Tous créneaux</option>
-                    <option value="NON_PLANIFIES">Non planifiés</option>
-                    <option value="AUJOURDHUI">Aujourd'hui</option>
-                    <option value="DEMAIN">Demain</option>
-                    <option value="PLANIFIES">Planifiés</option>
-                  </select>
+                  <FilterSelect compact icon={ClipboardList} label="État des dossiers" value={livraisonFiltre} onChange={setLivraisonFiltre} options={[
+                    { value: 'A_TRAITER', label: 'File active' },
+                    { value: 'PRIORITAIRES', label: 'Prioritaires' },
+                    { value: 'PROBLEMES', label: 'Problèmes' },
+                    { value: 'CONFIRMATIONS', label: 'Confirmations' },
+                    { value: 'TERMINES', label: 'Terminés' },
+                    { value: 'TOUS', label: 'Tous les dossiers' },
+                  ]} />
+                  <FilterSelect compact icon={CalendarClock} label="Créneau" value={planningFiltre} onChange={setPlanningFiltre} options={[
+                    { value: 'TOUS', label: 'Tous' },
+                    { value: 'NON_PLANIFIES', label: 'À planifier' },
+                    { value: 'AUJOURDHUI', label: "Aujourd'hui" },
+                    { value: 'DEMAIN', label: 'Demain' },
+                    { value: 'PLANIFIES', label: 'Planifiés' },
+                  ]} />
+                  <label className="min-w-0">
+                    <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-400">Du</span>
+                    <input type="date" value={dateDebutFiltre} onChange={e => setDateDebutFiltre(e.target.value)}
+                      title="Inscrits à partir du"
+                      className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs outline-none focus:border-violet-400" />
+                  </label>
+                  <label className="min-w-0">
+                    <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-400">Au</span>
+                    <input type="date" value={dateFinFiltre} onChange={e => setDateFinFiltre(e.target.value)}
+                      title="Inscrits jusqu'au"
+                      className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs outline-none focus:border-violet-400" />
+                  </label>
                 </div>
+                {(dateDebutFiltre || dateFinFiltre) && (
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-800">
+                    <span>Période d'inscription active : {dateDebutFiltre || 'début'} → {dateFinFiltre || 'aujourd’hui'}</span>
+                    <button type="button" onClick={() => { setDateDebutFiltre(''); setDateFinFiltre('') }}
+                      className="rounded-lg bg-white px-2 py-1 text-[11px] font-black text-sky-700 hover:bg-sky-100">
+                      Effacer
+                    </button>
+                  </div>
+                )}
 
               </div>
 
@@ -802,17 +843,17 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                   <div className="mt-4 grid gap-3 lg:grid-cols-[210px_190px_1fr_auto]">
                     <select value={bulkLivraison} onChange={e => setBulkLivraison(e.target.value)}
                       className="rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500">
-                      {STATUT_LIVRAISON_OPTIONS.map(status => (
+                      {STATUT_LIVRAISON_MANUEL_OPTIONS.map(status => (
                         <option key={status} value={status}>{STATUT_LIVRAISON_LABEL[status]}</option>
                       ))}
                     </select>
                     <input type="datetime-local" value={bulkDeliveryInfo.dateLivraisonPrevue}
                       onChange={e => setBulkDeliveryInfo(v => ({ ...v, dateLivraisonPrevue: e.target.value }))}
-                      title="Date promise par le partenaire"
+                      title="Date promise par le fournisseur"
                       className="rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500" />
                     <input value={bulkDeliveryInfo.referenceLivraison}
                       onChange={e => setBulkDeliveryInfo(v => ({ ...v, referenceLivraison: e.target.value }))}
-                      placeholder="Référence du lot partenaire"
+                      placeholder="Référence du lot fournisseur"
                       className="rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500" />
                     <button onClick={applyBulkLivraison} disabled={savingLivraison}
                       className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-sky-700 px-3 py-2.5 text-xs font-bold text-white hover:bg-sky-800 disabled:opacity-40">
@@ -855,7 +896,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                         : 'Essayez une autre recherche ou réinitialisez les filtres pour retrouver les participants.'}
                     </p>
                     {participants.length > 0 && (
-                      <button onClick={() => { setSearchParticipant(''); setStatutFiltre('TOUS'); setLivraisonFiltre('A_TRAITER'); setPlanningFiltre('TOUS') }}
+                      <button onClick={() => { setSearchParticipant(''); setStatutFiltre('TOUS'); setLivraisonFiltre('A_TRAITER'); setPlanningFiltre('TOUS'); setDateDebutFiltre(''); setDateFinFiltre('') }}
                         className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50">
                         Réinitialiser les filtres
                       </button>
@@ -863,8 +904,8 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                   </div>
                 ) : (
                   <>
-                  <div className="divide-y divide-slate-100 md:hidden">
-                    {filteredParticipants.map(p => {
+                  <div className="divide-y divide-slate-100 lg:hidden">
+                    {participantsPageItems.map(p => {
                       const pPlan = participantPlan(p.id)
                       const isSelected = selectedIds.includes(p.id)
                       return (
@@ -875,16 +916,13 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                               className="mt-1 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-start justify-between gap-2">
-                                <div>
-                                  <p className="font-bold text-slate-900">{p.nom || 'Participant sans nom'}</p>
-                                  <p className="text-xs text-slate-400">{p.telephone || 'Téléphone non renseigné'}</p>
-                                </div>
+                                <ParticipantLink participant={p} compact />
                                 <Badge color={STATUT_PAIEMENT_COLOR[p.statutPaiement] || STATUT_PARTICIPATION_COLOR[p.statut] || 'gray'}>
                                   {STATUT_PAIEMENT_LABEL[p.statutPaiement] || STATUT_PARTICIPATION_LABEL[p.statut] || p.statut}
                                 </Badge>
                               </div>
                               <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                                <div className="rounded-xl bg-slate-50 p-2.5"><span className="text-slate-400">Commande</span><p className="mt-1 font-black text-slate-800">×{p.quantite || 0} · {formatMontant(p.montantGele)} FCFA</p></div>
+                                <div className="rounded-xl bg-slate-50 p-2.5"><span className="text-slate-400">Commande</span><p className="mt-1 font-black text-slate-800">Quantité ×{p.quantite || 0}</p></div>
                                 <div className="rounded-xl bg-slate-50 p-2.5"><span className="text-slate-400">Lot prévu</span><p className="mt-1 font-bold text-slate-700">{pPlan.slot ? formatDateTime(pPlan.slot) : 'Non planifié'}</p></div>
                               </div>
                               <div className="mt-3">
@@ -896,10 +934,10 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                               </div>
                               {p.dateLivraisonPrevue && <p className="mt-2 text-xs text-slate-500"><span className="font-bold">Date promise :</span> {formatDateTime(p.dateLivraisonPrevue)}</p>}
                               <div className="mt-3 grid grid-cols-2 gap-2">
-                                <select value={p.statutLivraison || 'EN_ATTENTE_QUOTA'} onChange={e => updateLivraison([p.id], { statutLivraison: e.target.value })}
+                                <select value={STATUT_LIVRAISON_MANUEL_OPTIONS.includes(p.statutLivraison) ? p.statutLivraison : ''} onChange={e => e.target.value && updateLivraison([p.id], { statutLivraison: e.target.value })}
                                   className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-xs outline-none focus:border-violet-400">
-                                  <option value="EN_ATTENTE_QUOTA">Campagne en cours</option>
-                                  {STATUT_LIVRAISON_OPTIONS.map(status => <option key={status} value={status}>{STATUT_LIVRAISON_LABEL[status]}</option>)}
+                                  <option value="">Action admin</option>
+                                  {STATUT_LIVRAISON_MANUEL_OPTIONS.map(status => <option key={status} value={status}>{STATUT_LIVRAISON_LABEL[status]}</option>)}
                                 </select>
                                 <button onClick={() => updateLivraison([p.id], { prioriteTraitement: !p.prioriteTraitement })} disabled={savingLivraison}
                                   className="rounded-lg border border-violet-200 bg-white px-2 py-2 text-xs font-bold text-violet-700 disabled:opacity-50">
@@ -912,25 +950,23 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                       )
                     })}
                   </div>
-                  <div className="hidden overflow-x-auto md:block">
-                    <table className="w-full min-w-[980px] border-collapse">
+                  <div className="hidden overflow-x-auto lg:block">
+                    <table className="w-full min-w-[780px] table-fixed border-collapse">
                       <thead>
                         <tr>
-                          <Th className="w-10">
+                          <Th className="w-12">
                             <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible}
                               aria-label="Sélectionner tous les participants visibles"
                               className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
                           </Th>
-                          <Th>Participant</Th>
-                          <Th>Commande</Th>
-                          <Th>État du dossier</Th>
-                          <Th>Lot / créneau</Th>
-                          <Th>Engagement partenaire</Th>
-                          <Th>Mettre à jour</Th>
+                          <Th className="w-[18%]">Participant</Th>
+                          <Th className="w-[25%]">État du dossier</Th>
+                          <Th className="w-[34%]">Planification et fournisseur</Th>
+                          <Th className="w-[18%]">Actions</Th>
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredParticipants.map(p => {
+                        {participantsPageItems.map(p => {
                           const pPlan = participantPlan(p.id)
                           const isSelected = selectedIds.includes(p.id)
                           return (
@@ -941,79 +977,79 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                                   className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
                               </Td>
                               <Td>
-                                <p className="font-bold text-slate-900">{p.nom || 'Participant sans nom'}</p>
-                                <p className="mt-0.5 text-xs text-slate-400">{p.telephone || 'Téléphone non renseigné'}</p>
-                                <p className="mt-0.5 text-[10px] text-slate-300">Inscrit le {formatDateTime(p.createdAt)}</p>
-                              </Td>
-                              <Td>
-                                <div className="space-y-1">
-                                  <p className="font-black text-slate-900 tabular-nums">×{p.quantite || 0}</p>
-                                  <p className="text-xs font-bold text-slate-600 tabular-nums">{formatMontant(p.montantGele)} FCFA</p>
-                                  <Badge color={STATUT_PAIEMENT_COLOR[p.statutPaiement] || STATUT_PARTICIPATION_COLOR[p.statut] || 'gray'}>{STATUT_PAIEMENT_LABEL[p.statutPaiement] || STATUT_PARTICIPATION_LABEL[p.statut] || p.statut}</Badge>
-                                  {Number(p.montantRestant || 0) > 0 && <p className="text-[10px] font-bold text-rose-600">Reste {formatMontant(p.montantRestant)} FCFA</p>}
+                                <div className="space-y-2">
+                                  <ParticipantLink participant={p} />
+                                  <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-600">×{p.quantite || 0} unité{Number(p.quantite || 0) > 1 ? 's' : ''}</span>
                                 </div>
                               </Td>
                               <Td>
-                                <div className="min-w-44 space-y-2">
-                                  <Badge color={STATUT_LIVRAISON_COLOR[p.statutLivraison] || 'gray'}>
-                                    {STATUT_LIVRAISON_LABEL[p.statutLivraison] || p.statutLivraison || 'Quota non validé'}
-                                  </Badge>
-                                  {p.prioriteTraitement && (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-black text-violet-700">
-                                      <Flag size={10} /> Prioritaire
-                                    </span>
-                                  )}
+                                <div className="space-y-2">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <Badge color={STATUT_LIVRAISON_COLOR[p.statutLivraison] || 'gray'}>
+                                      {STATUT_LIVRAISON_LABEL[p.statutLivraison] || p.statutLivraison || 'Quota non validé'}
+                                    </Badge>
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{STATUT_PAIEMENT_LABEL[p.statutPaiement] || STATUT_PARTICIPATION_LABEL[p.statut] || p.statut}</span>
+                                    {p.prioriteTraitement && (
+                                      <span title="Dossier prioritaire" className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-violet-100 text-violet-700">
+                                        <Flag size={10} />
+                                      </span>
+                                    )}
+                                  </div>
                                   {p.commentaireParticipantLivraison && (
-                                    <span className="text-[10px] text-slate-400">Participant : {p.commentaireParticipantLivraison}</span>
+                                    <p title={p.commentaireParticipantLivraison} className="flex items-center gap-1 truncate text-[10px] font-bold text-rose-600"><AlertTriangle size={11} className="shrink-0" /> Message participant</p>
                                   )}
-                                  <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-slate-500">
-                                    <span>{p.progressionLivraison || 0}%</span>
-                                    {p.statutLivraison === 'LIVRE_CONFIRME' && <PackageCheck size={12} className="text-emerald-600" />}
-                                    {(p.statutLivraison === 'LITIGE' || p.statutLivraison === 'ECHEC_LIVRAISON') && <AlertTriangle size={12} className="text-rose-600" />}
-                                  </div>
-                                  <ProgressBar value={p.progressionLivraison || 0} color={p.statutLivraison === 'LIVRE_CONFIRME' ? 'emerald' : p.statutLivraison === 'LITIGE' ? 'rose' : 'sky'} />
-                                </div>
-                              </Td>
-                              <Td>
-                                <div className="space-y-2 text-xs text-slate-600">
-                                  <p className="font-bold text-slate-500">{pPlan.slot ? formatDateTime(pPlan.slot) : 'Non planifié'}</p>
-                                  <div className="flex items-center gap-2">
-                                  <Clock size={13} className={pPlan.slot ? 'text-violet-500' : 'text-slate-300'} />
-                                  <input type="datetime-local" value={pPlan.slot || ''}
-                                    onChange={e => setParticipantPlan(p.id, { slot: e.target.value })}
-                                    className="w-44 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-violet-400 focus:bg-white" />
+                                  <div>
+                                    <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-slate-500">
+                                      <span>Avancement</span>
+                                      <span className="inline-flex items-center gap-1">
+                                        {p.progressionLivraison || 0}%
+                                        {p.statutLivraison === 'LIVRE_CONFIRME' && <PackageCheck size={12} className="text-emerald-600" />}
+                                        {(p.statutLivraison === 'LITIGE' || p.statutLivraison === 'ECHEC_LIVRAISON') && <AlertTriangle size={12} className="text-rose-600" />}
+                                      </span>
+                                    </div>
+                                    <ProgressBar value={p.progressionLivraison || 0} color={p.statutLivraison === 'LIVRE_CONFIRME' ? 'emerald' : p.statutLivraison === 'LITIGE' ? 'rose' : 'sky'} />
                                   </div>
                                 </div>
                               </Td>
                               <Td>
-                                <div className="space-y-1 text-[11px] text-slate-500">
-                                  <p><span className="font-bold text-slate-700">Date promise :</span> {formatDateTime(p.dateLivraisonPrevue)}</p>
-                                  <p><span className="font-bold text-slate-700">Réf. partenaire :</span> {p.referenceLivraison || '—'}</p>
-                                  {p.noteLivraison && <p className="text-slate-400">{p.noteLivraison}</p>}
-                                  {p.dateConfirmationParticipant && (
-                                    <p className="font-bold text-emerald-700">Confirmé le {formatDateTime(p.dateConfirmationParticipant)}</p>
-                                  )}
-                                  {p.confirmationEnRetard && <p className="font-bold text-rose-600">Confirmation en retard</p>}
+                                <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(150px,1fr)_minmax(120px,0.8fr)]">
+                                  <div className="min-w-0">
+                                    <p className="mb-1 text-[9px] font-black uppercase tracking-wider text-slate-400">Créneau du lot</p>
+                                    <div className="flex min-w-0 items-center gap-1.5">
+                                      <Clock size={12} className={pPlan.slot ? 'shrink-0 text-violet-500' : 'shrink-0 text-slate-300'} />
+                                      <input type="datetime-local" value={pPlan.slot || ''}
+                                        onChange={e => setParticipantPlan(p.id, { slot: e.target.value })}
+                                        aria-label={`Créneau de ${p.nom || 'ce participant'}`}
+                                        className="h-8 min-w-0 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-[10px] outline-none focus:border-violet-400 focus:bg-white" />
+                                    </div>
+                                  </div>
+                                  <div className="min-w-0 text-[10px] text-slate-500">
+                                    <p className="font-black uppercase tracking-wider text-slate-400">Promesse</p>
+                                    <p className="mt-1 truncate font-bold text-slate-700">{p.dateLivraisonPrevue ? formatDateTime(p.dateLivraisonPrevue) : 'Non renseignée'}</p>
+                                    {p.referenceLivraison && <p className="mt-0.5 truncate text-slate-400" title={p.referenceLivraison}>Réf. {p.referenceLivraison}</p>}
+                                    {p.confirmationEnRetard && <p className="mt-1 font-bold text-rose-600">En retard</p>}
+                                  </div>
                                 </div>
                               </Td>
                               <Td>
-                                <div className="flex flex-col gap-1.5">
-                                  <select value={p.statutLivraison || 'EN_ATTENTE_QUOTA'}
-                                    onChange={e => updateLivraison([p.id], { statutLivraison: e.target.value })}
-                                    className="w-40 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-violet-400">
-                                    <option value="EN_ATTENTE_QUOTA">Campagne en cours</option>
-                                    {STATUT_LIVRAISON_OPTIONS.map(status => (
+                                <div className="flex min-w-0 flex-col gap-1.5">
+                                  <select value={STATUT_LIVRAISON_MANUEL_OPTIONS.includes(p.statutLivraison) ? p.statutLivraison : ''}
+                                    onChange={e => e.target.value && updateLivraison([p.id], { statutLivraison: e.target.value })}
+                                    aria-label={`Action pour ${p.nom || 'ce participant'}`}
+                                    className="h-8 w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2 text-[10px] outline-none focus:border-violet-400">
+                                    <option value="">Mettre à jour</option>
+                                    {STATUT_LIVRAISON_MANUEL_OPTIONS.map(status => (
                                       <option key={status} value={status}>{STATUT_LIVRAISON_LABEL[status]}</option>
                                     ))}
                                   </select>
                                   <button onClick={() => updateLivraison([p.id], { prioriteTraitement: !p.prioriteTraitement })}
                                     disabled={savingLivraison}
-                                    className={`rounded-lg border px-2 py-1.5 text-[11px] font-bold transition disabled:opacity-50 ${
+                                    className={`h-8 rounded-lg border px-2 text-[10px] font-bold transition disabled:opacity-50 ${
                                       p.prioriteTraitement
                                         ? 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'
                                         : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                                     }`}>
-                                    {p.prioriteTraitement ? 'Retirer priorité' : 'Marquer prioritaire'}
+                                    {p.prioriteTraitement ? 'Retirer priorité' : 'Prioriser'}
                                   </button>
                                 </div>
                               </Td>
@@ -1023,24 +1059,11 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                       </tbody>
                     </table>
                   </div>
+                  <Pagination page={participantsPage} totalItems={filteredParticipants.length} onPageChange={setParticipantsPage} />
                   </>
                 )}
               </div>
 
-              <div className="grid gap-3 lg:grid-cols-3">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <p className="flex items-center gap-2 text-sm font-black text-slate-900"><CheckSquare size={16} className="text-emerald-600" /> Traitement conseillé</p>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-500">Après la clôture et la validation financière, constituez un lot prioritaire, exportez-le puis transmettez-le au partenaire hors plateforme.</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <p className="flex items-center gap-2 text-sm font-black text-slate-900"><Truck size={16} className="text-sky-600" /> Engagement partenaire</p>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-500">Consignez uniquement la date promise et la référence communiquées par le partenaire. Sa préparation et son transport restent hors plateforme.</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <p className="flex items-center gap-2 text-sm font-black text-slate-900"><CalendarClock size={16} className="text-amber-600" /> Décalage</p>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-500">Formez un lot aujourd’hui, demain ou à une date précise. Ce créneau organise votre transmission au partenaire ; ce n’est pas un planning de transport.</p>
-                </div>
-              </div>
             </section>
           </div>
         </div>
@@ -1133,7 +1156,7 @@ function SpecsEditor({ titre, description, categorie, specs, setSpecs }) {
     <div className="space-y-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
       <div className="flex items-center justify-between">
         <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-          Fiche produit enrichie <span className="font-normal normal-case text-slate-400 tracking-normal">(optionnel)</span>
+          Fiche opportunité enrichie <span className="font-normal normal-case text-slate-400 tracking-normal">(optionnel)</span>
         </p>
         <button type="button" onClick={handleGenerer} disabled={generating || !titre}
           className="inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-100 transition disabled:opacity-50">
@@ -1162,11 +1185,11 @@ function SpecsEditor({ titre, description, categorie, specs, setSpecs }) {
 }
 
 function NouvelleOpportuniteWizard({ onClose, onSaved }) {
-  const commanditaires = useCommanditairesDisponibles()
+  const fournisseurs = useFournisseursDisponibles()
   const [form, setForm] = useState({
     titre: '', description: '', prixNormal: '', seuilMinimum: '', seuilMaximal: '',
     dateExpiration: '', categorie: '', actif: true,
-    commanditaireId: '',
+    fournisseurId: '',
     messagePartage: MESSAGE_PARTAGE_DEFAUT,
     partenaireNom: '', partenaireLogoUrl: '', partenaireContact: '', partenaireReseauxUrl: '',
     montantDuPartenaire: '', montantPayePartenaire: '', delaiConfirmationReceptionJours: '3', messageNotificationLivraison: '',
@@ -1180,14 +1203,16 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
   const [step, setStep]                   = useState(0)
 
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }))
-  const handleCommanditaireChange = (commanditaireId) => {
-    const commanditaire = commanditaires.find(item => item.id === commanditaireId)
-    setForm(current => commanditaire ? {
+  const handleFournisseurChange = (fournisseurId) => {
+    const fournisseur = fournisseurs.find(item => item.id === fournisseurId)
+    setForm(current => fournisseur ? {
       ...current,
-      commanditaireId,
-      partenaireNom: nomPublicCommanditaire(commanditaire),
-      partenaireContact: contactCommanditaire(commanditaire),
-    } : { ...current, commanditaireId: '' })
+      fournisseurId,
+      partenaireNom: nomPublicFournisseur(fournisseur),
+      partenaireContact: contactFournisseur(fournisseur),
+      partenaireLogoUrl: fournisseur.logoUrl || current.partenaireLogoUrl,
+      partenaireReseauxUrl: fournisseur.reseauxUrl || current.partenaireReseauxUrl,
+    } : { ...current, fournisseurId: '' })
   }
 
   const validateStep = (index) => {
@@ -1242,7 +1267,7 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
         categorie: form.categorie || undefined,
         actif: form.actif,
         messagePartage: form.messagePartage || undefined,
-        commanditaireId: form.commanditaireId || undefined,
+        fournisseurId: form.fournisseurId || undefined,
         partenaireNom: form.partenaireNom || undefined,
         partenaireLogoUrl: form.partenaireLogoUrl || undefined,
         partenaireContact: form.partenaireContact || undefined,
@@ -1317,16 +1342,16 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
               <div>
                 <h3 className="text-base font-black text-slate-900">{CREATION_STEPS[step].label}</h3>
                 <p className="text-xs text-slate-500">{
-                  ['Présentez clairement le produit aux futurs participants.', 'Définissez le prix, les objectifs et les remises de groupe.', 'Identifiez le client fournisseur et préparez le suivi de livraison.', 'Enrichissez la fiche avec des arguments et des visuels.', 'Relisez les informations avant de publier.'][step]
+                  ['Présentez clairement l’opportunité aux futurs participants.', 'Définissez le prix, les objectifs et les remises de groupe.', 'Identifiez le fournisseur de l’opportunité et préparez le suivi de livraison.', 'Enrichissez la fiche avec des arguments et des visuels.', 'Relisez les informations avant de publier.'][step]
                 }</p>
               </div>
             </div>
 
             {step === 0 && (
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="sm:col-span-2"><label className={labelCls}>Titre du produit *</label><input autoFocus value={form.titre} onChange={e => setField('titre', e.target.value)} className={inputCls} placeholder="Ex. Table pliante de marché renforcée" /></div>
+                <div className="sm:col-span-2"><label className={labelCls}>Titre de l’opportunité *</label><input autoFocus value={form.titre} onChange={e => setField('titre', e.target.value)} className={inputCls} placeholder="Ex. Table pliante de marché renforcée" /></div>
                 <div><label className={labelCls}>Catégorie</label><select value={form.categorie} onChange={e => setField('categorie', e.target.value)} className={inputCls}><option value="">— Sélectionner —</option>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-                <div className="sm:col-span-2"><label className={labelCls}>Description du produit</label><textarea value={form.description} onChange={e => setField('description', e.target.value)} rows={4} className={`${inputCls} resize-none`} placeholder="Décrivez le produit, ses caractéristiques et ses avantages…" /></div>
+                <div className="sm:col-span-2"><label className={labelCls}>Description de l’opportunité</label><textarea value={form.description} onChange={e => setField('description', e.target.value)} rows={4} className={`${inputCls} resize-none`} placeholder="Décrivez l’opportunité, ses caractéristiques et ses avantages…" /></div>
                 <div className="sm:col-span-2 rounded-xl border border-violet-100 bg-violet-50/60 p-4"><label className={labelCls}>Message de partage</label><textarea value={form.messagePartage} onChange={e => setField('messagePartage', e.target.value)} rows={6} maxLength={500} className={`${inputCls} resize-none bg-white`} /><p className="mt-1.5 text-[10px] leading-4 text-slate-500">Ajouté automatiquement au lien partagé. Utilisez <strong>{'{titre}'}</strong> et <strong>{'{prix}'}</strong> pour insérer les informations de l’offre.</p></div>
               </div>
             )}
@@ -1346,8 +1371,8 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
             {step === 2 && (
               <div className="space-y-5">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <FilterSelect label="Commanditaire enregistré" value={form.commanditaireId} onChange={handleCommanditaireChange} options={[{ value: '', label: '— Sélectionner un commanditaire —' }, ...commanditaires.map(item => ({ value: item.id, label: nomPublicCommanditaire(item) || item.email }))]} />
-                  <p className="mt-2 text-[10px] text-slate-500">La sélection préremplit l’identité. Les informations publiques restent personnalisables ci-dessous.</p>
+                  <FilterSelect label="Fournisseur enregistré" value={form.fournisseurId} onChange={handleFournisseurChange} options={[{ value: '', label: '— Sélectionner un fournisseur —' }, ...fournisseurs.map(item => ({ value: item.id, label: nomPublicFournisseur(item) || item.email }))]} />
+                  <p className="mt-2 text-[10px] text-slate-500">Les fournisseurs sont liés aux opportunités. Les commanditaires restent exclusivement liés aux sondages.</p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div><label className={labelCls}>Nom public du fournisseur</label><input value={form.partenaireNom} onChange={e => setField('partenaireNom', e.target.value)} className={inputCls} /></div>
@@ -1365,16 +1390,16 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
             {step === 3 && (
               <div className="space-y-5">
                 <SpecsEditor titre={form.titre} description={form.description} categorie={form.categorie} specs={specs} setSpecs={setSpecs} />
-                <div className="rounded-xl border border-slate-200 p-4"><label className={`${labelCls} mb-2`}>Galerie du produit <span className="font-normal normal-case text-slate-400 tracking-normal">(optionnel)</span></label><ImagePicker images={images} onChange={setImages} /></div>
+                <div className="rounded-xl border border-slate-200 p-4"><label className={`${labelCls} mb-2`}>Galerie de l’opportunité <span className="font-normal normal-case text-slate-400 tracking-normal">(optionnel)</span></label><ImagePicker images={images} onChange={setImages} /></div>
               </div>
             )}
 
             {step === 4 && (
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Produit</p><p className="mt-2 text-sm font-black text-slate-900">{form.titre}</p><p className="mt-1 text-xs text-slate-500">{form.categorie || 'Sans catégorie'}</p></div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Opportunité</p><p className="mt-2 text-sm font-black text-slate-900">{form.titre}</p><p className="mt-1 text-xs text-slate-500">{form.categorie || 'Sans catégorie'}</p></div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Prix normal</p><p className="mt-2 text-sm font-black text-slate-900">{prixLisible}</p><p className="mt-1 text-xs text-slate-500">Objectif : {form.seuilMinimum || '—'} participant(s)</p></div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Fournisseur</p><p className="mt-2 text-sm font-black text-slate-900">{form.partenaireNom || 'À confirmer'}</p><p className="mt-1 text-xs text-slate-500">{form.commanditaireId ? 'Fiche commanditaire liée' : 'Aucune fiche liée'}</p></div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Fournisseur</p><p className="mt-2 text-sm font-black text-slate-900">{form.partenaireNom || 'À confirmer'}</p><p className="mt-1 text-xs text-slate-500">{form.fournisseurId ? 'Fiche fournisseur liée' : 'Aucune fiche liée'}</p></div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Contenu</p><p className="mt-2 text-sm font-black text-slate-900">{images.length} image{images.length !== 1 ? 's' : ''}</p><p className="mt-1 text-xs text-slate-500">{paliers.length} palier{paliers.length !== 1 ? 's' : ''} de prix</p></div>
                 </div>
                 <div className="rounded-2xl border border-violet-100 bg-violet-50/50 p-4 sm:p-5">
@@ -1449,10 +1474,10 @@ function ExistingImages({ opportuniteId, images, setImages }) {
   )
 }
 
-// ── ModifierOpportuniteModal ─────────────────────────────────────────────────
+// ── Formulaire dédié de modification ─────────────────────────────────────────
 
-function ModifierOpportuniteModal({ item, onClose, onSaved }) {
-  const commanditaires = useCommanditairesDisponibles()
+function ModifierOpportuniteForm({ item, onClose, onSaved }) {
+  const fournisseurs = useFournisseursDisponibles()
   const [form, setForm] = useState({
     titre: item.titre || '',
     description: item.description || '',
@@ -1461,7 +1486,7 @@ function ModifierOpportuniteModal({ item, onClose, onSaved }) {
     seuilMaximal: item.seuilMaximal != null ? String(item.seuilMaximal) : '',
     dateExpiration: item.dateExpiration ? item.dateExpiration.slice(0, 16) : '',
     categorie: item.categorie || '',
-    commanditaireId: item.commanditaireId || '',
+    fournisseurId: item.fournisseurId || '',
     messagePartage: item.messagePartage || MESSAGE_PARTAGE_DEFAUT,
     partenaireNom: item.partenaireNom || '',
     partenaireLogoUrl: item.partenaireLogoUrl || '',
@@ -1489,14 +1514,16 @@ function ModifierOpportuniteModal({ item, onClose, onSaved }) {
   const [error, setError]                 = useState('')
 
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }))
-  const handleCommanditaireChange = (commanditaireId) => {
-    const commanditaire = commanditaires.find(candidate => candidate.id === commanditaireId)
-    setForm(current => commanditaire ? {
+  const handleFournisseurChange = (fournisseurId) => {
+    const fournisseur = fournisseurs.find(candidate => candidate.id === fournisseurId)
+    setForm(current => fournisseur ? {
       ...current,
-      commanditaireId,
-      partenaireNom: nomPublicCommanditaire(commanditaire),
-      partenaireContact: contactCommanditaire(commanditaire),
-    } : { ...current, commanditaireId: '' })
+      fournisseurId,
+      partenaireNom: nomPublicFournisseur(fournisseur),
+      partenaireContact: contactFournisseur(fournisseur),
+      partenaireLogoUrl: fournisseur.logoUrl || current.partenaireLogoUrl,
+      partenaireReseauxUrl: fournisseur.reseauxUrl || current.partenaireReseauxUrl,
+    } : { ...current, fournisseurId: '' })
   }
 
   const handleSubmit = async (e) => {
@@ -1516,7 +1543,7 @@ function ModifierOpportuniteModal({ item, onClose, onSaved }) {
         dateExpiration: form.dateExpiration ? new Date(form.dateExpiration).toISOString() : undefined,
         categorie: form.categorie || undefined,
         messagePartage: form.messagePartage,
-        commanditaireId: form.commanditaireId || undefined,
+        fournisseurId: form.fournisseurId || undefined,
         partenaireNom: form.partenaireNom,
         partenaireLogoUrl: form.partenaireLogoUrl,
         partenaireContact: form.partenaireContact,
@@ -1611,30 +1638,30 @@ function ModifierOpportuniteModal({ item, onClose, onSaved }) {
 
           <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="mb-4">
-              <h4 className="text-sm font-black text-slate-900">Partenaire et engagement financier</h4>
-              <p className="mt-1 text-xs text-slate-500">Le partenaire est facultatif. Son contact reste réservé à l'administration ; son nom, logo et lien public peuvent apparaître côté client.</p>
+              <h4 className="text-sm font-black text-slate-900">Fournisseur et engagement financier</h4>
+              <p className="mt-1 text-xs text-slate-500">Le fournisseur approvisionne l’opportunité. Son contact reste privé ; son nom, logo et lien public peuvent apparaître côté client.</p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <FilterSelect
-                  label="Commanditaire enregistré"
-                  value={form.commanditaireId}
-                  onChange={handleCommanditaireChange}
+                  label="Fournisseur enregistré"
+                  value={form.fournisseurId}
+                  onChange={handleFournisseurChange}
                   options={[
-                    { value: '', label: '— Sélectionner un commanditaire —' },
-                    ...commanditaires.map(commanditaire => ({
-                      value: commanditaire.id,
-                      label: nomPublicCommanditaire(commanditaire) || commanditaire.email,
+                    { value: '', label: '— Sélectionner un fournisseur —' },
+                    ...fournisseurs.map(fournisseur => ({
+                      value: fournisseur.id,
+                      label: nomPublicFournisseur(fournisseur) || fournisseur.email,
                     })),
                   ]}
                 />
-                <p className="mt-1.5 text-[10px] leading-4 text-slate-400">Vous pouvez changer le commanditaire lié. Les informations publiques restent modifiables juste en dessous.</p>
+                <p className="mt-1.5 text-[10px] leading-4 text-slate-400">Vous pouvez changer le fournisseur lié. Les commanditaires sont gérés séparément pour les sondages.</p>
               </div>
               <div><label className={labelCls}>Nom public du fournisseur</label><input value={form.partenaireNom} onChange={e => setField('partenaireNom', e.target.value)} className={inputCls} /></div>
               <div><label className={labelCls}>Logo (URL)</label><input type="url" value={form.partenaireLogoUrl} onChange={e => setField('partenaireLogoUrl', e.target.value)} className={inputCls} /></div>
               <div><label className={labelCls}>Contact privé</label><input value={form.partenaireContact} onChange={e => setField('partenaireContact', e.target.value)} className={inputCls} /></div>
               <div><label className={labelCls}>Réseau social / site public</label><input type="url" value={form.partenaireReseauxUrl} onChange={e => setField('partenaireReseauxUrl', e.target.value)} className={inputCls} /></div>
-              <div><label className={labelCls}>Montant dû au partenaire</label><input type="number" min="0" value={form.montantDuPartenaire} onChange={e => setField('montantDuPartenaire', e.target.value)} className={inputCls} /></div>
+              <div><label className={labelCls}>Montant dû au fournisseur</label><input type="number" min="0" value={form.montantDuPartenaire} onChange={e => setField('montantDuPartenaire', e.target.value)} className={inputCls} /></div>
               <div><label className={labelCls}>Montant déjà payé</label><input type="number" min="0" value={form.montantPayePartenaire} onChange={e => setField('montantPayePartenaire', e.target.value)} className={inputCls} /></div>
               <div><label className={labelCls}>Délai avant alerte (jours)</label><input type="number" min="1" value={form.delaiConfirmationReceptionJours} onChange={e => setField('delaiConfirmationReceptionJours', e.target.value)} className={inputCls} /></div>
               <div className="sm:col-span-2"><label className={labelCls}>Message envoyé quand une date est promise</label><textarea rows={3} maxLength={500} value={form.messageNotificationLivraison} onChange={e => setField('messageNotificationLivraison', e.target.value)} placeholder="Votre campagne a été validée. Votre livraison est prévue…" className={`${inputCls} resize-none`} /></div>
@@ -1678,11 +1705,17 @@ export function OpportuniteDetailPage() {
   const [loading, setLoading] = useState(true)
   const [actionId, setActionId] = useState(null)
 
-  const refresh = useCallback(() => {
-    setLoading(true)
+  const refresh = useCallback((showLoader = true) => {
+    if (showLoader) setLoading(true)
     getAdminOpportunite(id).then(setItem).finally(() => setLoading(false))
   }, [id])
-  useEffect(() => { refresh() }, [refresh])
+  useEffect(() => {
+    let cancelled = false
+    getAdminOpportunite(id)
+      .then(data => { if (!cancelled) setItem(data) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [id])
 
   const activer = async (opportuniteId) => {
     setActionId(opportuniteId)
@@ -1695,7 +1728,7 @@ export function OpportuniteDetailPage() {
 
   if (loading) return <Spinner py="py-24" />
   if (!item) return <EmptyState icon={Package} title="Opportunité introuvable" sub="Revenez à la liste et choisissez une autre campagne." />
-  return <DetailDrawer item={item} onClose={() => navigate('/opportunites')} onActiver={activer} onCloturer={cloturer} onModifier={() => navigate(`/opportunites/${id}/modifier`)} actionId={actionId} />
+  return <DetailDrawer key={item.id} item={item} onClose={() => navigate('/opportunites')} onActiver={activer} onCloturer={cloturer} onModifier={() => navigate(`/opportunites/${id}/modifier`)} actionId={actionId} />
 }
 
 export function ModifierOpportunitePage() {
@@ -1708,7 +1741,7 @@ export function ModifierOpportunitePage() {
   }, [id])
   if (loading) return <Spinner py="py-24" />
   if (!item) return <EmptyState icon={Package} title="Opportunité introuvable" />
-  return <ModifierOpportuniteModal item={item} onClose={() => navigate(`/opportunites/${id}`)} onSaved={() => navigate(`/opportunites/${id}`)} />
+  return <ModifierOpportuniteForm item={item} onClose={() => navigate(`/opportunites/${id}`)} onSaved={() => navigate(`/opportunites/${id}`)} />
 }
 
 export function NouvelleOpportunitePage() {
@@ -1716,7 +1749,17 @@ export function NouvelleOpportunitePage() {
   return <NouvelleOpportuniteWizard onClose={() => navigate('/opportunites')} onSaved={() => navigate('/opportunites', { replace: true })} />
 }
 
-export default function Opportunites() {
+const MOTIF_TENTATIVE_LABEL = {
+  SOLDE_INSUFFISANT: 'Solde insuffisant',
+  OFFRE_INDISPONIBLE: 'Offre indisponible',
+  VALIDATION: 'Données invalides',
+  ERREUR_TECHNIQUE: 'Erreur technique',
+}
+
+const TRAITEMENT_LABEL = { A_TRAITER: 'À traiter', EN_COURS: 'Traitement en cours', TERMINE: 'Traité' }
+const TRAITEMENT_COLOR = { A_TRAITER: 'rose', EN_COURS: 'amber', TERMINE: 'emerald' }
+
+export default function Opportunites({ mode = 'encours' }) {
   const navigate = useNavigate()
   const [opportunites, setOpportunites] = useState([])
   const [loading, setLoading]           = useState(true)
@@ -1726,6 +1769,11 @@ export default function Opportunites() {
   const [recherche, setRecherche] = useState('')
   const [triListe, setTriListe] = useState('RECENTES')
   const [filtresOuverts, setFiltresOuverts] = useState(false)
+  const [tentatives, setTentatives] = useState([])
+  const [page, setPage] = useState(1)
+  const [tentativesPage, setTentativesPage] = useState(1)
+  const traitementMode = mode === 'traitement'
+  const tentativesMode = mode === 'tentatives'
 
   const fetchData = () => {
     setLoading(true)
@@ -1735,7 +1783,21 @@ export default function Opportunites() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    let cancelled = false
+    getAdminOpportunites()
+      .then(data => { if (!cancelled) setOpportunites(data) })
+      .catch(() => { if (!cancelled) setOpportunites([]) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    if (traitementMode) return
+    getTentativesSouscriptionEchouees()
+      .then(setTentatives)
+      .catch(() => setTentatives([]))
+  }, [traitementMode])
 
   // Compteurs/prix/statut mis à jour en direct
   useSSE('events/opportunites', {
@@ -1749,16 +1811,18 @@ export default function Opportunites() {
 
   const handleActiver  = async (id) => {
     setActionId(id)
-    try { await activerOpportunite(id); fetchData() } catch { } finally { setActionId(null) }
+    try { await activerOpportunite(id); fetchData() } catch { setActionId(null) } finally { setActionId(null) }
   }
   const handleCloturer = async (id) => {
     setActionId(id)
-    try { await cloturerOpportunite(id); fetchData() } catch { } finally { setActionId(null) }
+    try { await cloturerOpportunite(id); fetchData() } catch { setActionId(null) } finally { setActionId(null) }
   }
 
-  const categories = Array.from(new Set(opportunites.map(o => o.categorie).filter(Boolean))).sort()
+  const estTerminee = o => o.statut === 'CLOTUREE' || o.statut === 'ANNULEE'
+  const opportunitesDuParcours = opportunites.filter(o => traitementMode ? estTerminee(o) : !estTerminee(o))
+  const categories = Array.from(new Set(opportunitesDuParcours.map(o => o.categorie).filter(Boolean))).sort()
   const termesRecherche = normaliserRecherche(recherche).split(/\s+/).filter(Boolean)
-  const opportunitesFiltrees = opportunites
+  const opportunitesFiltrees = opportunitesDuParcours
     .filter(o => categorieFiltre === 'TOUTES' || o.categorie === categorieFiltre)
     .filter(o => statutListeFiltre === 'TOUS' || o.statut === statutListeFiltre)
     .filter(o => {
@@ -1783,22 +1847,90 @@ export default function Opportunites() {
     setRecherche('')
     setTriListe('RECENTES')
   }
+  const echecsSolde = tentatives.filter(item => item.motif === 'SOLDE_INSUFFISANT').length
+  const echecsTechniques = tentatives.filter(item => item.motif === 'ERREUR_TECHNIQUE').length
+  useEffect(() => setPage(1), [categorieFiltre, statutListeFiltre, recherche, triListe, mode])
+  const opportunitesPage = opportunitesFiltrees.slice((page - 1) * 10, page * 10)
+  const tentativesPageItems = tentatives.slice((tentativesPage - 1) * 10, tentativesPage * 10)
+
+  if (tentativesMode) {
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div>
+            <p className="text-[13px] font-bold text-slate-900">Souscriptions non abouties</p>
+            <p className="mt-0.5 text-[11px] text-slate-400">Analysez les essais sans dépôt gelé pour détecter les problèmes de solde, d’offre ou de technique.</p>
+          </div>
+          <button onClick={() => navigate('/opportunites')}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 sm:w-auto">
+            <ArrowLeft size={15} /> Retour aux opportunités
+          </button>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total</p>
+            <p className="mt-2 text-2xl font-black text-slate-950">{tentatives.length}</p>
+          </div>
+          <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 shadow-sm">
+            <p className="text-[10px] font-black uppercase tracking-wider text-amber-600">Solde insuffisant</p>
+            <p className="mt-2 text-2xl font-black text-amber-800">{echecsSolde}</p>
+          </div>
+          <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 shadow-sm">
+            <p className="text-[10px] font-black uppercase tracking-wider text-rose-600">Erreurs techniques</p>
+            <p className="mt-2 text-2xl font-black text-rose-800">{echecsTechniques}</p>
+          </div>
+        </div>
+
+        <Card noPad>
+          {tentatives.length === 0 ? (
+            <EmptyState icon={AlertTriangle} title="Aucune tentative échouée enregistrée" sub="Les souscriptions non abouties apparaîtront ici sans encombrer la liste principale." />
+          ) : (
+            <>
+              <Table>
+                <thead><tr><Th>Client</Th><Th>Opportunité</Th><Th>Cause</Th><Th>Date</Th><Th>Décision</Th></tr></thead>
+                <tbody>{tentativesPageItems.map(item => <Tr key={item.id}>
+                  <Td><p className="font-bold text-slate-800">{item.utilisateurNom || 'Client'}</p><p className="text-[10px] text-slate-400">{item.utilisateurTelephone || '—'}</p></Td>
+                  <Td><button onClick={() => navigate(`/opportunites/${item.opportuniteId}`)} className="max-w-52 truncate text-left text-xs font-bold text-violet-700 hover:underline">{item.opportuniteTitre}</button><p className="text-[10px] text-slate-400">{item.quantite} unité{item.quantite > 1 ? 's' : ''}</p></Td>
+                  <Td><Badge color={item.motif === 'ERREUR_TECHNIQUE' ? 'rose' : item.motif === 'SOLDE_INSUFFISANT' ? 'amber' : 'gray'}>{MOTIF_TENTATIVE_LABEL[item.motif] || item.motif}</Badge><p title={item.detail} className="mt-1 max-w-64 truncate text-[10px] text-slate-400">{item.detail}</p></Td>
+                  <Td><span className="text-[11px] text-slate-500">{formatDate(item.createdAt)}</span></Td>
+                  <Td><span className="text-[10px] font-semibold text-slate-500">{item.motif === 'SOLDE_INSUFFISANT' ? 'Relance / recharge' : item.motif === 'ERREUR_TECHNIQUE' ? 'Vérifier l’incident' : 'Informer le client'}</span></Td>
+                </Tr>)}</tbody>
+              </Table>
+              <Pagination page={tentativesPage} totalItems={tentatives.length} onPageChange={setTentativesPage} />
+            </>
+          )}
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
-          <p className="text-[13px] font-bold text-slate-900">Opportunités</p>
+          <p className="text-[13px] font-bold text-slate-900">{traitementMode ? 'Traitement et livraisons' : 'Opportunités en cours'}</p>
           <p className="text-[11px] text-slate-400 mt-0.5">
-            {opportunites.length} opportunité{opportunites.length !== 1 ? 's' : ''}
+            {traitementMode
+              ? 'Campagnes clôturées à préparer, livrer ou finaliser'
+              : 'Campagnes actives ou en préparation, visibles après activation'}
           </p>
         </div>
-        <button
-          onClick={() => navigate('/opportunites/nouvelle')}
-          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-700 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 hover:bg-violet-800 sm:w-auto"
-        >
-          <Plus size={15} /> Nouvelle opportunité
-        </button>
+        {!traitementMode && (
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <button onClick={() => navigate('/opportunites/tentatives')}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 transition hover:bg-amber-100 sm:w-auto">
+              <AlertTriangle size={15} /> Tentatives non abouties
+              {tentatives.length > 0 && <span className="rounded-full bg-amber-600 px-1.5 py-0.5 text-[10px] text-white">{tentatives.length}</span>}
+            </button>
+            <button
+              onClick={() => navigate('/opportunites/nouvelle')}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-700 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 hover:bg-violet-800 sm:w-auto"
+            >
+              <Plus size={15} /> Nouvelle opportunité
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
@@ -1806,7 +1938,7 @@ export default function Opportunites() {
           <div className="relative min-w-0 flex-1">
             <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input value={recherche} onChange={e => setRecherche(e.target.value)}
-              placeholder="Rechercher par produit, catégorie, partenaire…"
+              placeholder="Rechercher par opportunité, catégorie, fournisseur…"
               className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50" />
             {recherche && (
               <button onClick={() => setRecherche('')} aria-label="Effacer la recherche"
@@ -1829,7 +1961,7 @@ export default function Opportunites() {
         {filtresOuverts && (
           <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2 xl:grid-cols-3">
             <FilterSelect label="Catégorie" value={categorieFiltre} onChange={setCategorieFiltre}
-              options={[{ value: 'TOUTES', label: `Toutes les catégories (${opportunites.length})` }, ...categories.map(cat => ({ value: cat, label: `${cat} (${opportunites.filter(o => o.categorie === cat).length})` }))]} />
+              options={[{ value: 'TOUTES', label: `Toutes les catégories (${opportunitesDuParcours.length})` }, ...categories.map(cat => ({ value: cat, label: `${cat} (${opportunitesDuParcours.filter(o => o.categorie === cat).length})` }))]} />
             <FilterSelect label="Statut" value={statutListeFiltre} onChange={setStatutListeFiltre}
               options={[{ value: 'TOUS', label: 'Tous les statuts' }, ...Object.entries(STATUT_LABEL).map(([optionValue, optionLabel]) => ({ value: optionValue, label: optionLabel }))]} />
             <FilterSelect label="Trier par" value={triListe} onChange={setTriListe} className="sm:col-span-2 xl:col-span-1"
@@ -1859,31 +1991,45 @@ export default function Opportunites() {
           <Spinner py="py-12" />
         ) : opportunitesFiltrees.length === 0 ? (
           <EmptyState icon={Package}
-            title={opportunites.length === 0 ? 'Aucune opportunité' : 'Aucun résultat'}
-            sub={opportunites.length === 0 ? 'Créez votre première opportunité.' : 'Modifiez la recherche ou retirez certains filtres.'} />
+            title={opportunitesDuParcours.length === 0 ? (traitementMode ? 'Aucune campagne à traiter' : 'Aucune opportunité en cours') : 'Aucun résultat'}
+            sub={opportunitesDuParcours.length === 0 ? (traitementMode ? 'Les campagnes clôturées apparaîtront ici avec leur état de traitement.' : 'Créez votre première opportunité.') : 'Modifiez la recherche ou retirez certains filtres.'} />
         ) : (
-          <Table>
+          <><Table>
             <thead>
               <tr>
-                <Th>Produit</Th>
+                <Th>Opportunité</Th>
                 <Th>Prix normal</Th>
                 <Th>Avancement</Th>
                 <Th>Expiration</Th>
-                <Th>Statut</Th>
+                <Th>{traitementMode ? 'Traitement' : 'Statut'}</Th>
                 <Th>Actions</Th>
               </tr>
             </thead>
             <tbody>
-              {opportunitesFiltrees.map(item => {
+              {opportunitesPage.map(item => {
                 const { pct, valide: seuilValide, phase: phaseProgression, placesRestantes } = calculerProgression(item)
+                const couverture = item.images?.[0]?.url
                 return (
                   <Tr key={item.id}>
                     <Td>
-                      <div className="font-semibold text-slate-900 text-[12.5px]">{item.titre}</div>
-                      {item.categorie && <div className="text-[10.5px] font-medium text-violet-500 mt-0.5">{item.categorie}</div>}
-                      {item.description && (
-                        <div className="text-[11px] text-slate-400 mt-0.5 max-w-[180px] truncate">{item.description}</div>
-                      )}
+                      <div className="flex min-w-64 items-center gap-3">
+                        <div className="h-14 w-16 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                          {couverture ? (
+                            <img src={imgUrl(couverture)} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-slate-300">
+                              <ImagePlus size={18} />
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="line-clamp-2 font-semibold text-slate-900 text-[12.5px]">{item.titre}</div>
+                          {item.categorie && <div className="text-[10.5px] font-medium text-violet-500 mt-0.5">{item.categorie}</div>}
+                          {item.description && (
+                            <div className="text-[11px] text-slate-400 mt-0.5 max-w-[220px] truncate">{item.description}</div>
+                          )}
+                        </div>
+                      </div>
                     </Td>
                     <Td><span className="font-semibold tabular-nums">{formatMontant(item.prixNormal)} FCFA</span></Td>
                     <Td className="w-44">
@@ -1902,7 +2048,7 @@ export default function Opportunites() {
                       )}
                     </Td>
                     <Td><span className="text-[12px] text-slate-500">{formatDate(item.dateExpiration)}</span></Td>
-                    <Td><Badge color={STATUT_COLOR[item.statut] || 'gray'}>{STATUT_LABEL[item.statut] || item.statut}</Badge></Td>
+                    <Td>{traitementMode ? <div className="space-y-1"><Badge color={TRAITEMENT_COLOR[item.statutTraitement] || 'red'}>{TRAITEMENT_LABEL[item.statutTraitement] || 'À traiter'}</Badge><p className="text-[10px] text-slate-400">{item.dossiersATraiter || 0} à traiter · {item.dossiersEnCours || 0} en cours · {item.dossiersTermines || 0} terminés</p></div> : <Badge color={STATUT_COLOR[item.statut] || 'gray'}>{STATUT_LABEL[item.statut] || item.statut}</Badge>}</Td>
                     <Td>
                       <div className="flex gap-1.5 items-center">
                         <button onClick={() => navigate(`/opportunites/${item.id}`)}
@@ -1934,6 +2080,7 @@ export default function Opportunites() {
               })}
             </tbody>
           </Table>
+          <Pagination page={page} totalItems={opportunitesFiltrees.length} onPageChange={setPage} /></>
         )}
       </Card>
     </div>

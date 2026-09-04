@@ -56,9 +56,9 @@ public class Opportunite {
     @Column(nullable = false)
     private Integer participantsActuels;
 
-    /** Fournisseur/partenaire de la campagne. Ces informations restent optionnelles. */
-    @Column(name = "commanditaire_id")
-    private UUID commanditaireId;
+    /** Fournisseur du produit. Indépendant des commanditaires réservés aux sondages. */
+    @Column(name = "fournisseur_id")
+    private UUID fournisseurId;
 
     private String partenaireNom;
 
