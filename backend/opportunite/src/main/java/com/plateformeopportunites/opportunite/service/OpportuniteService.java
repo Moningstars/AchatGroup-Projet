@@ -1,6 +1,5 @@
 package com.plateformeopportunites.opportunite.service;
 
-import com.plateformeopportunites.common.enums.ModePlafond;
 import com.plateformeopportunites.common.enums.StatutOpportunite;
 import org.springframework.security.access.prepost.PreAuthorize;
 import com.plateformeopportunites.common.enums.StatutLivraison;
@@ -12,10 +11,10 @@ import com.plateformeopportunites.common.redis.RedisService;
 import com.plateformeopportunites.common.service.PusherNotificationService;
 import com.plateformeopportunites.finance.service.WalletService;
 import com.plateformeopportunites.identity.entity.Administrateur;
-import com.plateformeopportunites.identity.entity.Commanditaire;
+import com.plateformeopportunites.identity.entity.Fournisseur;
 import com.plateformeopportunites.identity.entity.Utilisateur;
 import com.plateformeopportunites.identity.repository.AdministrateurRepository;
-import com.plateformeopportunites.identity.repository.CommanditaireRepository;
+import com.plateformeopportunites.identity.repository.FournisseurRepository;
 import com.plateformeopportunites.identity.repository.UtilisateurRepository;
 import com.plateformeopportunites.opportunite.dto.CreerOpportuniteRequest;
 import com.plateformeopportunites.opportunite.dto.ConfirmerReceptionRequest;
@@ -56,7 +55,7 @@ public class OpportuniteService {
     private final ParticipationRepository participationRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final AdministrateurRepository administrateurRepository;
-    private final CommanditaireRepository commanditaireRepository;
+    private final FournisseurRepository fournisseurRepository;
     private final OpportuniteImageRepository imageRepository;
     private final CategorieRepository categorieRepository;
     private final WalletService walletService;
@@ -78,16 +77,18 @@ public class OpportuniteService {
         }
 
         StatutOpportunite statut = req.isActif() ? StatutOpportunite.ACTIVE : StatutOpportunite.BROUILLON;
-        Commanditaire commanditaire = trouverCommanditaire(req.getCommanditaireId());
+        Fournisseur fournisseur = trouverFournisseur(req.getFournisseurId());
         String partenaireNom = nettoyer(req.getPartenaireNom());
         String partenaireContact = nettoyer(req.getPartenaireContact());
-        if (commanditaire != null) {
-            if (partenaireNom == null) partenaireNom = nomPublicCommanditaire(commanditaire);
-            if (partenaireContact == null) partenaireContact = contactCommanditaire(commanditaire);
+        String partenaireLogoUrl = nettoyer(req.getPartenaireLogoUrl());
+        String partenaireReseauxUrl = nettoyer(req.getPartenaireReseauxUrl());
+        if (fournisseur != null) {
+            if (partenaireNom == null) partenaireNom = nomPublicFournisseur(fournisseur);
+            if (partenaireContact == null) partenaireContact = contactFournisseur(fournisseur);
+            if (partenaireLogoUrl == null) partenaireLogoUrl = nettoyer(fournisseur.getLogoUrl());
+            if (partenaireReseauxUrl == null) partenaireReseauxUrl = nettoyer(fournisseur.getReseauxUrl());
         }
 
-        ModePlafond modePlafond = modePlafond(req.getModePlafond(), req.getSeuilMaximal());
-        Integer seuilMaximal = modePlafond == ModePlafond.PLAFONNE ? req.getSeuilMaximal() : null;
         Opportunite opportunite = Opportunite.builder()
                 .admin(admin)
                 .categorie(categorie)
@@ -98,13 +99,12 @@ public class OpportuniteService {
                 .specsFinePrint(req.getSpecsFinePrint())
                 .prixNormal(req.getPrixNormal())
                 .seuilMinimum(req.getSeuilMinimum())
-                .seuilMaximal(seuilMaximal)
-                .modePlafond(modePlafond)
-                .commanditaireId(req.getCommanditaireId())
+                .seuilMaximal(req.getSeuilMaximal())
+                .fournisseurId(req.getFournisseurId())
                 .partenaireNom(partenaireNom)
-                .partenaireLogoUrl(nettoyer(req.getPartenaireLogoUrl()))
+                .partenaireLogoUrl(partenaireLogoUrl)
                 .partenaireContact(partenaireContact)
-                .partenaireReseauxUrl(nettoyer(req.getPartenaireReseauxUrl()))
+                .partenaireReseauxUrl(partenaireReseauxUrl)
                 .montantDuPartenaire(valeurPositiveOuZero(req.getMontantDuPartenaire()))
                 .montantPayePartenaire(valeurPositiveOuZero(req.getMontantPayePartenaire()))
                 .delaiConfirmationReceptionJours(req.getDelaiConfirmationReceptionJours() == null ? 3 : req.getDelaiConfirmationReceptionJours())
@@ -119,9 +119,7 @@ public class OpportuniteService {
         validerPaliers(req.getPaliers());
         int maxPalier = req.getPaliers().stream()
                 .mapToInt(CreerOpportuniteRequest.PalierPrixRequest::getSeuilMax).max().orElse(0);
-        validerSeuilMaximal(modePlafond, seuilMaximal, req.getSeuilMinimum(), maxPalier);
-        validerSeuilMinimumPlafonne(modePlafond, req.getSeuilMinimum(), req.getPaliers().stream()
-            .map(CreerOpportuniteRequest.PalierPrixRequest::getSeuilMax).toList());
+        validerSeuilMaximal(req.getSeuilMaximal(), req.getSeuilMinimum(), maxPalier);
 
         for (CreerOpportuniteRequest.PalierPrixRequest p : req.getPaliers()) {
             palierPrixRepository.save(PalierPrix.builder()
@@ -373,13 +371,7 @@ public class OpportuniteService {
         if (req.getSpecsFinePrint() != null) opp.setSpecsFinePrint(req.getSpecsFinePrint());
         if (req.getPrixNormal() != null) opp.setPrixNormal(req.getPrixNormal());
         if (req.getSeuilMinimum() != null) opp.setSeuilMinimum(req.getSeuilMinimum());
-        if (req.getModePlafond() != null) {
-            opp.setModePlafond(req.getModePlafond());
-            opp.setSeuilMaximal(req.getModePlafond() == ModePlafond.PLAFONNE ? req.getSeuilMaximal() : null);
-        } else if (req.getSeuilMaximal() != null) {
-            opp.setModePlafond(ModePlafond.PLAFONNE);
-            opp.setSeuilMaximal(req.getSeuilMaximal());
-        }
+        if (req.getSeuilMaximal() != null) opp.setSeuilMaximal(req.getSeuilMaximal());
         if (req.getDateExpiration() != null) opp.setDateExpiration(req.getDateExpiration());
         if (req.getCategorie() != null && !req.getCategorie().isBlank()) {
             Categorie categorie = categorieRepository.findByNom(req.getCategorie())
@@ -387,11 +379,13 @@ public class OpportuniteService {
                             Categorie.builder().nom(req.getCategorie()).build()));
             opp.setCategorie(categorie);
         }
-        if (req.getCommanditaireId() != null) {
-            Commanditaire commanditaire = trouverCommanditaire(req.getCommanditaireId());
-            opp.setCommanditaireId(commanditaire.getId());
-            if (req.getPartenaireNom() == null) opp.setPartenaireNom(nomPublicCommanditaire(commanditaire));
-            if (req.getPartenaireContact() == null) opp.setPartenaireContact(contactCommanditaire(commanditaire));
+        if (req.getFournisseurId() != null) {
+            Fournisseur fournisseur = trouverFournisseur(req.getFournisseurId());
+            opp.setFournisseurId(fournisseur.getId());
+            if (req.getPartenaireNom() == null) opp.setPartenaireNom(nomPublicFournisseur(fournisseur));
+            if (req.getPartenaireContact() == null) opp.setPartenaireContact(contactFournisseur(fournisseur));
+            if (req.getPartenaireLogoUrl() == null) opp.setPartenaireLogoUrl(nettoyer(fournisseur.getLogoUrl()));
+            if (req.getPartenaireReseauxUrl() == null) opp.setPartenaireReseauxUrl(nettoyer(fournisseur.getReseauxUrl()));
         }
         if (req.getPartenaireNom() != null) opp.setPartenaireNom(nettoyer(req.getPartenaireNom()));
         if (req.getPartenaireLogoUrl() != null) opp.setPartenaireLogoUrl(nettoyer(req.getPartenaireLogoUrl()));
@@ -414,11 +408,7 @@ public class OpportuniteService {
                 ? req.getPaliers().stream().mapToInt(CreerOpportuniteRequest.PalierPrixRequest::getSeuilMax).max().orElse(0)
                 : palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(opportuniteId)
                         .stream().mapToInt(PalierPrix::getSeuilMax).max().orElse(0);
-        validerSeuilMaximal(modePlafond(opp.getModePlafond(), opp.getSeuilMaximal()), opp.getSeuilMaximal(), opp.getSeuilMinimum(), maxPalier);
-        if (paliersFournis) {
-            validerSeuilMinimumPlafonne(modePlafond(opp.getModePlafond(), opp.getSeuilMaximal()), opp.getSeuilMinimum(),
-                req.getPaliers().stream().map(CreerOpportuniteRequest.PalierPrixRequest::getSeuilMax).toList());
-        }
+        validerSeuilMaximal(opp.getSeuilMaximal(), opp.getSeuilMinimum(), maxPalier);
 
         opportuniteRepository.save(opp);
 
@@ -791,15 +781,8 @@ public class OpportuniteService {
         }
     }
 
-    private ModePlafond modePlafond(ModePlafond mode, Integer seuilMaximal) {
-        return mode != null ? mode : seuilMaximal == null ? ModePlafond.ILLIMITE : ModePlafond.PLAFONNE;
-    }
-
-    private void validerSeuilMaximal(ModePlafond modePlafond, Integer seuilMaximal, Integer seuilMinimum, int maxPalier) {
-        if (modePlafond == ModePlafond.ILLIMITE) return;
-        if (seuilMaximal == null) {
-            throw new IllegalArgumentException("Un seuil maximal est obligatoire pour une opportunité plafonnée");
-        }
+    private void validerSeuilMaximal(Integer seuilMaximal, Integer seuilMinimum, int maxPalier) {
+        if (seuilMaximal == null) return;
         if (seuilMaximal < maxPalier) {
             throw new IllegalArgumentException(
                 "Le seuil maximal (" + seuilMaximal + ") ne peut pas être inférieur au plafond du dernier palier (" + maxPalier + ")");
@@ -809,30 +792,23 @@ public class OpportuniteService {
         }
     }
 
-    private void validerSeuilMinimumPlafonne(ModePlafond modePlafond, Integer seuilMinimum, List<Integer> seuilsMax) {
-        if (modePlafond != ModePlafond.PLAFONNE || seuilMinimum == null) return;
-        if (!seuilsMax.contains(seuilMinimum)) {
-            throw new IllegalArgumentException("Le seuil minimum doit correspondre au seuil maximal d'un palier");
-        }
-    }
-
     // ── Private helpers ──────────────────────────────────────────────────────
 
-    private Commanditaire trouverCommanditaire(UUID commanditaireId) {
-        if (commanditaireId == null) return null;
-        return commanditaireRepository.findById(commanditaireId)
-                .orElseThrow(() -> new IllegalArgumentException("Commanditaire introuvable"));
+    private Fournisseur trouverFournisseur(UUID fournisseurId) {
+        if (fournisseurId == null) return null;
+        return fournisseurRepository.findById(fournisseurId)
+                .orElseThrow(() -> new IllegalArgumentException("Fournisseur introuvable"));
     }
 
-    private String nomPublicCommanditaire(Commanditaire commanditaire) {
-        String societe = nettoyer(commanditaire.getSociete());
+    private String nomPublicFournisseur(Fournisseur fournisseur) {
+        String societe = nettoyer(fournisseur.getSociete());
         if (societe != null) return societe;
-        return (commanditaire.getPrenom() + " " + commanditaire.getNom()).trim();
+        return fournisseur.getNom().trim();
     }
 
-    private String contactCommanditaire(Commanditaire commanditaire) {
-        String telephone = nettoyer(commanditaire.getTelephone());
-        String email = nettoyer(commanditaire.getEmail());
+    private String contactFournisseur(Fournisseur fournisseur) {
+        String telephone = nettoyer(fournisseur.getTelephone());
+        String email = nettoyer(fournisseur.getEmail());
         if (telephone == null) return email;
         if (email == null) return telephone;
         return telephone + " · " + email;
@@ -847,9 +823,9 @@ public class OpportuniteService {
                 .map(PalierPrix::getPrix)
                 .findFirst()
                 .orElseGet(() -> {
-                    // Avant le seuil du premier palier (y compris à 0 participant) : le prix
-                    // dégressif du premier palier s'applique déjà, prixNormal ne sert plus
-                    // que de référence barrée pour afficher la réduction.
+                    // Le tarif du premier palier s'applique dès l'ouverture. Sans ce cas,
+                    // le premier participant serait facturé au prix normal alors que le
+                    // catalogue annonce déjà le tarif de départ de la campagne.
                     if (premier != null && opp.getParticipantsActuels() < premier.getSeuilMin()) {
                         return premier.getPrix();
                     }
@@ -1013,6 +989,21 @@ public class OpportuniteService {
             raisonIndisponibilite = "Le stock disponible est déjà réservé";
         }
 
+        List<Participation> dossiers = participationRepository.findByOpportuniteId(opp.getId());
+        int dossiersTermines = (int) dossiers.stream().filter(p -> {
+            StatutLivraison statut = statutLivraisonOuDefaut(p);
+            return statut == StatutLivraison.LIVRE_CONFIRME || statut == StatutLivraison.ANNULE;
+        }).count();
+        int dossiersEnCours = (int) dossiers.stream().filter(p -> {
+            StatutLivraison statut = statutLivraisonOuDefaut(p);
+            return statut != StatutLivraison.EN_ATTENTE_QUOTA && statut != StatutLivraison.A_PREPARER
+                    && statut != StatutLivraison.LIVRE_CONFIRME && statut != StatutLivraison.ANNULE;
+        }).count();
+        int dossiersATraiter = Math.max(dossiers.size() - dossiersTermines - dossiersEnCours, 0);
+        String statutTraitement = dossiers.isEmpty() || dossiersTermines == dossiers.size()
+                ? "TERMINE"
+                : dossiersEnCours > 0 ? "EN_COURS" : "A_TRAITER";
+
         return OpportuniteResponse.builder()
                 .id(opp.getId())
                 .titre(opp.getTitre())
@@ -1024,18 +1015,21 @@ public class OpportuniteService {
                 .prixActuel(calculerPrixActuel(opp))
                 .seuilMinimum(opp.getSeuilMinimum())
                 .seuilMaximal(opp.getSeuilMaximal())
-                .modePlafond(modePlafond(opp.getModePlafond(), opp.getSeuilMaximal()))
                 .participantsActuels(compteurRedis)
                 .placesRestantes(opp.getSeuilMaximal() == null ? null : Math.max(opp.getSeuilMaximal() - compteurRedis, 0))
                 .souscriptionOuverte(souscriptionOuverte)
                 .activationAtteinte(compteurRedis >= opp.getSeuilMinimum())
                 .raisonIndisponibilite(raisonIndisponibilite)
+                .statutTraitement(statutTraitement)
+                .dossiersATraiter(dossiersATraiter)
+                .dossiersEnCours(dossiersEnCours)
+                .dossiersTermines(dossiersTermines)
                 .dateExpiration(opp.getDateExpiration())
                 .statut(opp.getStatut())
                 .createdAt(opp.getCreatedAt())
                 .categorie(opp.getCategorie() != null ? opp.getCategorie().getNom() : null)
                 .categorieIcone(opp.getCategorie() != null ? opp.getCategorie().getIcone() : null)
-                .commanditaireId(opp.getCommanditaireId())
+                .fournisseurId(opp.getFournisseurId())
                 .partenaireNom(opp.getPartenaireNom())
                 .partenaireLogoUrl(opp.getPartenaireLogoUrl())
                 .partenaireContact(opp.getPartenaireContact())

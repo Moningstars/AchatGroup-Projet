@@ -27,7 +27,8 @@ const PAGE_META = {
   '/sondages': { label: 'Sondages', sub: 'Enquêtes rémunérées' },
   '/utilisateurs': { label: 'Utilisateurs', sub: 'Gestion des comptes' },
   '/portefeuilles': { label: 'Portefeuilles', sub: 'Transactions & retraits' },
-  '/commanditaires': { label: 'Commanditaires', sub: 'Entreprises partenaires' },
+  '/fournisseurs': { label: 'Fournisseurs', sub: 'Approvisionnement des opportunités' },
+  '/commanditaires': { label: 'Commanditaires', sub: 'Sponsors des sondages' },
   '/bannieres': { label: 'Bannières', sub: 'Publicités affichées dans l\'app' },
   '/kyc': { label: 'KYC', sub: "Vérification d'identité" },
   '/parametres': { label: 'Paramètres', sub: 'Configuration du compte' },
@@ -37,10 +38,37 @@ function getPageMeta(pathname) {
   if (pathname === '/opportunites/nouvelle') {
     return { label: 'Nouvelle opportunité', sub: 'Création guidée de la campagne' }
   }
+  if (pathname === '/opportunites/traitement') {
+    return { label: 'Opportunités à traiter', sub: 'Préparation, livraison et clôture des dossiers' }
+  }
+  if (pathname === '/opportunites/tentatives') {
+    return { label: 'Tentatives non abouties', sub: 'Analyse des souscriptions échouées' }
+  }
   if (pathname.startsWith('/opportunites/')) {
     return pathname.endsWith('/modifier')
       ? { label: 'Modifier une opportunité', sub: 'Configuration de la campagne' }
       : { label: "Détail de l’opportunité", sub: 'Pilotage de la campagne' }
+  }
+  if (pathname === '/sondages/nouveau') {
+    return { label: 'Nouveau sondage', sub: 'Création complète de l’enquête' }
+  }
+  if (pathname === '/fournisseurs/nouveau') {
+    return { label: 'Nouveau fournisseur', sub: 'Référencement d’un fournisseur d’opportunité' }
+  }
+  if (pathname === '/commanditaires/nouveau') {
+    return { label: 'Nouveau commanditaire', sub: 'Référencement d’un sponsor de sondage' }
+  }
+  if (pathname === '/portefeuilles/alimenter') {
+    return { label: 'Alimenter la trésorerie', sub: 'Crédit du wallet plateforme' }
+  }
+  if (pathname.startsWith('/utilisateurs/')) {
+    return { label: 'Détail utilisateur', sub: 'Compte, identité et vérification' }
+  }
+  if (pathname.startsWith('/sondages/')) {
+    if (pathname.endsWith('/modifier')) return { label: 'Modifier le sondage', sub: 'Paramètres de l’enquête' }
+    if (pathname.endsWith('/eligibilite')) return { label: 'Test d’éligibilité', sub: 'Présélection des participants' }
+    if (pathname.endsWith('/reponses')) return { label: 'Réponses à valider', sub: 'Contrôle des participations' }
+    if (pathname.endsWith('/resultats')) return { label: 'Résultats du sondage', sub: 'Analyse et répondants' }
   }
   if (pathname === '/bannieres/nouvelle') {
     return { label: 'Nouvelle bannière', sub: 'Création du contenu publicitaire' }

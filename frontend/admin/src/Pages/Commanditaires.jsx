@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Loader2, ShieldCheck, ShieldOff, Building2, Plus, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import {
-  Badge, Card, Table, Th, Td, Tr, Spinner, EmptyState,
-  SearchInput, FilterPill, ActionBtn,
+  ArrowLeft, Loader2, ShieldCheck, ShieldOff, Building2, Plus, Search,
+  Users, Clock3, CircleOff, RotateCcw,
+} from 'lucide-react'
+import {
+  Badge, Card, Table, Th, Td, Tr, Spinner, FilterPill, ActionBtn, Pagination,
 } from '../components/ui'
 import {
   getAdminCommanditaires, creerCommanditaire,
@@ -21,9 +24,9 @@ function initiales(nom, prenom) {
   return ((nom?.[0] || '') + (prenom?.[0] || '')).toUpperCase() || '?'
 }
 
-// ── Modal : nouveau commanditaire ────────────────────────────────────────────
+// ── Formulaire dédié : nouveau commanditaire ─────────────────────────────────
 
-function NouveauCommanditaireModal({ onClose, onSaved }) {
+function NouveauCommanditaireForm({ onClose, onSaved }) {
   const [form, setForm] = useState({ nom: '', prenom: '', societe: '', email: '', telephone: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
@@ -43,13 +46,11 @@ function NouveauCommanditaireModal({ onClose, onSaved }) {
   }
 
   return (
-    <div className="admin-modal-layer fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-200">
+    <div className="mx-auto w-full max-w-3xl pb-8">
+      <div className="w-full rounded-2xl bg-white shadow-sm border border-slate-200">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <h3 className="text-base font-bold text-slate-900">Nouveau commanditaire</h3>
-          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 transition">
-            <X size={16} />
-          </button>
+          <button onClick={onClose} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"><ArrowLeft size={14} /> Retour</button>
         </div>
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -95,13 +96,14 @@ function NouveauCommanditaireModal({ onClose, onSaved }) {
 // ── Page principale ───────────────────────────────────────────────────────────
 
 export default function Commanditaires() {
+  const navigate = useNavigate()
   const [commanditaires, setCommanditaires] = useState([])
   const [loading, setLoading]               = useState(true)
   const [filterIdx, setFilterIdx]           = useState(0)
   const [search, setSearch]                 = useState('')
   const [actionId, setActionId]             = useState(null)
   const [confirmId, setConfirmId]           = useState(null)
-  const [showNouveauModal, setShowNouveauModal] = useState(false)
+  const [page, setPage]                     = useState(1)
 
   const fetchData = () => {
     setLoading(true)
@@ -111,12 +113,19 @@ export default function Commanditaires() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    let cancelled = false
+    getAdminCommanditaires()
+      .then(data => { if (!cancelled) setCommanditaires(data) })
+      .catch(() => { if (!cancelled) setCommanditaires([]) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
 
   const handleActiver = async (id) => {
     setActionId(id)
     try { await activerCommanditaire(id); fetchData() }
-    catch { }
+    catch { setActionId(null) }
     finally { setActionId(null) }
   }
 
@@ -124,7 +133,7 @@ export default function Commanditaires() {
     setConfirmId(null)
     setActionId(id)
     try { await suspendreCommanditaire(id); fetchData() }
-    catch { }
+    catch { setActionId(null) }
     finally { setActionId(null) }
   }
 
@@ -144,63 +153,114 @@ export default function Commanditaires() {
     })
 
   const countByStatut = key => commanditaires.filter(c => c.statut === key).length
+  const hasFilters = filterIdx !== 0 || search.trim()
+  useEffect(() => setPage(1), [filterIdx, search])
+  const pageItems = filtered.slice((page - 1) * 10, page * 10)
+
+  const statCards = [
+    { key: 'TOUS', label: 'Tous', helper: 'Partenaires enregistrés', count: commanditaires.length, icon: Users, tone: 'violet' },
+    { key: 'ACTIF', label: 'Actifs', helper: 'Peuvent sponsoriser', count: countByStatut('ACTIF'), icon: ShieldCheck, tone: 'emerald' },
+    { key: 'EN_ATTENTE', label: 'En attente', helper: 'À examiner', count: countByStatut('EN_ATTENTE'), icon: Clock3, tone: 'amber' },
+    { key: 'SUSPENDU', label: 'Suspendus', helper: 'Accès désactivé', count: countByStatut('SUSPENDU'), icon: CircleOff, tone: 'rose' },
+  ]
+
+  const toneClasses = {
+    violet: 'bg-violet-50 text-violet-700 border-violet-200',
+    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    amber: 'bg-amber-50 text-amber-700 border-amber-200',
+    rose: 'bg-rose-50 text-rose-700 border-rose-200',
+  }
 
   return (
     <div className="space-y-4">
 
-      {showNouveauModal && (
-        <NouveauCommanditaireModal
-          onClose={() => setShowNouveauModal(false)}
-          onSaved={() => { setShowNouveauModal(false); fetchData() }}
-        />
-      )}
-
-      {/* ── En-tête ── */}
-      <Card>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-[13px] font-bold text-slate-900">Commanditaires</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              {commanditaires.length} commanditaire{commanditaires.length !== 1 ? 's' : ''} enregistré{commanditaires.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-            {[
-              { key: 'ACTIF',      label: 'Actifs',     cls: 'bg-emerald-50 text-emerald-700' },
-              { key: 'EN_ATTENTE', label: 'En attente', cls: 'bg-amber-50 text-amber-700' },
-              { key: 'SUSPENDU',   label: 'Suspendus',  cls: 'bg-rose-50 text-rose-600' },
-            ].map(({ key, label, cls }) => (
-              <span key={key} className={`text-[11px] font-bold px-2.5 py-1 rounded-lg ${cls}`}>
-                {countByStatut(key)} {label}
+      {/* ── En-tête et pilotage ── */}
+      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div className="relative overflow-hidden bg-gradient-to-r from-slate-950 via-slate-900 to-violet-950 px-5 py-5 text-white sm:px-6">
+          <div className="absolute -right-12 -top-16 h-48 w-48 rounded-full border-[28px] border-white/5" />
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15">
+                <Building2 size={23} />
               </span>
-            ))}
-            <button
-              onClick={() => setShowNouveauModal(true)}
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm shadow-violet-200 transition hover:bg-violet-800 sm:w-auto"
-            >
-              <Plus size={15} /> Nouveau
+              <div>
+                <h2 className="text-lg font-extrabold">Partenaires de vos sondages</h2>
+                <p className="mt-0.5 max-w-xl text-xs leading-relaxed text-slate-300">Enregistrez et gérez ici les commanditaires qui financent ou portent vos enquêtes.</p>
+              </div>
+            </div>
+            <button onClick={() => navigate('/commanditaires/nouveau')}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-extrabold text-slate-950 shadow-lg transition hover:-translate-y-0.5 hover:bg-violet-50 sm:w-auto">
+              <Plus size={16} /> Ajouter un commanditaire
             </button>
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-3 items-center">
-          <SearchInput value={search} onChange={setSearch} placeholder="Nom, société, email, téléphone…" />
-          <div className="flex gap-1.5 flex-wrap">
-            {FILTER_LABELS.map((label, idx) => (
-              <FilterPill key={label} label={label} active={filterIdx === idx} onClick={() => setFilterIdx(idx)} />
-            ))}
-          </div>
+        <div className="grid gap-2 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-4">
+          {statCards.map(({ key, label, helper, count, icon: Icon, tone }, idx) => {
+            const active = filterIdx === idx
+            return (
+              <button key={key} type="button" onClick={() => setFilterIdx(idx)} aria-pressed={active}
+                className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition ${active ? `${toneClasses[tone]} shadow-sm ring-2 ring-current/10` : 'border-slate-100 bg-slate-50/70 hover:border-slate-200 hover:bg-white'}`}>
+                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${active ? 'bg-white/75' : toneClasses[tone]}`}>
+                  <Icon size={18} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="text-xs font-extrabold text-slate-700">{label}</span>
+                    <strong className="text-xl leading-none text-slate-950">{count}</strong>
+                  </span>
+                  <span className="mt-1 block truncate text-[10px] font-medium text-slate-400">{helper}</span>
+                </span>
+              </button>
+            )
+          })}
         </div>
-      </Card>
+
+        <div className="border-t border-slate-100 px-4 py-4 sm:px-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <label className="relative block min-w-0 flex-1 lg:max-w-xl">
+              <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={search} onChange={event => setSearch(event.target.value)}
+                placeholder="Rechercher un nom, une société, un email…"
+                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none transition focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100" />
+            </label>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {FILTER_LABELS.map((label, idx) => (
+                <FilterPill key={label} label={label} active={filterIdx === idx} onClick={() => setFilterIdx(idx)} />
+              ))}
+              {hasFilters && (
+                <button type="button" onClick={() => { setFilterIdx(0); setSearch('') }}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-slate-500 transition hover:bg-slate-100 hover:text-slate-900">
+                  <RotateCcw size={13} /> Réinitialiser
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="mt-3 text-[11px] font-medium text-slate-400">{filtered.length} résultat{filtered.length !== 1 ? 's' : ''} affiché{filtered.length !== 1 ? 's' : ''}</p>
+        </div>
+      </section>
 
       {/* ── Tableau ── */}
       <Card noPad>
         {loading ? (
           <Spinner py="py-12" />
         ) : filtered.length === 0 ? (
-          <EmptyState icon={Building2} title="Aucun commanditaire trouvé" />
+          <div className="flex min-h-64 flex-col items-center justify-center px-5 py-12 text-center">
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50 text-violet-500 ring-8 ring-violet-50/50">
+              <Building2 size={26} />
+            </span>
+            <h3 className="mt-5 text-base font-extrabold text-slate-900">{hasFilters ? 'Aucun résultat pour ces critères' : 'Ajoutez votre premier commanditaire'}</h3>
+            <p className="mt-1 max-w-md text-sm leading-relaxed text-slate-500">
+              {hasFilters ? 'Modifiez votre recherche ou réinitialisez les filtres pour afficher les partenaires disponibles.' : 'Les commanditaires sont les entreprises ou personnes qui sponsorisent vos sondages.'}
+            </p>
+            <button type="button" onClick={hasFilters ? () => { setFilterIdx(0); setSearch('') } : () => navigate('/commanditaires/nouveau')}
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-violet-100 transition hover:bg-violet-800">
+              {hasFilters ? <RotateCcw size={15} /> : <Plus size={15} />}
+              {hasFilters ? 'Réinitialiser la recherche' : 'Créer un commanditaire'}
+            </button>
+          </div>
         ) : (
-          <Table>
+          <><Table>
             <thead>
               <tr>
                 <Th>Commanditaire</Th>
@@ -212,7 +272,7 @@ export default function Commanditaires() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(c => (
+              {pageItems.map(c => (
                 <Tr key={c.id}>
                   <Td>
                     <div className="flex items-center gap-2.5">
@@ -260,9 +320,14 @@ export default function Commanditaires() {
                 </Tr>
               ))}
             </tbody>
-          </Table>
+          </Table><Pagination page={page} totalItems={filtered.length} onPageChange={setPage} /></>
         )}
       </Card>
     </div>
   )
+}
+
+export function NouveauCommanditairePage() {
+  const navigate = useNavigate()
+  return <NouveauCommanditaireForm onClose={() => navigate('/commanditaires')} onSaved={() => navigate('/commanditaires')} />
 }

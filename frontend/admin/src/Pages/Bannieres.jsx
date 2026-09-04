@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, Edit2, Trash2, Eye, EyeOff, Image, Loader2, Calendar, Search, SlidersHorizontal, RotateCcw, ChevronDown, Check, ArrowLeft } from 'lucide-react'
+import {
+  Plus, Edit2, Trash2, Eye, EyeOff, Image, Loader2, Calendar, Search,
+  SlidersHorizontal, RotateCcw, ChevronDown, Check, ArrowLeft, UsersRound,
+  ShoppingBag, Gift, Megaphone, BadgePercent, Trophy, WalletCards,
+  ClipboardList, Package, Heart, Star, Zap,
+} from 'lucide-react'
 import {
   getAdminBannieres, creerBanniere, modifierBanniere,
   toggleBanniere, supprimerBanniere,
 } from '../services/api'
+import { Pagination } from '../components/ui'
 
 const BASE_URL = `http://${window.location.hostname}:8080`
 
@@ -23,6 +29,22 @@ const PAGE_COLORS = {
 }
 
 const PAGE_LABELS = { ACCUEIL: 'Accueil', CATALOGUE: 'Catalogue', SONDAGES: 'Sondages', TOUTES: 'Toutes' }
+
+const BANNER_ICONS = [
+  { value: '', label: 'Sans icône', icon: Image },
+  { value: 'ti-users-group', label: 'Communauté', icon: UsersRound },
+  { value: 'ti-shopping-bag', label: 'Achats', icon: ShoppingBag },
+  { value: 'ti-gift', label: 'Cadeau', icon: Gift },
+  { value: 'ti-speakerphone', label: 'Annonce', icon: Megaphone },
+  { value: 'ti-discount-2', label: 'Promotion', icon: BadgePercent },
+  { value: 'ti-trophy', label: 'Récompense', icon: Trophy },
+  { value: 'ti-wallet', label: 'Portefeuille', icon: WalletCards },
+  { value: 'ti-clipboard-text', label: 'Sondage', icon: ClipboardList },
+  { value: 'ti-package', label: 'Opportunité', icon: Package },
+  { value: 'ti-heart', label: 'Favori', icon: Heart },
+  { value: 'ti-star', label: 'Vedette', icon: Star },
+  { value: 'ti-bolt', label: 'Offre flash', icon: Zap },
+]
 
 const inputCls = 'w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition'
 const labelCls = 'block text-xs font-semibold text-slate-600 mb-1'
@@ -91,6 +113,47 @@ function FilterDropdown({ label, value, onChange, options, icon: Icon }) {
           })}
         </div>
       )}
+    </div>
+  )
+}
+
+function IconPicker({ value, onChange }) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef(null)
+  const selected = BANNER_ICONS.find(option => option.value === value) || BANNER_ICONS[0]
+  const SelectedIcon = selected.icon
+
+  useEffect(() => {
+    const close = event => {
+      if (rootRef.current && !rootRef.current.contains(event.target)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [])
+
+  return (
+    <div ref={rootRef} className="relative" onKeyDown={event => event.key === 'Escape' && setOpen(false)}>
+      <button type="button" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(current => !current)}
+        className={`flex h-11 w-full items-center gap-3 rounded-xl border px-3 text-left transition ${open ? 'border-violet-400 bg-white ring-4 ring-violet-100' : 'border-slate-200 bg-slate-50 hover:bg-white'}`}>
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700"><SelectedIcon size={16} /></span>
+        <span className="min-w-0 flex-1 truncate text-sm font-bold text-slate-700">{selected.label}</span>
+        <ChevronDown size={15} className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <div role="listbox" aria-label="Choisir une icône" className="absolute right-0 top-full z-50 mt-2 grid w-[min(22rem,calc(100vw-2rem))] grid-cols-4 gap-1.5 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_50px_-16px_rgba(15,23,42,0.35)]">
+        {BANNER_ICONS.map(option => {
+          const Icon = option.icon
+          const active = option.value === selected.value
+          return (
+            <button key={option.value || 'none'} type="button" role="option" aria-selected={active}
+              aria-label={option.label} title={option.label} onClick={() => { onChange(option.value); setOpen(false) }}
+              className={`group relative flex h-14 flex-col items-center justify-center gap-1 rounded-xl border p-1.5 text-center transition ${active ? 'border-violet-400 bg-violet-50 text-violet-700 ring-2 ring-violet-100' : 'border-transparent bg-slate-50 text-slate-500 hover:border-violet-200 hover:text-violet-700'}`}>
+              {active && <Check size={11} className="absolute right-1 top-1 rounded-full bg-violet-600 p-0.5 text-white" />}
+              <Icon size={18} />
+              <span className="w-full truncate text-[9px] font-bold">{option.label}</span>
+            </button>
+          )
+        })}
+      </div>}
     </div>
   )
 }
@@ -238,8 +301,8 @@ function BanniereForm({ banniere, onClose, onSaved }) {
               </select>
             </div>
             <div>
-              <label className={labelCls}>Icône Tabler (optionnel)</label>
-              <input value={form.icone} onChange={e => set('icone', e.target.value)} className={inputCls} placeholder="ti-users-group" />
+              <label className={labelCls}>Icône de la bannière (optionnel)</label>
+              <IconPicker value={form.icone} onChange={value => set('icone', value)} />
             </div>
           </div>
 
@@ -431,6 +494,7 @@ export default function Bannieres() {
   const [recherche, setRecherche] = useState('')
   const [pendingId, setPendingId] = useState(null)
   const [feedback, setFeedback] = useState('')
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     let cancelled = false
@@ -488,6 +552,8 @@ export default function Bannieres() {
 
   const activeCount = bannieres.filter(b => b.actif).length
   const hasFilters = filtre !== 'TOUS' || statut !== 'TOUS' || recherche.trim()
+  useEffect(() => setPage(1), [filtre, statut, recherche])
+  const bannieresPage = filtrees.slice((page - 1) * 10, page * 10)
 
   const resetFilters = () => {
     setFiltre('TOUS')
@@ -559,8 +625,8 @@ export default function Bannieres() {
           {hasFilters && <button type="button" onClick={resetFilters} className="mt-4 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800">Effacer les filtres</button>}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtrees.map(b => (
+        <><div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {bannieresPage.map(b => (
             <BanniereCard
               key={b.id}
               b={b}
@@ -570,7 +636,7 @@ export default function Bannieres() {
               pending={pendingId === b.id}
             />
           ))}
-        </div>
+        </div><Pagination page={page} totalItems={filtrees.length} onPageChange={setPage} /></>
       )}
 
       {feedback && (

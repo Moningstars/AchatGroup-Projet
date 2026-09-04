@@ -31,6 +31,9 @@ export const adminLogout = async () => {
 export const getAdminOpportunites = () =>
   api.get('/admin/opportunites').then(r => r.data)
 
+export const getTentativesSouscriptionEchouees = () =>
+  api.get('/admin/opportunites/tentatives-echouees').then(r => r.data)
+
 export const getAdminOpportunite = (id) =>
   api.get(`/admin/opportunites/${id}`).then(r => r.data)
 
@@ -135,6 +138,19 @@ export const activerCommanditaire = (id) =>
 
 export const suspendreCommanditaire = (id) =>
   api.patch(`/admin/commanditaires/${id}/suspendre`).then(r => r.data)
+
+// Fournisseurs d'opportunités (admin)
+export const getAdminFournisseurs = () =>
+  api.get('/admin/fournisseurs').then(r => r.data)
+
+export const creerFournisseur = (data) =>
+  api.post('/admin/fournisseurs', data).then(r => r.data)
+
+export const activerFournisseur = (id) =>
+  api.patch(`/admin/fournisseurs/${id}/activer`).then(r => r.data)
+
+export const suspendreFournisseur = (id) =>
+  api.patch(`/admin/fournisseurs/${id}/suspendre`).then(r => r.data)
 
 // Stats admin
 export const getAdminStats = () =>

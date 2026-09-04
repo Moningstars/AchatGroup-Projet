@@ -1,39 +1,38 @@
 import { Link } from 'react-router-dom'
 import { imgUrl } from '../services/api'
 import { calculerProgression } from '../utils/progression'
+import { useCountdown } from '../hooks/useCountdown'
 
 function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
 
 function CountdownBadge({ dateExpiration }) {
-  if (!dateExpiration) return null
-  const diff = Math.ceil((new Date(dateExpiration) - Date.now()) / (1000 * 60 * 60 * 24))
-  if (diff < 0 || diff > 7) return null
-  const urgent = diff <= 1
+  const countdown = useCountdown(dateExpiration, 60_000)
+  if (!countdown || countdown.expired) return null
+  const joursRestants = Math.ceil(countdown.total / 86_400_000)
+  if (joursRestants > 7) return null
+  const urgent = joursRestants <= 1
   return (
     <span className={`text-[9px] font-black px-1.5 py-0.5 uppercase ${
       urgent ? 'bg-urgency text-white' : 'bg-accent text-primary'
     }`}>
-      {diff === 0 ? 'Auj.' : diff === 1 ? 'Demain' : `${diff}j`}
+      {joursRestants <= 1 ? 'Moins de 24 h' : `${joursRestants}j`}
     </span>
   )
 }
 
 const ProductCard = ({ opportunity }) => {
   if (!opportunity) return null
-  const { id, titre, prixActuel, prixNormal, participantsActuels, seuilMinimum, seuilMaximal, paliers, images, dateExpiration } = opportunity
+  const { id, titre, prixActuel, prixNormal, participantsActuels, seuilMinimum, seuilMaximal, images, dateExpiration } = opportunity
 
-  const paliersTries = [...(opportunity.paliers || [])].sort((a, b) => a.seuilMin - b.seuilMin)
-  const palierActif = paliersTries.find((palier, i) => {
-    const dernier = i === paliersTries.length - 1
-    return (participantsActuels >= palier.seuilMin || (i === 0 && participantsActuels < palier.seuilMin)) &&
-      (dernier || !palier.seuilMax || participantsActuels <= palier.seuilMax)
+  const discount = prixNormal && Number(prixNormal) > Number(prixActuel)
+    ? Math.round((1 - Number(prixActuel) / Number(prixNormal)) * 100) : null
+
+  const { pct: progress, valide, objectifFinal } = calculerProgression({
+    participantsActuels,
+    seuilMinimum,
+    seuilMaximal,
+    paliers: opportunity.paliers,
   })
-  const prixAffiche = palierActif ? palierActif.prix : prixActuel
-
-  const discount = prixNormal && Number(prixNormal) > Number(prixAffiche)
-    ? Math.round((1 - Number(prixAffiche) / Number(prixNormal)) * 100) : null
-
-  const { pct: progress, valide } = calculerProgression({ participantsActuels, seuilMinimum, seuilMaximal, paliers })
   const isExpired = dateExpiration && new Date(dateExpiration) <= new Date()
   const isOpen = opportunity.souscriptionOuverte ?? (opportunity.statut === 'ACTIVE' && !isExpired)
   const isActivated = opportunity.activationAtteinte ?? participantsActuels >= seuilMinimum
@@ -94,18 +93,18 @@ const ProductCard = ({ opportunity }) => {
         <div>
           <div className="flex items-baseline gap-1.5 flex-wrap">
             <span className="text-base font-black text-urgency tabular-nums leading-none">
-              {fmt(prixAffiche)}<span className="text-[9px] font-bold ml-0.5">F</span>
+              {fmt(prixActuel)}<span className="text-[9px] font-bold ml-0.5">F</span>
             </span>
-            {prixNormal && Number(prixNormal) > Number(prixAffiche) && (
+            {prixNormal && Number(prixNormal) > Number(prixActuel) && (
               <span className="text-[10px] text-gray-300 line-through tabular-nums">{fmt(prixNormal)}F</span>
             )}
           </div>
           <p className="text-[9px] text-gray-400 font-bold mt-0.5">
-            {valide
-              ? seuilMaximal != null
-                ? `${participantsActuels} / ${seuilMaximal} places`
-                : `${participantsActuels} unités · offre validée`
-              : `${participantsActuels} / ${seuilMinimum} unités réservées`}
+            {seuilMaximal != null
+              ? `${participantsActuels} / ${objectifFinal || seuilMaximal} places`
+              : valide && objectifFinal === Number(seuilMinimum)
+                ? `${participantsActuels} unités · offre validée`
+                : `${participantsActuels} / ${objectifFinal || seuilMinimum} unités`}
           </p>
 
           {/* Barre de progression inline — mobile seulement */}
