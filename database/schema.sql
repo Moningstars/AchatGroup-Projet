@@ -454,6 +454,7 @@ CREATE TABLE public.utilisateurs (
     profil_complete boolean NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     id uuid NOT NULL,
+    admin_id uuid,
     mot_de_passe character varying(255),
     niveau_verification character varying(255) NOT NULL,
     nom character varying(255),
@@ -975,6 +976,14 @@ ALTER TABLE ONLY public.participations
 
 ALTER TABLE ONLY public.resultats_eligibilite
     ADD CONSTRAINT fkp6j278rlxg6em3hk8ljrj0rrw FOREIGN KEY (utilisateur_id) REFERENCES public.utilisateurs(id);
+
+
+--
+-- Name: utilisateurs fk_utilisateurs_admin_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.utilisateurs
+    ADD CONSTRAINT fk_utilisateurs_admin_id FOREIGN KEY (admin_id) REFERENCES public.administrateurs(id);
 
 
 --

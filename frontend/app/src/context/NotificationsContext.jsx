@@ -7,7 +7,7 @@ const NotificationsContext = createContext(null)
 function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
 
 // Raisons de wallet.credited/wallet.debited qui n'ont pas déjà leur propre notification
-// spécifique (RECOMPENSE et RETRAIT_REJETE sont déjà couverts via le canal SSE).
+// spécifique (RECOMPENSE a son propre événement Pusher "RECOMPENSE").
 const WALLET_CREDIT_LABELS = {
   RECHARGE: 'Recharge effectuée avec succès !',
   REMBOURSEMENT: 'Remboursement reçu sur votre portefeuille.',

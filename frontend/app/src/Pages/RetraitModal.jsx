@@ -1,16 +1,22 @@
 import React, { useState } from 'react'
 
-export default function RetraitModal({ open, onClose, onConfirm, balance }) {
+export default function RetraitModal({ open, onClose, onConfirm, balance, loading, error }) {
   const [amount, setAmount] = useState('')
   const [coordonnees, setCoordonnees] = useState('')
+  const [localError, setLocalError] = useState('')
   if (!open) return null
 
   const handleConfirm = () => {
-    if (!amount || !coordonnees) return
+    if (loading || !amount || !coordonnees) return
+    const val = Number(amount)
+    if (val > balance) { setLocalError('Le montant dépasse votre solde disponible'); return }
+    setLocalError('')
     onConfirm(amount, coordonnees)
     setAmount('')
     setCoordonnees('')
   }
+
+  const displayedError = localError || error
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
@@ -22,7 +28,7 @@ export default function RetraitModal({ open, onClose, onConfirm, balance }) {
         <label className="mb-2 block text-sm font-medium text-slate-700">Montant (FCFA)</label>
         <input
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={(e) => { setAmount(e.target.value); setLocalError('') }}
           placeholder="1000"
           type="number"
           min="1000"
@@ -37,17 +43,23 @@ export default function RetraitModal({ open, onClose, onConfirm, balance }) {
           placeholder="ex : +228 90 00 00 00"
           className="w-full rounded-lg border border-slate-200 px-4 py-2 mb-4"
         />
+        {displayedError && (
+          <div className="mb-4 rounded-lg bg-rose-50 border border-rose-100 px-4 py-2 text-sm text-rose-600">
+            {displayedError}
+          </div>
+        )}
         <div className="flex gap-3">
           <button
             onClick={handleConfirm}
-            disabled={!amount || !coordonnees}
+            disabled={loading || !amount || !coordonnees}
             className="flex-1 rounded-lg bg-rose-500 px-4 py-2 text-white disabled:opacity-50"
           >
-            Confirmer
+            {loading ? 'Envoi…' : 'Confirmer'}
           </button>
           <button
-            onClick={() => { setAmount(''); setCoordonnees(''); onClose() }}
-            className="flex-1 rounded-lg border border-slate-200 px-4 py-2"
+            onClick={() => { setAmount(''); setCoordonnees(''); setLocalError(''); onClose() }}
+            disabled={loading}
+            className="flex-1 rounded-lg border border-slate-200 px-4 py-2 disabled:opacity-50"
           >
             Annuler
           </button>

@@ -1,5 +1,6 @@
 package com.plateformeopportunites.finance.service;
 
+import com.plateformeopportunites.common.enums.NiveauVerification;
 import com.plateformeopportunites.common.enums.StatutTransaction;
 import com.plateformeopportunites.common.enums.TypeTransaction;
 import com.plateformeopportunites.common.event.RetraitDemandeEvent;
@@ -9,6 +10,7 @@ import com.plateformeopportunites.finance.dto.RetraitRequest;
 import com.plateformeopportunites.finance.entity.Portefeuille;
 import com.plateformeopportunites.finance.repository.PortefeuilleRepository;
 import com.plateformeopportunites.finance.repository.TransactionRepository;
+import com.plateformeopportunites.identity.entity.Utilisateur;
 import com.plateformeopportunites.identity.repository.UtilisateurRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,6 +49,10 @@ class WalletServiceTest {
                 .build();
     }
 
+    private Utilisateur utilisateurVerifie() {
+        return Utilisateur.builder().id(PID).niveauVerification(NiveauVerification.VERIFIE).build();
+    }
+
     // ── recharger ────────────────────────────────────────────────────────────
 
     @Test
@@ -73,7 +79,8 @@ class WalletServiceTest {
     @Test
     void demanderRetrait_soldeInsuffisant_leveException() {
         Portefeuille p = wallet("500");
-        when(portefeuilleRepository.findByUtilisateurId(PID)).thenReturn(Optional.of(p));
+        when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateurVerifie()));
+        when(portefeuilleRepository.findByUtilisateurIdForUpdate(PID)).thenReturn(Optional.of(p));
 
         RetraitRequest req = new RetraitRequest();
         req.setMontant(new BigDecimal("1000"));
@@ -86,7 +93,8 @@ class WalletServiceTest {
     @Test
     void demanderRetrait_geleLeFondsEtPublieEvenement() {
         Portefeuille p = wallet("5000");
-        when(portefeuilleRepository.findByUtilisateurId(PID)).thenReturn(Optional.of(p));
+        when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateurVerifie()));
+        when(portefeuilleRepository.findByUtilisateurIdForUpdate(PID)).thenReturn(Optional.of(p));
         when(portefeuilleRepository.save(any())).thenReturn(p);
 
         RetraitRequest req = new RetraitRequest();
