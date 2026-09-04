@@ -1201,8 +1201,45 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
   const [uploadProgress, setUploadProgress] = useState(null)
   const [error, setError]                 = useState('')
   const [step, setStep]                   = useState(0)
+  const [aiGenerating, setAiGenerating]   = useState(false)
+  const [aiError, setAiError]             = useState('')
+  const [aiNotice, setAiNotice]           = useState('')
 
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const handlePresentationAi = async () => {
+    if (!form.titre.trim()) {
+      setAiError('Saisissez d’abord un titre pour guider la génération.')
+      return
+    }
+    setAiError('')
+    setAiNotice('')
+    setAiGenerating(true)
+    try {
+      const res = await genererSpecsOpportunite({
+        titre: form.titre.trim(),
+        description: form.description.trim() || undefined,
+        categorie: form.categorie || undefined,
+      })
+      setForm(current => ({
+        ...current,
+        description: res.description?.trim() || current.description,
+        categorie: !current.categorie && CATEGORIES.includes(res.categorieSuggestion) ? res.categorieSuggestion : current.categorie,
+        messagePartage: current.messagePartage === MESSAGE_PARTAGE_DEFAUT && res.messagePartage?.trim()
+          ? res.messagePartage.trim()
+          : current.messagePartage,
+      }))
+      setSpecs(current => ({
+        pointsForts: (res.pointsForts || []).length ? res.pointsForts.join('\n') : current.pointsForts,
+        casUsage: res.casUsage?.trim() || current.casUsage,
+        finePrint: res.finePrint?.trim() || current.finePrint,
+      }))
+      setAiNotice('Description complétée. La catégorie et le contenu enrichi ont aussi été préparés lorsque nécessaire.')
+    } catch (err) {
+      setAiError(err.response?.data?.message || 'L’assistant IA est momentanément indisponible. Vos champs ont été conservés.')
+    } finally {
+      setAiGenerating(false)
+    }
+  }
   const handleFournisseurChange = (fournisseurId) => {
     const fournisseur = fournisseurs.find(item => item.id === fournisseurId)
     setForm(current => fournisseur ? {
@@ -1357,7 +1394,22 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
             {step === 0 && (
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2"><label className={labelCls}>Titre de l’opportunité *</label><input autoFocus value={form.titre} onChange={e => setField('titre', e.target.value)} className={inputCls} placeholder="Ex. Table pliante de marché renforcée" /></div>
-                <div><label className={labelCls}>Catégorie</label><select value={form.categorie} onChange={e => setField('categorie', e.target.value)} className={inputCls}><option value="">— Sélectionner —</option>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                <div className="sm:col-span-2 flex flex-col gap-3 rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-start gap-2.5">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-600 text-white"><Sparkles size={15} /></span>
+                    <div>
+                      <p className="text-xs font-black text-slate-900">Assistant de rédaction</p>
+                      <p className="mt-0.5 text-[11px] leading-4 text-slate-500">Génère une description ou améliore votre brouillon, puis prépare les champs de contenu.</p>
+                    </div>
+                  </div>
+                  <button type="button" onClick={handlePresentationAi} disabled={aiGenerating || !form.titre.trim()} className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-xs font-black text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50">
+                    {aiGenerating ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                    {aiGenerating ? 'Rédaction…' : (form.description.trim() ? 'Améliorer avec l’IA' : 'Générer avec l’IA')}
+                  </button>
+                </div>
+                {aiError && <p className="sm:col-span-2 rounded-lg bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700">{aiError}</p>}
+                {aiNotice && <p className="sm:col-span-2 rounded-lg bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-700">{aiNotice}</p>}
+                <div><label className={labelCls}>Catégorie <span className="font-normal normal-case tracking-normal text-slate-400">(suggérée si vide)</span></label><select value={form.categorie} onChange={e => setField('categorie', e.target.value)} className={inputCls}><option value="">— Sélectionner —</option>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                 <div className="sm:col-span-2"><label className={labelCls}>Description de l’opportunité</label><textarea value={form.description} onChange={e => setField('description', e.target.value)} rows={4} className={`${inputCls} resize-none`} placeholder="Décrivez l’opportunité, ses caractéristiques et ses avantages…" /></div>
                 <div className="sm:col-span-2 rounded-xl border border-violet-100 bg-violet-50/60 p-4"><label className={labelCls}>Message de partage</label><textarea value={form.messagePartage} onChange={e => setField('messagePartage', e.target.value)} rows={6} maxLength={500} className={`${inputCls} resize-none bg-white`} /><p className="mt-1.5 text-[10px] leading-4 text-slate-500">Ajouté automatiquement au lien partagé. Utilisez <strong>{'{titre}'}</strong> et <strong>{'{prix}'}</strong> pour insérer les informations de l’offre.</p></div>
               </div>
