@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Loader2, ShieldCheck, ShieldOff, Users, Eye, User, Phone, Calendar, CheckCircle2, ShieldAlert, Globe, MapPin, CreditCard, Briefcase, Mail, Home, Trash2, AlertTriangle } from 'lucide-react'
+import { Loader2, ShieldCheck, ShieldOff, Users, Eye, X, User, Phone, Calendar, CheckCircle2, ShieldAlert, Globe, MapPin, CreditCard, Briefcase, Mail, Home, Trash2, AlertTriangle } from 'lucide-react'
 import {
   Badge, Card, Table, Th, Td, Tr, Spinner, EmptyState,
-  SearchInput, FilterPill, ActionBtn, Pagination,
+  SearchInput, FilterPill, ActionBtn,
 } from '../components/ui'
 import { getAdminUtilisateurs, getAdminUtilisateurDetail, activerUtilisateur, suspendreUtilisateur, supprimerUtilisateur } from '../services/api'
 
@@ -62,7 +61,7 @@ function Section({ title, children }) {
   )
 }
 
-function UserDetailContent({ userId, baseUser, onClose, onDeleted }) {
+function UserDetailModal({ userId, baseUser, onClose, onDeleted }) {
   const [detail, setDetail]       = useState(null)
   const [loading, setLoading]     = useState(true)
   const [confirmDel, setConfirmDel] = useState(false)
@@ -71,12 +70,13 @@ function UserDetailContent({ userId, baseUser, onClose, onDeleted }) {
 
   useEffect(() => {
     if (!userId) return
-    let cancelled = false
+    setLoading(true)
+    setConfirmDel(false)
+    setDelError('')
     getAdminUtilisateurDetail(userId)
-      .then(data => { if (!cancelled) setDetail(data) })
-      .catch(() => { if (!cancelled) setDetail(null) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+      .then(setDetail)
+      .catch(() => setDetail(null))
+      .finally(() => setLoading(false))
   }, [userId])
 
   const handleSupprimer = async () => {
@@ -104,8 +104,8 @@ function UserDetailContent({ userId, baseUser, onClose, onDeleted }) {
   const hasKyc = detail && (detail.prenom || detail.numeroPiece || detail.email)
 
   return (
-    <div className="mx-auto w-full max-w-5xl pb-8">
-      <div className="flex w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className="admin-modal-layer fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
 
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 flex-shrink-0">
@@ -119,7 +119,9 @@ function UserDetailContent({ userId, baseUser, onClose, onDeleted }) {
             <p className="text-[11px] font-mono text-slate-400 mt-0.5">{d?.id?.slice(0, 8)}…</p>
           </div>
           <Badge color={STATUT_COLOR[d?.statut] || 'gray'}>{STATUT_LABEL[d?.statut] || d?.statut}</Badge>
-          <button onClick={onClose} className="inline-flex flex-shrink-0 items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"><ArrowLeft size={14} /> Retour</button>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 transition flex-shrink-0">
+            <X size={15} />
+          </button>
         </div>
 
         {/* Body */}
@@ -226,14 +228,13 @@ function UserDetailContent({ userId, baseUser, onClose, onDeleted }) {
 }
 
 export default function Utilisateurs() {
-  const navigate = useNavigate()
   const [utilisateurs, setUtilisateurs] = useState([])
   const [loading, setLoading]           = useState(true)
   const [filterIdx, setFilterIdx]       = useState(0)
   const [search, setSearch]             = useState('')
   const [actionId, setActionId]         = useState(null)
   const [confirmId, setConfirmId]       = useState(null)
-  const [page, setPage]                 = useState(1)
+  const [detailUser, setDetailUser]     = useState(null)  // { id, ...baseFields }
 
   const fetchData = () => {
     setLoading(true)
@@ -243,19 +244,12 @@ export default function Utilisateurs() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => {
-    let cancelled = false
-    getAdminUtilisateurs()
-      .then(data => { if (!cancelled) setUtilisateurs(data) })
-      .catch(() => { if (!cancelled) setUtilisateurs([]) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [])
+  useEffect(() => { fetchData() }, [])
 
   const handleActiver = async (id) => {
     setActionId(id)
     try { await activerUtilisateur(id); fetchData() }
-    catch { setActionId(null) }
+    catch { }
     finally { setActionId(null) }
   }
 
@@ -263,7 +257,7 @@ export default function Utilisateurs() {
     setConfirmId(null)
     setActionId(id)
     try { await suspendreUtilisateur(id); fetchData() }
-    catch { setActionId(null) }
+    catch { }
     finally { setActionId(null) }
   }
 
@@ -277,11 +271,16 @@ export default function Utilisateurs() {
     })
 
   const countByStatut = key => utilisateurs.filter(u => u.statut === key).length
-  useEffect(() => setPage(1), [filterIdx, search])
-  const utilisateursPage = filtered.slice((page - 1) * 10, page * 10)
 
   return (
     <div className="space-y-4">
+
+      <UserDetailModal
+        userId={detailUser?.id}
+        baseUser={detailUser}
+        onClose={() => setDetailUser(null)}
+        onDeleted={() => { setDetailUser(null); fetchData() }}
+      />
 
       {/* ── En-tête ── */}
       <Card>
@@ -336,7 +335,7 @@ export default function Utilisateurs() {
                 </tr>
               </thead>
               <tbody>
-                {utilisateursPage.map(u => (
+                {filtered.map(u => (
                   <Tr key={u.id}>
                     <Td>
                       <div className="flex items-center gap-2.5">
@@ -363,7 +362,7 @@ export default function Utilisateurs() {
                       ) : (
                         <div className="flex gap-1.5">
                           <button
-                            onClick={() => navigate(`/utilisateurs/${u.id}`)}
+                            onClick={() => setDetailUser(u)}
                             className="inline-flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 hover:bg-violet-50 hover:border-violet-200 hover:text-violet-600 transition"
                             title="Voir les informations"
                           >
@@ -389,7 +388,6 @@ export default function Utilisateurs() {
                 ))}
               </tbody>
             </Table>
-            <Pagination page={page} totalItems={filtered.length} onPageChange={setPage} />
             <div className="px-4 py-2.5 border-t border-slate-100 flex items-center justify-between">
               <span className="text-[11px] text-slate-400">
                 {filtered.length} résultat{filtered.length !== 1 ? 's' : ''} sur {utilisateurs.length}
@@ -399,18 +397,5 @@ export default function Utilisateurs() {
         )}
       </Card>
     </div>
-  )
-}
-
-export function UtilisateurDetailPage() {
-  const navigate = useNavigate()
-  const { id } = useParams()
-  return (
-    <UserDetailContent
-      userId={id}
-      baseUser={{ id }}
-      onClose={() => navigate('/utilisateurs')}
-      onDeleted={() => navigate('/utilisateurs')}
-    />
   )
 }

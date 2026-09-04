@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useSearchParams } from 'react-router-dom'
-import { Check, ChevronDown, Loader2, Search, SlidersHorizontal, Tags } from 'lucide-react'
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
+import { ChevronDown, Filter, Loader2, Search, SlidersHorizontal, X } from 'lucide-react'
 import { getOpportunites, getBannieres, imgUrl } from '../services/api'
 import ProductCard from '../components/ProductCard'
 import PageCarousel from '../components/PageCarousel'
@@ -19,95 +19,18 @@ const TRIS = [
   { label: 'Plus populaires',   value: 'participants' },
 ]
 
+function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
+
 // 5 colonnes desktop × 2 lignes = 10 items par page (scroll infini)
 const PAGE_SIZE = 10
 
-function CatalogueSelect({ label, value, options, onChange, icon: Icon }) {
-  const [open, setOpen] = useState(false)
-  const rootRef = useRef(null)
-  const selected = options.find(option => option.value === value) || options[0]
-
-  useEffect(() => {
-    const closeOnOutsideClick = (event) => {
-      if (!rootRef.current?.contains(event.target)) setOpen(false)
-    }
-    const closeOnEscape = (event) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-
-    document.addEventListener('mousedown', closeOnOutsideClick)
-    document.addEventListener('keydown', closeOnEscape)
-    return () => {
-      document.removeEventListener('mousedown', closeOnOutsideClick)
-      document.removeEventListener('keydown', closeOnEscape)
-    }
-  }, [])
-
-  return (
-    <div ref={rootRef} className="relative min-w-0">
-      <span className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-gray-400">
-        {label}
-      </span>
-      <button
-        type="button"
-        onClick={() => setOpen(current => !current)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className={`flex w-full items-center gap-3 rounded-2xl border-2 bg-bg-light px-4 py-3 text-left transition-all ${
-          open ? 'border-primary shadow-[0_0_0_4px_rgba(5,71,108,0.08)]' : 'border-gray-100 hover:border-primary/30'
-        }`}
-      >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-primary shadow-sm">
-          <Icon size={16} />
-        </span>
-        <span className="min-w-0 flex-1 truncate text-xs font-black uppercase tracking-wider text-primary">
-          {selected.label}
-        </span>
-        <ChevronDown
-          size={16}
-          className={`shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-
-      {open && (
-        <div
-          role="listbox"
-          aria-label={label}
-          className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 max-h-72 overflow-y-auto rounded-2xl border border-gray-100 bg-white p-1.5 shadow-2xl shadow-primary/15"
-        >
-          {options.map(option => {
-            const active = option.value === value
-            return (
-              <button
-                key={option.value}
-                type="button"
-                role="option"
-                aria-selected={active}
-                onClick={() => {
-                  onChange(option.value)
-                  setOpen(false)
-                }}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold transition-colors ${
-                  active ? 'bg-primary text-white' : 'text-gray-600 hover:bg-bg-light hover:text-primary'
-                }`}
-              >
-                <span className="flex-1">{option.label}</span>
-                {active && <Check size={15} />}
-              </button>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function Catalogue() {
+  const navigate = useNavigate()
   const location = useLocation()
   const [opportunites, setOpportunites] = useState([])
   const [slides, setSlides] = useState([])
   const [loading, setLoading] = useState(true)
-  const [searching, setSearching] = useState(true)
+  const [searching, setSearching] = useState(false)
   const [search, setSearch] = useState(location.state?.search || '')
   const [serverSearch, setServerSearch] = useState(location.state?.search || '')
   const [searchParams] = useSearchParams()
@@ -116,6 +39,7 @@ export default function Catalogue() {
     ? location.state.categories
     : initialCategory === 'Tout' ? [] : [initialCategory]
   const [selectedCategories, setSelectedCategories] = useState(initialCategories)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [tri, setTri] = useState('recent')
   const [page, setPage] = useState(1)
   const sentinelRef = useRef(null)
@@ -140,6 +64,7 @@ export default function Catalogue() {
 
   useEffect(() => {
     let cancelled = false
+    setSearching(true)
     getOpportunites({
       q: serverSearch || undefined,
       categories: selectedCategories.length ? selectedCategories : undefined,
@@ -154,6 +79,8 @@ export default function Catalogue() {
       })
     return () => { cancelled = true }
   }, [serverSearch, selectedCategories])
+
+  useEffect(() => { setPage(1) }, [selectedCategories, search, tri])
 
   // Compteurs/prix/statut mis à jour en direct pour toutes les opportunités affichées
   useSSE('opportunites', {
@@ -180,31 +107,28 @@ export default function Catalogue() {
   const visibleItems = filtered.slice(0, page * PAGE_SIZE)
   const hasMore = filtered.length > page * PAGE_SIZE
   const actives = opportunites.filter(o => o.statut === 'ACTIVE').length
-  const selectedCategoryValue = selectedCategories[0] || 'Tout'
+  const selectedCategoryValue = selectedCategories.length > 1 ? '__MULTI__' : selectedCategories[0] || 'Tout'
+
+  const toggleCategory = (cat) => {
+    if (cat === 'Tout') {
+      setSelectedCategories([])
+      return
+    }
+    setSelectedCategories(prev => prev.includes(cat)
+      ? prev.filter(c => c !== cat)
+      : [...prev, cat]
+    )
+  }
 
   const resetFilters = () => {
     setSearch('')
     setServerSearch('')
     setSelectedCategories([])
     setTri('recent')
-    setPage(1)
   }
 
   const selectMainCategory = (cat) => {
-    setSearching(true)
     setSelectedCategories(cat === 'Tout' ? [] : [cat])
-    setPage(1)
-  }
-
-  const handleSearch = (value) => {
-    setSearching(true)
-    setSearch(value)
-    setPage(1)
-  }
-
-  const selectSort = (value) => {
-    setTri(value)
-    setPage(1)
   }
 
   // Scroll infini : charge le lot suivant dès que la sentinelle approche du viewport
@@ -241,7 +165,7 @@ export default function Catalogue() {
               type="text"
               placeholder="Rechercher une offre..."
               value={search}
-              onChange={e => handleSearch(e.target.value)}
+              onChange={e => setSearch(e.target.value)}
               className="w-full bg-bg-light border-2 border-gray-100 rounded-2xl py-2.5 pl-10 pr-4 text-sm font-semibold focus:border-primary focus:outline-none transition-all"
             />
           </div>
@@ -264,50 +188,128 @@ export default function Catalogue() {
             type="text"
             placeholder="Rechercher..."
             value={search}
-            onChange={e => handleSearch(e.target.value)}
+            onChange={e => setSearch(e.target.value)}
             className="w-full bg-white border-2 border-gray-100 rounded-2xl py-3 pl-11 pr-4 text-sm font-semibold focus:border-primary focus:outline-none transition-all shadow-sm"
           />
         </div>
 
         {/* Barre catalogue e-commerce */}
-        <div className="relative z-30 rounded-3xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-gray-100 pb-4">
-            <div>
-              <p className="font-heading text-sm font-black text-primary">Affiner les opportunités</p>
-              <p className="mt-1 text-[11px] font-semibold text-gray-400">
-                Choisissez une catégorie, puis l’ordre d’affichage.
-              </p>
-            </div>
-            {(selectedCategories.length > 0 || tri !== 'recent') && (
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="text-[10px] font-black uppercase tracking-widest text-gray-400 transition-colors hover:text-primary"
+        <div className="rounded-3xl border border-gray-100 bg-white p-3 sm:p-4 shadow-sm space-y-3 overflow-hidden">
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:grid-cols-[280px_auto_280px] md:items-center md:justify-between">
+            <label className="relative block">
+              <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">Catégorie</span>
+              <select
+                value={selectedCategoryValue}
+                onChange={e => selectMainCategory(e.target.value)}
+                className="w-full appearance-none rounded-2xl border-2 border-gray-100 bg-bg-light px-4 py-3 pr-10 text-xs font-black uppercase tracking-widest text-primary outline-none transition-all focus:border-primary"
               >
-                Réinitialiser
-              </button>
-            )}
+                {selectedCategories.length > 1 && (
+                  <option value="__MULTI__" disabled>{selectedCategories.length} catégories</option>
+                )}
+                {CATS.map(cat => (
+                  <option key={cat} value={cat}>{cat === 'Tout' ? 'Toutes catégories' : cat}</option>
+                ))}
+              </select>
+              <ChevronDown size={16} className="pointer-events-none absolute bottom-3.5 right-4 text-gray-400" />
+            </label>
+
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(v => !v)}
+              className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border-2 px-4 py-3 text-[11px] font-black uppercase tracking-widest transition-all md:mt-5 ${
+                filtersOpen || selectedCategories.length > 0
+                  ? 'border-accent bg-accent text-primary'
+                  : 'border-gray-100 bg-bg-light text-gray-500 hover:border-primary/30 hover:text-primary'
+              }`}
+            >
+              <Filter size={15} />
+              Filtres avancés
+              {selectedCategories.length > 0 && (
+                <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] text-white">
+                  {selectedCategories.length}
+                </span>
+              )}
+            </button>
+
+            <label className="relative block">
+              <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">Trier par</span>
+              <select
+                value={tri}
+                onChange={e => setTri(e.target.value)}
+                className="w-full appearance-none rounded-2xl border-2 border-gray-100 bg-bg-light px-4 py-3 pr-10 text-xs font-black uppercase tracking-widest text-primary outline-none transition-all focus:border-primary"
+              >
+                {TRIS.map(t => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+              <SlidersHorizontal size={16} className="pointer-events-none absolute bottom-3.5 right-4 text-gray-400" />
+            </label>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <CatalogueSelect
-              label="Filtrer par catégorie"
-              value={selectedCategoryValue}
-              options={CATS.map(cat => ({
-                value: cat,
-                label: cat === 'Tout' ? 'Toutes les catégories' : cat,
-              }))}
-              onChange={selectMainCategory}
-              icon={Tags}
-            />
-            <CatalogueSelect
-              label="Trier les résultats"
-              value={tri}
-              options={TRIS}
-              onChange={selectSort}
-              icon={SlidersHorizontal}
-            />
-          </div>
+          {filtersOpen && (
+            <div className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-widest text-primary">Filtrer les catégories</p>
+                  <p className="text-[11px] text-gray-400 font-bold mt-1">
+                    Cochez une ou plusieurs familles. Les 5 raccourcis restent visibles pour les choix fréquents.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen(false)}
+                  className="h-8 w-8 rounded-full bg-bg-light text-gray-400 hover:text-primary flex items-center justify-center"
+                  aria-label="Fermer les filtres"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                {CATS.filter(c => c !== 'Tout').map(cat => {
+                  const checked = selectedCategories.includes(cat)
+                  return (
+                    <label
+                      key={cat}
+                      className={`flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-xs font-black uppercase tracking-wide cursor-pointer transition-all ${
+                        checked
+                          ? 'border-primary bg-primary text-white shadow-sm'
+                          : 'border-gray-100 bg-bg-light text-gray-500 hover:border-primary/30 hover:text-primary'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleCategory(cat)}
+                        className="sr-only"
+                      />
+                      <span className={`h-4 w-4 rounded border-2 flex items-center justify-center ${
+                        checked ? 'border-white bg-white text-primary' : 'border-gray-300'
+                      }`}>
+                        {checked && <i className="ti ti-check text-[11px]" />}
+                      </span>
+                      {cat}
+                    </label>
+                  )
+                })}
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="text-[11px] font-bold text-gray-400">
+                  {selectedCategories.length === 0
+                    ? 'Toutes les catégories sont incluses.'
+                    : `${selectedCategories.length} catégorie${selectedCategories.length > 1 ? 's' : ''} sélectionnée${selectedCategories.length > 1 ? 's' : ''}.`}
+                </div>
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-primary"
+                >
+                  Réinitialiser les filtres
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Grille */}

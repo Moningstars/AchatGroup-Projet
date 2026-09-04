@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { useNavigate, useParams } from 'react-router-dom'
 import {
-  Loader2, Plus, Trash2, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
+  Loader2, Plus, Trash2, X, ChevronDown, ChevronUp,
   Edit2, CheckCircle2, XCircle, Clock, Users,
-  AlertTriangle, ArrowLeft, ClipboardList, Eye, BarChart3, Search, SlidersHorizontal,
+  AlertTriangle, ClipboardList, Eye, BarChart3, Search, SlidersHorizontal,
 } from 'lucide-react'
-import { Badge, Pagination, ProgressBar } from '../components/ui'
+import { Badge, ProgressBar } from '../components/ui'
 import { useSSE } from '../hooks/useSSE'
 import {
   getAdminSondages, activerSondage, distribuerSondage, creerSondage,
@@ -170,7 +168,7 @@ function QuestionsEditor({ questions, setQuestions, eligibilite = false }) {
   )
 }
 
-// ─── Formulaire dédié : nouveau sondage ──────────────────────────────────────
+// ─── NouveauSondageModal ─────────────────────────────────────────────────────
 
 const ELIG_Q_VIDE = {
   ordre: 1, typeQuestion: 'CHOIX_UNIQUE', texte: '', obligatoire: true,
@@ -180,7 +178,7 @@ const ELIG_Q_VIDE = {
   ],
 }
 
-function NouveauSondageForm({ onClose, onSaved, modal = false }) {
+function NouveauSondageModal({ onClose, onSaved }) {
   const [form, setForm] = useState({
     titre: '', description: '',
     quotaVise: '', recompense: '', typeRecompense: 'ARGENT',
@@ -194,7 +192,6 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
   const [eligQuestions, setEligQuestions] = useState([{ ...ELIG_Q_VIDE }])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [step, setStep] = useState(1)
 
   useEffect(() => {
     getAdminCommanditaires()
@@ -203,43 +200,6 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
   }, [])
 
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }))
-
-  const validateQuestions = (items, eligibility = false) => {
-    for (const [index, q] of items.entries()) {
-      if (!q.texte.trim()) return `Renseignez le texte de la question ${index + 1}.`
-      if (['CHOIX_UNIQUE', 'CHOIX_MULTIPLE'].includes(q.typeQuestion)) {
-        if (q.options.some(option => !option.libelle.trim())) return `Complétez toutes les options de la question ${index + 1}.`
-        if (eligibility) {
-          const correctes = q.options.filter(option => option.estCorrecte).length
-          if (correctes === 0) return `Cochez au moins une bonne réponse pour la question ${index + 1}.`
-          if (q.typeQuestion === 'CHOIX_UNIQUE' && correctes !== 1) return `Sélectionnez une seule bonne réponse pour la question ${index + 1}.`
-        }
-      }
-    }
-    return ''
-  }
-
-  const goNext = () => {
-    let message = ''
-    if (step === 1 && (!form.titre.trim() || !form.quotaVise || form.recompense === '' || !form.dateExpiration)) {
-      message = 'Complétez le titre, le quota, la récompense et la date d’expiration.'
-    }
-    if (step === 2) message = validateQuestions(questions)
-    if (step === 3) message = validateQuestions(eligQuestions, true)
-    if (message) {
-      setError(message)
-      return
-    }
-    setError('')
-    setStep(current => Math.min(4, current + 1))
-  }
-
-  const steps = [
-    { number: 1, label: 'Informations' },
-    { number: 2, label: 'Questions' },
-    { number: 3, label: 'Présélection' },
-    { number: 4, label: 'Vérification' },
-  ]
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -305,44 +265,21 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
     }
   }
 
-  const content = (
-    <div className={modal ? 'fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-sm sm:p-6' : 'mx-auto w-full max-w-4xl pb-8'}>
-      <div className={modal
-        ? 'flex max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-white/70 bg-white shadow-2xl sm:max-h-[calc(100dvh-3rem)]'
-        : 'flex w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm'}>
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-6">
-          <div>
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-violet-600">Création guidée</p>
-            <h3 className="text-xl font-bold text-slate-950">Nouveau sondage</h3>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Fermer"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900">
-            <X size={18} />
-          </button>
+  return (
+    <div className="admin-modal-layer fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+      <div className="my-8 w-full max-w-2xl rounded-2xl bg-white p-4 shadow-2xl sm:p-6">
+        <div className="mb-6 flex items-center justify-between">
+          <h3 className="text-xl font-bold text-slate-950">Nouveau sondage</h3>
+          <button onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X size={20} /></button>
         </div>
-
-        <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-3 sm:px-6">
-          <div className="grid grid-cols-4 gap-2">
-            {steps.map(item => (
-              <button key={item.number} type="button" onClick={() => item.number < step && setStep(item.number)}
-                className={`min-w-0 rounded-xl px-2 py-2 text-left transition ${item.number === step ? 'bg-violet-700 text-white shadow-md shadow-violet-200' : item.number < step ? 'bg-emerald-50 text-emerald-700' : 'bg-white text-slate-400'}`}>
-                <span className="block text-[10px] font-black">{item.number < step ? '✓' : `0${item.number}`}</span>
-                <span className="hidden truncate text-xs font-bold sm:block">{item.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
 
           {/* ── Section 1 : infos générales ── */}
-          {step === 1 && <div>
-            <p className="mb-1 text-base font-bold text-slate-900">Informations générales</p>
-            <p className="mb-4 text-sm text-slate-500">Définissez le cadre, la récompense et les règles de participation.</p>
+          <div>
+            <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">1 — Informations générales</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <label className="mb-1 block text-sm font-medium text-slate-700">Commanditaire du sondage</label>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Commanditaire</label>
                 <select value={form.commanditaireId} onChange={e => setField('commanditaireId', e.target.value)} className={inputCls}>
                   <option value="">— Aucun (sondage interne) —</option>
                   {commanditaires.map(c => (
@@ -351,7 +288,6 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
                     </option>
                   ))}
                 </select>
-                <p className="mt-1 text-[10px] text-slate-400">Sponsor de l’enquête — ce choix n’est jamais utilisé comme fournisseur de produit.</p>
               </div>
               <div className="sm:col-span-2">
                 <label className="mb-1 block text-sm font-medium text-slate-700">Titre *</label>
@@ -401,19 +337,19 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
                   onChange={e => setField('dateExpiration', e.target.value)} className={inputCls} />
               </div>
             </div>
-          </div>}
+          </div>
 
           {/* ── Section 2 : questions du sondage ── */}
-          {step === 2 && <div>
-            <p className="mb-1 text-base font-bold text-slate-900">Questions du sondage</p>
-            <p className="mb-4 text-sm text-slate-500">Ajoutez les questions qui seront présentées aux participants.</p>
+          <div>
+            <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">2 — Questions du sondage</p>
             <QuestionsEditor questions={questions} setQuestions={setQuestions} eligibilite={false} />
-          </div>}
+          </div>
 
           {/* ── Section 3 : test d'éligibilité ── */}
-          {step === 3 && <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
-            <p className="mb-1 text-base font-bold text-slate-900">Test de présélection</p>
-            <p className="mb-4 text-sm text-slate-500">Déterminez si le participant correspond au profil recherché.</p>
+          <div className="rounded-xl border-2 border-amber-200 bg-amber-50/50 p-4">
+            <p className="mb-3 text-xs font-bold uppercase tracking-wider text-amber-700">
+              3 — Test de présélection (obligatoire)
+            </p>
             <div className="mb-3">
               <label className="mb-1 block text-sm font-medium text-slate-700">Titre du test</label>
               <input
@@ -428,69 +364,30 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
               Le participant doit obtenir ≥ <span className="font-bold">{form.seuilEligibilite || '80'}%</span> pour accéder au sondage.
             </div>
             <QuestionsEditor questions={eligQuestions} setQuestions={setEligQuestions} eligibilite={true} />
-          </div>}
-
-          {step === 4 && (
-            <div>
-              <p className="mb-1 text-base font-bold text-slate-900">Vérifiez avant de créer</p>
-              <p className="mb-5 text-sm text-slate-500">Un dernier contrôle des informations importantes.</p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Sondage</p>
-                  <p className="mt-1 text-lg font-bold text-slate-900">{form.titre}</p>
-                  <p className="mt-1 text-sm text-slate-500">{form.description || 'Aucune description'}</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 p-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Participation</p>
-                  <p className="mt-2 font-bold text-slate-900">{form.quotaVise} répondants visés</p>
-                  <p className="text-sm text-slate-500">{questions.length} question{questions.length > 1 ? 's' : ''}</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 p-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Récompense</p>
-                  <p className="mt-2 font-bold text-slate-900">{fmt(form.recompense)} {form.typeRecompense === 'ARGENT' ? 'FCFA' : 'points'}</p>
-                  <p className="text-sm text-slate-500">Validation {form.modeDistribution === 'AUTO' ? 'automatique' : 'manuelle'}</p>
-                </div>
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:col-span-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-amber-700">Présélection</p>
-                  <p className="mt-2 font-bold text-slate-900">{eligTitre || `Test d’éligibilité — ${form.titre}`}</p>
-                  <p className="text-sm text-slate-600">{eligQuestions.length} question{eligQuestions.length > 1 ? 's' : ''} · seuil de réussite {form.seuilEligibilite}%</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {error && <div className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-white px-4 py-4 sm:px-6">
-            <button type="button" onClick={step === 1 ? onClose : () => { setError(''); setStep(current => current - 1) }}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50">
-              {step > 1 && <ChevronLeft size={16} />} {step === 1 ? 'Annuler' : 'Précédent'}
+          {error && <div className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
+
+          <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+            <button type="submit" disabled={loading}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 transition disabled:opacity-60">
+              {loading && <Loader2 size={14} className="animate-spin" />}
+              Créer le sondage
             </button>
-            {step < 4 ? (
-              <button type="button" onClick={goNext}
-                className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-violet-200 transition hover:bg-violet-800">
-                Continuer <ChevronRight size={16} />
-              </button>
-            ) : (
-              <button type="submit" disabled={loading}
-                className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-violet-200 transition hover:bg-violet-800 disabled:opacity-60">
-                {loading && <Loader2 size={14} className="animate-spin" />}
-                Créer le sondage
-              </button>
-            )}
+            <button type="button" onClick={onClose}
+              className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+              Annuler
+            </button>
           </div>
         </form>
       </div>
     </div>
   )
-
-  return modal ? createPortal(content, document.body) : content
 }
 
-// ─── Formulaire dédié : éligibilité ──────────────────────────────────────────
+// ─── ConfigurerEligibiliteModal ──────────────────────────────────────────────
 
-function ConfigurerEligibiliteForm({ sondage, onClose, onSaved }) {
+function ConfigurerEligibiliteModal({ sondage, onClose, onSaved }) {
   const [eligTitre, setEligTitre] = useState(`Test d'éligibilité — ${sondage.titre}`)
   const [eligQuestions, setEligQuestions] = useState([{ ...ELIG_Q_VIDE }])
   const [loading, setLoading] = useState(false)
@@ -545,14 +442,14 @@ function ConfigurerEligibiliteForm({ sondage, onClose, onSaved }) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl pb-8">
-      <div className="w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+    <div className="admin-modal-layer fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+      <div className="my-8 w-full max-w-2xl rounded-2xl bg-white p-4 shadow-2xl sm:p-6">
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold text-slate-950">Configurer le test d'éligibilité</h3>
             <p className="text-sm text-slate-500 mt-0.5 line-clamp-1">{sondage.titre}</p>
           </div>
-          <button onClick={onClose} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"><ArrowLeft size={15} /> Retour</button>
+          <button onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X size={20} /></button>
         </div>
 
         <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -591,9 +488,9 @@ function ConfigurerEligibiliteForm({ sondage, onClose, onSaved }) {
   )
 }
 
-// ─── Formulaire dédié : modification ─────────────────────────────────────────
+// ─── ModifierSondageModal ────────────────────────────────────────────────────
 
-function ModifierSondageForm({ sondage, onClose, onSaved }) {
+function ModifierSondageModal({ sondage, onClose, onSaved }) {
   const [form, setForm] = useState({
     titre: sondage.titre || '',
     description: sondage.description || '',
@@ -627,11 +524,11 @@ function ModifierSondageForm({ sondage, onClose, onSaved }) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl pb-8">
-      <div className="w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+    <div className="admin-modal-layer fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white p-4 shadow-2xl sm:p-6">
         <div className="mb-5 flex items-center justify-between">
           <h3 className="text-lg font-bold text-slate-950">Modifier le sondage</h3>
-          <button onClick={onClose} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"><ArrowLeft size={15} /> Retour</button>
+          <button onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X size={20} /></button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -675,9 +572,9 @@ function ModifierSondageForm({ sondage, onClose, onSaved }) {
   )
 }
 
-// ─── Page de validation des réponses ─────────────────────────────────────────
+// ─── ReponsesModal ───────────────────────────────────────────────────────────
 
-function ReponsesSondageContent({ sondageId, onClose, onChanged }) {
+function ReponsesModal({ sondageId, onClose, onChanged }) {
   const [reponses, setReponses] = useState([])
   const [loading, setLoading] = useState(true)
   const [actionId, setActionId] = useState(null)
@@ -691,14 +588,7 @@ function ReponsesSondageContent({ sondageId, onClose, onChanged }) {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => {
-    let cancelled = false
-    getReponsesAValider(sondageId)
-      .then(data => { if (!cancelled) setReponses(data) })
-      .catch(() => { if (!cancelled) setError('Impossible de charger les réponses') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [sondageId])
+  useEffect(() => { load() }, [sondageId])
 
   const handle = async (reponseId, approuve) => {
     setActionId(reponseId)
@@ -714,11 +604,11 @@ function ReponsesSondageContent({ sondageId, onClose, onChanged }) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl pb-8">
-      <div className="w-full rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className="admin-modal-layer fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+      <div className="my-8 w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <h3 className="text-lg font-bold text-slate-950">Réponses à valider</h3>
-          <button onClick={onClose} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"><ArrowLeft size={15} /> Retour</button>
+          <button onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X size={20} /></button>
         </div>
 
         <div className="p-6">
@@ -770,9 +660,9 @@ function ReponsesSondageContent({ sondageId, onClose, onChanged }) {
   )
 }
 
-// ─── Page de résultats ────────────────────────────────────────────────────────
+// ─── ResultatsModal ──────────────────────────────────────────────────────────
 
-function ResultatsSondageContent({ sondageId, onClose }) {
+function ResultatsModal({ sondageId, onClose }) {
   const [resultats, setResultats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -780,6 +670,7 @@ function ResultatsSondageContent({ sondageId, onClose }) {
   const [loadingRepondants, setLoadingRepondants] = useState(true)
 
   useEffect(() => {
+    setLoading(true)
     getSondageResultats(sondageId)
       .then(setResultats)
       .catch(() => setError('Impossible de charger les résultats'))
@@ -787,6 +678,7 @@ function ResultatsSondageContent({ sondageId, onClose }) {
   }, [sondageId])
 
   useEffect(() => {
+    setLoadingRepondants(true)
     getRepondantsSondage(sondageId)
       .then(setRepondants)
       .catch(() => setRepondants([]))
@@ -794,8 +686,8 @@ function ResultatsSondageContent({ sondageId, onClose }) {
   }, [sondageId])
 
   return (
-    <div className="mx-auto w-full max-w-5xl pb-8">
-      <div className="w-full rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className="admin-modal-layer fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+      <div className="my-8 w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <div>
             <h3 className="text-lg font-bold text-slate-950">Résultats du sondage</h3>
@@ -806,7 +698,7 @@ function ResultatsSondageContent({ sondageId, onClose }) {
               </p>
             )}
           </div>
-          <button onClick={onClose} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"><ArrowLeft size={15} /> Retour</button>
+          <button onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X size={20} /></button>
         </div>
 
         <div className="p-6 space-y-6">
@@ -843,7 +735,7 @@ function ResultatsSondageContent({ sondageId, onClose }) {
 
               {/* Par question */}
               <div className="space-y-4">
-                {resultats.resultatsParQuestion.map(q => (
+                {resultats.resultatsParQuestion.map((q, i) => (
                   <div key={q.questionId} className="rounded-xl border border-slate-200 p-4">
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <p className="text-sm font-semibold text-slate-800 leading-snug">
@@ -1117,7 +1009,7 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
         <div className="overflow-hidden rounded-b-2xl border-t border-slate-100 bg-slate-50 px-4 py-4 sm:px-5">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Questions du sondage</p>
           <div className="space-y-3">
-            {survey.questions.map(q => (
+            {survey.questions.map((q, i) => (
               <div key={q.id} className="rounded-xl border border-slate-200 bg-white p-3.5">
                 <div className="flex items-start justify-between gap-2 mb-1.5">
                   <p className="text-sm font-semibold text-slate-800 leading-snug">
@@ -1151,63 +1043,9 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
   )
 }
 
-function useSondageRoute() {
-  const { id } = useParams()
-  const [sondage, setSondage] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    let cancelled = false
-    getAdminSondages()
-      .then(items => { if (!cancelled) setSondage(items.find(item => item.id === id) || null) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [id])
-
-  return { id, sondage, loading }
-}
-
-function SondageRouteLoading() {
-  return <div className="flex justify-center py-24"><Loader2 size={28} className="animate-spin text-violet-600" /></div>
-}
-
-export function NouveauSondagePage() {
-  const navigate = useNavigate()
-  return <NouveauSondageForm onClose={() => navigate('/sondages')} onSaved={() => navigate('/sondages')} />
-}
-
-export function ModifierSondagePage() {
-  const navigate = useNavigate()
-  const { sondage, loading } = useSondageRoute()
-  if (loading) return <SondageRouteLoading />
-  if (!sondage) return <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">Sondage introuvable.</p>
-  return <ModifierSondageForm sondage={sondage} onClose={() => navigate('/sondages')} onSaved={() => navigate('/sondages')} />
-}
-
-export function EligibiliteSondagePage() {
-  const navigate = useNavigate()
-  const { sondage, loading } = useSondageRoute()
-  if (loading) return <SondageRouteLoading />
-  if (!sondage) return <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">Sondage introuvable.</p>
-  return <ConfigurerEligibiliteForm sondage={sondage} onClose={() => navigate('/sondages')} onSaved={() => navigate('/sondages')} />
-}
-
-export function ReponsesSondagePage() {
-  const navigate = useNavigate()
-  const { id } = useParams()
-  return <ReponsesSondageContent sondageId={id} onClose={() => navigate('/sondages')} onChanged={() => undefined} />
-}
-
-export function ResultatsSondagePage() {
-  const navigate = useNavigate()
-  const { id } = useParams()
-  return <ResultatsSondageContent sondageId={id} onClose={() => navigate('/sondages')} />
-}
-
 // ─── Sondages (main) ─────────────────────────────────────────────────────────
 
 export default function Sondages() {
-  const navigate = useNavigate()
   const [sondages, setSondages] = useState([])
   const [loading, setLoading] = useState(true)
   const [filtre, setFiltre] = useState('TOUS')
@@ -1218,8 +1056,11 @@ export default function Sondages() {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [actionId, setActionId] = useState(null)
   const [actionError, setActionError] = useState(null)
-  const [createOpen, setCreateOpen] = useState(false)
-  const [page, setPage] = useState(1)
+  const [showNouveauModal, setShowNouveauModal] = useState(false)
+  const [editSondage, setEditSondage] = useState(null)
+  const [configEligSondage, setConfigEligSondage] = useState(null)
+  const [reponsesSondageId, setReponsesSondageId] = useState(null)
+  const [resultatsSondageId, setResultatsSondageId] = useState(null)
 
   const fetchData = () => {
     setLoading(true)
@@ -1229,14 +1070,7 @@ export default function Sondages() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => {
-    let cancelled = false
-    getAdminSondages()
-      .then(data => { if (!cancelled) setSondages(data) })
-      .catch(() => { if (!cancelled) setSondages([]) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [])
+  useEffect(() => { fetchData() }, [])
 
   // Compteurs/statut mis à jour en direct
   useSSE('events/sondages', {
@@ -1287,11 +1121,44 @@ export default function Sondages() {
   const resetFilters = () => { setFiltre('TOUS'); setModeFilter('TOUS'); setRewardFilter('TOUS'); setSearch('') }
 
   const countByStatut = (key) => sondages.filter(s => s.statut === key).length
-  useEffect(() => setPage(1), [filtre, search, modeFilter, rewardFilter, sort])
-  const sondagesPage = sondagesFiltres.slice((page - 1) * 10, page * 10)
 
   return (
     <div className="space-y-5">
+      {/* Modals */}
+      {showNouveauModal && (
+        <NouveauSondageModal
+          onClose={() => setShowNouveauModal(false)}
+          onSaved={() => { setShowNouveauModal(false); fetchData() }}
+        />
+      )}
+      {editSondage && (
+        <ModifierSondageModal
+          sondage={editSondage}
+          onClose={() => setEditSondage(null)}
+          onSaved={() => { setEditSondage(null); fetchData() }}
+        />
+      )}
+      {configEligSondage && (
+        <ConfigurerEligibiliteModal
+          sondage={configEligSondage}
+          onClose={() => setConfigEligSondage(null)}
+          onSaved={() => { setConfigEligSondage(null); fetchData() }}
+        />
+      )}
+      {reponsesSondageId && (
+        <ReponsesModal
+          sondageId={reponsesSondageId}
+          onClose={() => setReponsesSondageId(null)}
+          onChanged={fetchData}
+        />
+      )}
+      {resultatsSondageId && (
+        <ResultatsModal
+          sondageId={resultatsSondageId}
+          onClose={() => setResultatsSondageId(null)}
+        />
+      )}
+
       {/* ── En-tête compact ── */}
       <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
@@ -1301,7 +1168,7 @@ export default function Sondages() {
           <span className="h-1 w-1 rounded-full bg-slate-300" />
           <span><strong className="text-amber-600">{countByStatut('EN_ATTENTE_DISTRIBUTION')}</strong> à finaliser</span>
         </div>
-        <button onClick={() => setCreateOpen(true)}
+        <button onClick={() => setShowNouveauModal(true)}
           className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-700 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 hover:bg-violet-800 sm:w-auto">
           <Plus size={15} /> Nouveau sondage
         </button>
@@ -1366,8 +1233,8 @@ export default function Sondages() {
           <p className="text-slate-400 font-semibold">Aucun sondage{filtre !== 'TOUS' ? ' dans cette catégorie' : ''}</p>
         </div>
       ) : (
-        <><div className="space-y-3">
-          {sondagesPage.map(survey => (
+        <div className="space-y-3">
+          {sondagesFiltres.map(survey => (
             <SondageCard
               key={survey.id}
               survey={survey}
@@ -1375,25 +1242,14 @@ export default function Sondages() {
               onActiver={handleActiver}
               onDistribuer={handleDistribuer}
               onCloturer={handleCloturer}
-              onModifier={survey => navigate(`/sondages/${survey.id}/modifier`)}
+              onModifier={setEditSondage}
               onSupprimer={handleSupprimer}
-              onVoirReponses={id => navigate(`/sondages/${id}/reponses`)}
-              onConfigurerElig={survey => navigate(`/sondages/${survey.id}/eligibilite`)}
-              onVoirResultats={id => navigate(`/sondages/${id}/resultats`)}
+              onVoirReponses={setReponsesSondageId}
+              onConfigurerElig={setConfigEligSondage}
+              onVoirResultats={setResultatsSondageId}
             />
           ))}
-        </div><Pagination page={page} totalItems={sondagesFiltres.length} onPageChange={setPage} /></>
-      )}
-
-      {createOpen && (
-        <NouveauSondageForm
-          modal
-          onClose={() => setCreateOpen(false)}
-          onSaved={() => {
-            setCreateOpen(false)
-            fetchData()
-          }}
-        />
+        </div>
       )}
     </div>
   )

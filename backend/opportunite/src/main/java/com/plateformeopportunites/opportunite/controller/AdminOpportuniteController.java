@@ -8,11 +8,9 @@ import com.plateformeopportunites.opportunite.dto.ModifierOpportuniteRequest;
 import com.plateformeopportunites.opportunite.dto.OpportuniteResponse;
 import com.plateformeopportunites.opportunite.dto.ParticipantOpportuniteResponse;
 import com.plateformeopportunites.opportunite.dto.PlanifierParticipantsRequest;
-import com.plateformeopportunites.opportunite.dto.TentativeSouscriptionResponse;
 import com.plateformeopportunites.opportunite.service.AiSpecService;
 import com.plateformeopportunites.opportunite.service.ImageStorageService;
 import com.plateformeopportunites.opportunite.service.OpportuniteService;
-import com.plateformeopportunites.opportunite.service.TentativeSouscriptionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -34,16 +32,10 @@ public class AdminOpportuniteController {
     private final OpportuniteService opportuniteService;
     private final ImageStorageService imageStorageService;
     private final AiSpecService aiSpecService;
-    private final TentativeSouscriptionService tentativeSouscriptionService;
 
     @GetMapping
     public ResponseEntity<List<OpportuniteResponse>> lister() {
         return ResponseEntity.ok(opportuniteService.listerToutes());
-    }
-
-    @GetMapping("/tentatives-echouees")
-    public ResponseEntity<List<TentativeSouscriptionResponse>> listerTentativesEchouees() {
-        return ResponseEntity.ok(tentativeSouscriptionService.listerRecentes());
     }
 
     @GetMapping("/{id}")

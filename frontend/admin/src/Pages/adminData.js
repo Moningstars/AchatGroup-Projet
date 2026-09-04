@@ -3,18 +3,10 @@ export const menuSections = [
     title: 'PRINCIPAL',
     items: [
       { label: "Vue d'ensemble", path: '', badge: 'NEW' },
-      {
-        label: 'Opportunités',
-        path: 'opportunites',
-        children: [
-          { label: 'En cours', path: 'opportunites' },
-          { label: 'À traiter', path: 'opportunites/traitement', treatmentBadge: true },
-        ],
-      },
+      { label: 'Opportunités', path: 'opportunites' },
       { label: 'Sondages', path: 'sondages' },
       { label: 'Utilisateurs', path: 'utilisateurs' },
       { label: 'Portefeuilles', path: 'portefeuilles' },
-      { label: 'Fournisseurs', path: 'fournisseurs' },
       { label: 'Commanditaires', path: 'commanditaires' },
     ],
   },

@@ -4,7 +4,7 @@ import {
   User, Phone, Mail, MapPin, Briefcase, CreditCard, Calendar,
   Globe, Home, FileText, CheckCircle,
 } from 'lucide-react'
-import { Badge, Pagination, Spinner, SearchInput } from '../components/ui'
+import { Badge, Spinner, SearchInput } from '../components/ui'
 import { getKycEnAttente, approuverKyc, rejeterKyc } from '../services/api'
 import { usePusher } from '../context/PusherContext'
 
@@ -142,7 +142,6 @@ export default function Kyc() {
   const [actionId, setActionId]   = useState(null)
   const [actionError, setActionError] = useState('')
   const [search, setSearch]       = useState('')
-  const [page, setPage]           = useState(1)
 
   const fetchData = useCallback(() => {
     setLoading(true)
@@ -204,8 +203,6 @@ export default function Kyc() {
       d.telephone?.toLowerCase().includes(q)
     )
   })
-  useEffect(() => setPage(1), [search])
-  const demandesPage = filtered.slice((page - 1) * 10, page * 10)
 
   return (
     <div className="space-y-4">
@@ -251,7 +248,7 @@ export default function Kyc() {
                 </p>
               </div>
             ) : (
-              <>{demandesPage.map(d => (
+              filtered.map(d => (
                 <button
                   key={d.utilisateurId}
                   onClick={() => setSelected(d)}
@@ -272,7 +269,7 @@ export default function Kyc() {
                     {new Date(d.inscritLe).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
                   </div>
                 </button>
-              ))}<Pagination page={page} totalItems={filtered.length} onPageChange={setPage} /></>
+              ))
             )}
           </div>
         </div>

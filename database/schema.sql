@@ -86,24 +86,6 @@ CREATE TABLE public.commanditaires (
 
 
 --
--- Name: fournisseurs; Type: TABLE; Schema: public; Owner: -
--- Fournisseurs de produits pour les opportunités. Les commanditaires restent réservés aux sondages.
---
-
-CREATE TABLE public.fournisseurs (
-    id uuid NOT NULL,
-    email character varying(255) NOT NULL,
-    logo_url character varying(255),
-    nom character varying(255) NOT NULL,
-    reseaux_url character varying(255),
-    societe character varying(255),
-    statut character varying(255) NOT NULL,
-    telephone character varying(255) NOT NULL,
-    CONSTRAINT fournisseurs_statut_check CHECK (((statut)::text = ANY ((ARRAY['ACTIF'::character varying, 'SUSPENDU'::character varying, 'EN_ATTENTE'::character varying])::text[])))
-);
-
-
---
 -- Name: infos_personnelles; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -156,7 +138,6 @@ CREATE TABLE public.opportunites (
     date_expiration timestamp(6) without time zone NOT NULL,
     admin_id uuid NOT NULL,
     categorie_id uuid,
-    fournisseur_id uuid,
     id uuid NOT NULL,
     description text,
     specs_cas_usage text,
@@ -292,22 +273,6 @@ CREATE TABLE public.participations (
     CONSTRAINT participations_statut_livraison_check CHECK (((statut_livraison)::text = ANY ((ARRAY['EN_ATTENTE_QUOTA'::character varying, 'A_PREPARER'::character varying, 'PREPARATION'::character varying, 'PRET_LIVRAISON'::character varying, 'EN_LIVRAISON'::character varying, 'LIVRE_A_CONFIRMER'::character varying, 'LIVRE_CONFIRME'::character varying, 'ECHEC_LIVRAISON'::character varying, 'LITIGE'::character varying, 'ANNULE'::character varying])::text[]))),
     CONSTRAINT participations_statut_check CHECK (((statut)::text = ANY ((ARRAY['EN_ATTENTE'::character varying, 'CONFIRMEE'::character varying, 'REMBOURSEE'::character varying])::text[])))
 );
-
--- Les tentatives échouées restent séparées des participations : une ligne dans
--- cette table n'implique ni dépôt gelé, ni réservation d'unité.
-CREATE TABLE public.tentatives_souscription (
-    id uuid NOT NULL,
-    opportunite_id uuid NOT NULL,
-    utilisateur_id uuid NOT NULL,
-    quantite integer NOT NULL,
-    motif character varying(40) NOT NULL,
-    detail character varying(500) NOT NULL,
-    created_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT tentatives_souscription_pkey PRIMARY KEY (id)
-);
-
-CREATE INDEX tentatives_souscription_created_idx ON public.tentatives_souscription (created_at DESC);
-CREATE INDEX tentatives_souscription_opportunite_idx ON public.tentatives_souscription (opportunite_id);
 
 
 --
@@ -578,20 +543,6 @@ ALTER TABLE ONLY public.commanditaires
 
 ALTER TABLE ONLY public.commanditaires
     ADD CONSTRAINT commanditaires_telephone_key UNIQUE (telephone);
-
-
---
--- Name: fournisseurs fournisseurs_email_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.fournisseurs
-    ADD CONSTRAINT fournisseurs_email_key UNIQUE (email);
-
-ALTER TABLE ONLY public.fournisseurs
-    ADD CONSTRAINT fournisseurs_telephone_key UNIQUE (telephone);
-
-ALTER TABLE ONLY public.fournisseurs
-    ADD CONSTRAINT fournisseurs_pkey PRIMARY KEY (id);
 
 
 --
@@ -945,9 +896,6 @@ ALTER TABLE ONLY public.infos_personnelles
 ALTER TABLE ONLY public.opportunites
     ADD CONSTRAINT fkgm51hh1hcm5m3x6duheydvwlp FOREIGN KEY (categorie_id) REFERENCES public.categories(id);
 
-ALTER TABLE ONLY public.opportunites
-    ADD CONSTRAINT opportunites_fournisseur_fk FOREIGN KEY (fournisseur_id) REFERENCES public.fournisseurs(id);
-
 
 --
 -- Name: opportunite_images fkhpns4phq8fuuiy2aqvj8hyduw; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1027,12 +975,6 @@ ALTER TABLE ONLY public.participations
 
 ALTER TABLE ONLY public.resultats_eligibilite
     ADD CONSTRAINT fkp6j278rlxg6em3hk8ljrj0rrw FOREIGN KEY (utilisateur_id) REFERENCES public.utilisateurs(id);
-
-ALTER TABLE ONLY public.tentatives_souscription
-    ADD CONSTRAINT tentatives_souscription_opportunite_fk FOREIGN KEY (opportunite_id) REFERENCES public.opportunites(id);
-
-ALTER TABLE ONLY public.tentatives_souscription
-    ADD CONSTRAINT tentatives_souscription_utilisateur_fk FOREIGN KEY (utilisateur_id) REFERENCES public.utilisateurs(id);
 
 
 --

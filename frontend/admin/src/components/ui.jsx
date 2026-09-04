@@ -1,38 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react'
-
-export function Pagination({ page, totalItems, onPageChange, pageSize = 10 }) {
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
-  useEffect(() => {
-    if (page > totalPages) onPageChange(totalPages)
-  }, [page, totalPages, onPageChange])
-
-  if (totalItems <= pageSize) return null
-  const start = (page - 1) * pageSize + 1
-  const end = Math.min(page * pageSize, totalItems)
-  const visiblePages = Array.from({ length: totalPages }, (_, index) => index + 1)
-    .filter(number => number === 1 || number === totalPages || Math.abs(number - page) <= 1)
-
-  return (
-    <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-[11px] font-semibold text-slate-500">Résultats {start}–{end} sur {totalItems}</p>
-      <nav aria-label="Pagination" className="flex items-center gap-1">
-        <button type="button" onClick={() => onPageChange(page - 1)} disabled={page <= 1} aria-label="Page précédente"
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-violet-200 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={14} /></button>
-        {visiblePages.map((number, index) => {
-          const previous = visiblePages[index - 1]
-          return <span key={number} className="contents">
-            {previous && number - previous > 1 && <span className="px-1 text-xs text-slate-400">…</span>}
-            <button type="button" onClick={() => onPageChange(number)} aria-current={number === page ? 'page' : undefined}
-              className={`h-8 min-w-8 rounded-lg px-2 text-xs font-bold transition ${number === page ? 'bg-violet-700 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:text-violet-700'}`}>{number}</button>
-          </span>
-        })}
-        <button type="button" onClick={() => onPageChange(page + 1)} disabled={page >= totalPages} aria-label="Page suivante"
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-violet-200 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight size={14} /></button>
-      </nav>
-    </div>
-  )
-}
+import { Loader2, Search } from 'lucide-react'
 
 // ── Badge ─────────────────────────────────────────────────────────────────────
 

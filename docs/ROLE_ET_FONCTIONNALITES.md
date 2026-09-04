@@ -8,8 +8,7 @@ Son objectif est de mettre en relation :
 
 - des participants, qui peuvent consulter des opportunités d'achat groupé, participer à des sondages, gérer leur profil et leur portefeuille ;
 - des administrateurs, qui pilotent les opportunités, les participants, les sondages, les validations KYC, les transactions, les retraits et les contenus affichés ;
-- des fournisseurs, qui approvisionnent les produits proposés dans les opportunités d'achat groupé ;
-- des commanditaires, qui financent ou sponsorisent exclusivement les sondages.
+- des commanditaires, qui peuvent financer ou sponsoriser des opportunités, des sondages ou des campagnes.
 
 Le logiciel sert donc à centraliser l'ensemble du cycle opérationnel :
 
@@ -150,17 +149,11 @@ Ce choix évite de mélanger deux réalités différentes : une participation pe
 - Traitement des retraits en attente.
 - Approbation ou rejet de retraits.
 
-### Fournisseurs
+### Commanditaires
 
-- Liste des fournisseurs de produits.
-- Création, activation ou suspension d'un fournisseur.
-- Liaison d'un fournisseur à une opportunité avec préremplissage de son identité, son logo et son lien public.
-
-### Commanditaires de sondages
-
-- Liste des commanditaires de sondages.
-- Création, activation ou suspension d'un commanditaire.
-- Liaison d'un commanditaire uniquement aux sondages.
+- Liste des commanditaires.
+- Création d'un commanditaire.
+- Activation ou suspension d'un commanditaire.
 
 ### Bannières
 

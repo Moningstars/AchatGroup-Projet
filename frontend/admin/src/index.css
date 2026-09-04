@@ -84,3 +84,32 @@ button:not(:disabled),
 		transition-duration: .01ms !important;
 	}
 }
+
+@layer components {
+	.admin-modal-layer {
+		align-items: center !important;
+		overflow: hidden !important;
+		padding: .5rem !important;
+		background: rgba(9, 17, 13, .62) !important;
+		backdrop-filter: blur(4px);
+	}
+
+	.admin-modal-layer > :first-child {
+		max-height: calc(100dvh - 1rem) !important;
+		margin-block: 0 !important;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		border-radius: 1rem;
+		box-shadow: 0 24px 80px rgba(9, 17, 13, .24);
+	}
+
+	@media (min-width: 640px) {
+		.admin-modal-layer {
+			padding: 1rem !important;
+		}
+
+		.admin-modal-layer > :first-child {
+			max-height: calc(100dvh - 2rem) !important;
+		}
+	}
+}

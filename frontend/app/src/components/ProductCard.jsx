@@ -1,21 +1,19 @@
 import { Link } from 'react-router-dom'
 import { imgUrl } from '../services/api'
 import { calculerProgression } from '../utils/progression'
-import { useCountdown } from '../hooks/useCountdown'
 
 function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
 
 function CountdownBadge({ dateExpiration }) {
-  const countdown = useCountdown(dateExpiration, 60_000)
-  if (!countdown || countdown.expired) return null
-  const joursRestants = Math.ceil(countdown.total / 86_400_000)
-  if (joursRestants > 7) return null
-  const urgent = joursRestants <= 1
+  if (!dateExpiration) return null
+  const diff = Math.ceil((new Date(dateExpiration) - Date.now()) / (1000 * 60 * 60 * 24))
+  if (diff < 0 || diff > 7) return null
+  const urgent = diff <= 1
   return (
     <span className={`text-[9px] font-black px-1.5 py-0.5 uppercase ${
       urgent ? 'bg-urgency text-white' : 'bg-accent text-primary'
     }`}>
-      {joursRestants <= 1 ? 'Moins de 24 h' : `${joursRestants}j`}
+      {diff === 0 ? 'Auj.' : diff === 1 ? 'Demain' : `${diff}j`}
     </span>
   )
 }
@@ -27,12 +25,7 @@ const ProductCard = ({ opportunity }) => {
   const discount = prixNormal && Number(prixNormal) > Number(prixActuel)
     ? Math.round((1 - Number(prixActuel) / Number(prixNormal)) * 100) : null
 
-  const { pct: progress, valide, objectifFinal } = calculerProgression({
-    participantsActuels,
-    seuilMinimum,
-    seuilMaximal,
-    paliers: opportunity.paliers,
-  })
+  const { pct: progress, valide } = calculerProgression({ participantsActuels, seuilMinimum, seuilMaximal })
   const isExpired = dateExpiration && new Date(dateExpiration) <= new Date()
   const isOpen = opportunity.souscriptionOuverte ?? (opportunity.statut === 'ACTIVE' && !isExpired)
   const isActivated = opportunity.activationAtteinte ?? participantsActuels >= seuilMinimum
@@ -100,11 +93,11 @@ const ProductCard = ({ opportunity }) => {
             )}
           </div>
           <p className="text-[9px] text-gray-400 font-bold mt-0.5">
-            {seuilMaximal != null
-              ? `${participantsActuels} / ${objectifFinal || seuilMaximal} places`
-              : valide && objectifFinal === Number(seuilMinimum)
-                ? `${participantsActuels} unités · offre validée`
-                : `${participantsActuels} / ${objectifFinal || seuilMinimum} unités`}
+            {valide
+              ? seuilMaximal != null
+                ? `${participantsActuels} / ${seuilMaximal} places`
+                : `${participantsActuels} unités · offre validée`
+              : `${participantsActuels} / ${seuilMinimum} unités réservées`}
           </p>
 
           {/* Barre de progression inline — mobile seulement */}

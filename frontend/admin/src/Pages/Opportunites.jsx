@@ -1,41 +1,42 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Loader2, Plus, Trash2, X, Upload, Package, Eye, Users, CalendarClock, Layers, Edit2, Sparkles, Search, Download, Clock, CheckSquare, CalendarDays, UserCheck, ArrowLeft, ArrowRight, ClipboardList, Truck, PackageCheck, AlertTriangle, Flag, Route, SlidersHorizontal, RotateCcw, ChevronDown, Check, FileText, BadgeDollarSign, Building2, ImagePlus, CircleCheck } from 'lucide-react'
-import { Badge, Card, Table, Th, Td, Tr, Spinner, EmptyState, ProgressBar, Pagination } from '../components/ui'
+import { Badge, Card, Table, Th, Td, Tr, Spinner, EmptyState, ProgressBar } from '../components/ui'
 import { useSSE } from '../hooks/useSSE'
 import {
   getAdminOpportunites, getAdminOpportunite, activerOpportunite, cloturerOpportunite,
   creerOpportunite, modifierOpportunite, uploadOpportuniteImage, deleteOpportuniteImage,
   genererSpecsOpportunite, getParticipantsOpportunite, planifierParticipantsOpportunite, mettreAJourLivraisonParticipants,
-  getAdminFournisseurs, getTentativesSouscriptionEchouees,
+  getAdminCommanditaires,
 } from '../services/api'
 import { calculerProgression } from '../utils/progression'
 
 const BACKEND = `http://${window.location.hostname}:8080`
 const imgUrl = (url) => url ? (url.startsWith('http') ? url : BACKEND + url) : null
 
-function useFournisseursDisponibles() {
-  const [fournisseurs, setFournisseurs] = useState([])
+function useCommanditairesDisponibles() {
+  const [commanditaires, setCommanditaires] = useState([])
 
   useEffect(() => {
     let cancelled = false
-    getAdminFournisseurs()
+    getAdminCommanditaires()
       .then(items => {
-        if (!cancelled) setFournisseurs(items.filter(item => item.statut !== 'SUSPENDU'))
+        if (!cancelled) setCommanditaires(items.filter(item => item.statut !== 'SUSPENDU'))
       })
       .catch(() => {})
     return () => { cancelled = true }
   }, [])
 
-  return fournisseurs
+  return commanditaires
 }
 
-function nomPublicFournisseur(fournisseur) {
-  return fournisseur?.societe?.trim() || fournisseur?.nom?.trim()
+function nomPublicCommanditaire(commanditaire) {
+  return commanditaire?.societe?.trim()
+    || [commanditaire?.prenom, commanditaire?.nom].filter(Boolean).join(' ')
 }
 
-function contactFournisseur(fournisseur) {
-  return [fournisseur?.telephone, fournisseur?.email].filter(Boolean).join(' · ')
+function contactCommanditaire(commanditaire) {
+  return [commanditaire?.telephone, commanditaire?.email].filter(Boolean).join(' · ')
 }
 
 const CATEGORIES = ['Mode', 'Électronique', 'Véhicules', 'Maison', 'Alimentaire', 'Informatique', 'Beauté', 'Mobilier', 'Sport']
@@ -43,7 +44,7 @@ const MESSAGE_PARTAGE_DEFAUT = "🔥 Bon plan OpportuniHub !\n\nDécouvrez « {t
 const CREATION_STEPS = [
   { label: 'Présentation', short: 'Produit', icon: FileText },
   { label: 'Tarification', short: 'Prix', icon: BadgeDollarSign },
-  { label: 'Fournisseur', short: 'Fournisseur', icon: Building2 },
+  { label: 'Fournisseur', short: 'Partenaire', icon: Building2 },
   { label: 'Contenu', short: 'Médias', icon: ImagePlus },
   { label: 'Vérification', short: 'Validation', icon: CircleCheck },
 ]
@@ -150,7 +151,7 @@ const STATUT_LIVRAISON_COLOR = {
 const STATUT_LIVRAISON_LABEL = {
   EN_ATTENTE_QUOTA: 'Campagne en cours',
   A_PREPARER: 'Paiement validé',
-  PREPARATION: 'Lot transmis au fournisseur',
+  PREPARATION: 'Lot transmis au partenaire',
   PRET_LIVRAISON: 'Partenaire confirmé',
   EN_LIVRAISON: 'Date de livraison annoncée',
   LIVRE_A_CONFIRMER: 'Confirmation client attendue',
@@ -162,15 +163,6 @@ const STATUT_LIVRAISON_LABEL = {
 const STATUT_LIVRAISON_OPTIONS = [
   'A_PREPARER',
   'PREPARATION',
-  'EN_LIVRAISON',
-  'LIVRE_A_CONFIRMER',
-  'ECHEC_LIVRAISON',
-  'LITIGE',
-  'ANNULE',
-]
-const STATUT_LIVRAISON_MANUEL_OPTIONS = [
-  'PREPARATION',
-  'PRET_LIVRAISON',
   'EN_LIVRAISON',
   'LIVRE_A_CONFIRMER',
   'ECHEC_LIVRAISON',
@@ -263,18 +255,20 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
   const [bulkLivraison, setBulkLivraison] = useState('PREPARATION')
   const [bulkDeliveryInfo, setBulkDeliveryInfo] = useState({ referenceLivraison: '', dateLivraisonPrevue: '', noteLivraison: '' })
   const [savingLivraison, setSavingLivraison] = useState(false)
-  const [participantsPage, setParticipantsPage] = useState(1)
-  const [dateDebutFiltre, setDateDebutFiltre] = useState('')
-  const [dateFinFiltre, setDateFinFiltre] = useState('')
-
-  useEffect(() => setParticipantsPage(1), [searchParticipant, statutFiltre, planningFiltre, livraisonFiltre, dateDebutFiltre, dateFinFiltre])
 
   useEffect(() => {
     if (!item) return
-    let cancelled = false
+    setSelectedIds([])
+    setSearchParticipant('')
+    setStatutFiltre('TOUS')
+    setPlanningFiltre('TOUS')
+    setLivraisonFiltre('A_TRAITER')
+    setBulkSlot(todaySlot())
+    setBulkLivraison('PREPARATION')
+    setBulkDeliveryInfo({ referenceLivraison: '', dateLivraisonPrevue: '', noteLivraison: '' })
+    setLoadingParticipants(true)
     getParticipantsOpportunite(item.id)
       .then(data => {
-        if (cancelled) return
         setParticipants(data)
         setPlan(Object.fromEntries(
           data
@@ -282,10 +276,9 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
             .map(p => [p.id, { slot: p.creneauTraitement ? p.creneauTraitement.slice(0, 16) : '', note: p.noteTraitement || '' }])
         ))
       })
-      .catch(() => { if (!cancelled) setParticipants([]) })
-      .finally(() => { if (!cancelled) setLoadingParticipants(false) })
-    return () => { cancelled = true }
-  }, [item])
+      .catch(() => setParticipants([]))
+      .finally(() => setLoadingParticipants(false))
+  }, [item?.id])
 
   if (!item) return null
   const { pct, valide: seuilValide, phase: phaseProgression, placesRestantes: placesRestantesCalc } = calculerProgression(item)
@@ -314,9 +307,9 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
     : livraisonEnAttenteConfirmation > 0
       ? { icon: PackageCheck, title: 'Relancer les confirmations', text: `${livraisonEnAttenteConfirmation} participant(s) doivent confirmer la réception.`, color: 'amber' }
       : (livraisonCounts.EN_LIVRAISON || 0) > 0
-        ? { icon: Truck, title: 'Contrôler les dates promises', text: `${livraisonCounts.EN_LIVRAISON} participant(s) ont une livraison annoncée par le fournisseur.`, color: 'sky' }
+        ? { icon: Truck, title: 'Contrôler les dates promises', text: `${livraisonCounts.EN_LIVRAISON} participant(s) ont une livraison annoncée par le partenaire.`, color: 'sky' }
         : (livraisonCounts.A_PREPARER || 0) + (livraisonCounts.PREPARATION || 0) + (livraisonCounts.PRET_LIVRAISON || 0) > 0
-          ? { icon: ClipboardList, title: 'Transmettre le prochain lot', text: 'Sélectionnez les participants, exportez la liste et consignez la réponse du fournisseur.', color: 'violet' }
+          ? { icon: ClipboardList, title: 'Transmettre le prochain lot', text: 'Sélectionnez les participants, exportez la liste et consignez la réponse du partenaire.', color: 'violet' }
           : { icon: CheckSquare, title: 'Suivi à jour', text: 'Aucune action urgente détectée sur cette opportunité.', color: 'emerald' }
 
   const savePlan = (nextPlan) => {
@@ -355,10 +348,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
         (planningFiltre === 'AUJOURDHUI' && slotDay === today) ||
         (planningFiltre === 'DEMAIN' && slotDay === tomorrow) ||
         (planningFiltre === 'PLANIFIES' && hasSlot)
-      const inscriptionDate = p.createdAt ? new Date(p.createdAt) : null
-      const debutOk = !dateDebutFiltre || (inscriptionDate && inscriptionDate >= new Date(`${dateDebutFiltre}T00:00:00`))
-      const finOk = !dateFinFiltre || (inscriptionDate && inscriptionDate <= new Date(`${dateFinFiltre}T23:59:59`))
-      return matchesSearch && matchesStatut && matchesLivraison && matchesPlanning && debutOk && finOk
+      return matchesSearch && matchesStatut && matchesLivraison && matchesPlanning
     }).sort((a, b) => {
       const quantiteDiff = Number(b.quantite || 0) - Number(a.quantite || 0)
       if (quantiteDiff !== 0) return quantiteDiff
@@ -370,14 +360,13 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
     })
   })()
 
-  const participantsPageItems = filteredParticipants.slice((participantsPage - 1) * 10, participantsPage * 10)
   const selectedParticipants = filteredParticipants.filter(p => selectedIds.includes(p.id))
-  const allVisibleSelected = participantsPageItems.length > 0 && participantsPageItems.every(p => selectedIds.includes(p.id))
+  const allVisibleSelected = filteredParticipants.length > 0 && filteredParticipants.every(p => selectedIds.includes(p.id))
   const toggleAllVisible = () => {
     if (allVisibleSelected) {
-      setSelectedIds(ids => ids.filter(id => !participantsPageItems.some(p => p.id === id)))
+      setSelectedIds(ids => ids.filter(id => !filteredParticipants.some(p => p.id === id)))
     } else {
-      setSelectedIds(ids => Array.from(new Set([...ids, ...participantsPageItems.map(p => p.id)])))
+      setSelectedIds(ids => Array.from(new Set([...ids, ...filteredParticipants.map(p => p.id)])))
     }
   }
   const toggleSelected = (id) => {
@@ -437,7 +426,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
     })
   }
   const exportRows = (rows) => {
-    const header = ['Nom', 'Téléphone', 'Quantité', 'Montant gelé', 'Statut paiement', 'État du dossier', 'Avancement', 'Priorité', 'Inscription', 'Lot prévu', 'Date promise par le fournisseur', 'Référence fournisseur', 'Note admin', 'Note fournisseur', 'Confirmation participant', 'ID participant', 'ID utilisateur']
+    const header = ['Nom', 'Téléphone', 'Quantité', 'Montant gelé', 'Statut paiement', 'État du dossier', 'Avancement', 'Priorité', 'Inscription', 'Lot prévu', 'Date promise par le partenaire', 'Référence partenaire', 'Note admin', 'Note partenaire', 'Confirmation participant', 'ID participant', 'ID utilisateur']
     const body = rows.map(p => {
       const pPlan = participantPlan(p.id)
       return [
@@ -487,7 +476,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
             <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
               <button onClick={() => exportRows(filteredParticipants)}
                 className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 sm:flex-none">
-                <Download size={15} /> Exporter les commandes
+                <Download size={15} /> Exporter la liste
               </button>
               <button onClick={() => onModifier(item)}
                 className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 sm:flex-none">
@@ -619,7 +608,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <div className="mb-3 flex items-center justify-between">
-                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">Fournisseur du produit</p>
+                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">Partenaire fournisseur</p>
                   <Package size={15} className="text-violet-500" />
                 </div>
                 {item.partenaireNom ? (
@@ -633,7 +622,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                       <div className={`rounded-xl p-3 ${item.statutPaiementPartenaire === 'PAYE' ? 'bg-emerald-50' : 'bg-amber-50'}`}><p className="font-bold text-slate-500">Paiement</p><p className="mt-1 font-black text-slate-900">{STATUT_PAIEMENT_LABEL[item.statutPaiementPartenaire] || 'Non configuré'}</p><p className="mt-1 text-[10px] text-slate-500">Reste {formatMontant(item.montantRestantPartenaire)} FCFA</p></div>
                     </div>
                   </div>
-                ) : <p className="text-sm text-slate-400">Aucun fournisseur lié. Ajoutez-le depuis la page de modification.</p>}
+                ) : <p className="text-sm text-slate-400">Aucun partenaire lié. Ajoutez-le depuis la page de modification.</p>}
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -660,7 +649,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                     <p className="mt-1 font-black text-rose-700 tabular-nums">{livraisonsProblemes}</p>
                   </div>
                 </div>
-                <p className="mt-3 text-xs leading-relaxed text-slate-500">OpportuniHub ne prépare ni ne transporte les colis. Nous contrôlons l'engagement du fournisseur et la confirmation finale du participant.</p>
+                <p className="mt-3 text-xs leading-relaxed text-slate-500">OpportuniHub ne prépare ni ne transporte les colis. Nous contrôlons l'engagement du partenaire et la confirmation finale du participant.</p>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -721,7 +710,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                       <Users size={17} className="text-violet-600" /> Participants à traiter
                     </p>
                     <p className="mt-1 text-xs text-slate-400">
-                      Constituez le lot de commandes à transmettre au fournisseur. Les réceptions confirmées quittent automatiquement la file active. {filteredParticipants.length} visible(s), {selectedParticipants.length} sélectionné(s).
+                      Constituez le lot transmis au partenaire. Les réceptions confirmées quittent automatiquement la file active. {filteredParticipants.length} visible(s), {selectedParticipants.length} sélectionné(s).
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -740,7 +729,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                   </div>
                 </div>
 
-                <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(220px,1fr)_145px_175px_165px_145px_145px]">
+                <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_150px_170px_170px]">
                   <div className="relative">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input value={searchParticipant} onChange={e => setSearchParticipant(e.target.value)}
@@ -762,7 +751,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                     <option value="PRIORITAIRES">Prioritaires</option>
                     <option value="EN_ATTENTE_QUOTA">Campagne en cours</option>
                     <option value="A_PREPARER">Paiement validé</option>
-                    <option value="PREPARATION">Lot transmis au fournisseur</option>
+                    <option value="PREPARATION">Lot transmis au partenaire</option>
                     <option value="PRET_LIVRAISON">Partenaire confirmé</option>
                     <option value="EN_LIVRAISON">Date annoncée</option>
                     <option value="LIVRE_A_CONFIRMER">Confirmation client attendue</option>
@@ -777,22 +766,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                     <option value="DEMAIN">Demain</option>
                     <option value="PLANIFIES">Planifiés</option>
                   </select>
-                  <input type="date" value={dateDebutFiltre} onChange={e => setDateDebutFiltre(e.target.value)}
-                    title="Inscrits à partir du"
-                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400" />
-                  <input type="date" value={dateFinFiltre} onChange={e => setDateFinFiltre(e.target.value)}
-                    title="Inscrits jusqu'au"
-                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400" />
                 </div>
-                {(dateDebutFiltre || dateFinFiltre) && (
-                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-800">
-                    <span>Période d'inscription active : {dateDebutFiltre || 'début'} → {dateFinFiltre || 'aujourd’hui'}</span>
-                    <button type="button" onClick={() => { setDateDebutFiltre(''); setDateFinFiltre('') }}
-                      className="rounded-lg bg-white px-2 py-1 text-[11px] font-black text-sky-700 hover:bg-sky-100">
-                      Effacer
-                    </button>
-                  </div>
-                )}
 
               </div>
 
@@ -828,17 +802,17 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                   <div className="mt-4 grid gap-3 lg:grid-cols-[210px_190px_1fr_auto]">
                     <select value={bulkLivraison} onChange={e => setBulkLivraison(e.target.value)}
                       className="rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500">
-                      {STATUT_LIVRAISON_MANUEL_OPTIONS.map(status => (
+                      {STATUT_LIVRAISON_OPTIONS.map(status => (
                         <option key={status} value={status}>{STATUT_LIVRAISON_LABEL[status]}</option>
                       ))}
                     </select>
                     <input type="datetime-local" value={bulkDeliveryInfo.dateLivraisonPrevue}
                       onChange={e => setBulkDeliveryInfo(v => ({ ...v, dateLivraisonPrevue: e.target.value }))}
-                      title="Date promise par le fournisseur"
+                      title="Date promise par le partenaire"
                       className="rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500" />
                     <input value={bulkDeliveryInfo.referenceLivraison}
                       onChange={e => setBulkDeliveryInfo(v => ({ ...v, referenceLivraison: e.target.value }))}
-                      placeholder="Référence du lot fournisseur"
+                      placeholder="Référence du lot partenaire"
                       className="rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500" />
                     <button onClick={applyBulkLivraison} disabled={savingLivraison}
                       className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-sky-700 px-3 py-2.5 text-xs font-bold text-white hover:bg-sky-800 disabled:opacity-40">
@@ -881,7 +855,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                         : 'Essayez une autre recherche ou réinitialisez les filtres pour retrouver les participants.'}
                     </p>
                     {participants.length > 0 && (
-                      <button onClick={() => { setSearchParticipant(''); setStatutFiltre('TOUS'); setLivraisonFiltre('A_TRAITER'); setPlanningFiltre('TOUS'); setDateDebutFiltre(''); setDateFinFiltre('') }}
+                      <button onClick={() => { setSearchParticipant(''); setStatutFiltre('TOUS'); setLivraisonFiltre('A_TRAITER'); setPlanningFiltre('TOUS') }}
                         className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50">
                         Réinitialiser les filtres
                       </button>
@@ -890,7 +864,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                 ) : (
                   <>
                   <div className="divide-y divide-slate-100 md:hidden">
-                    {participantsPageItems.map(p => {
+                    {filteredParticipants.map(p => {
                       const pPlan = participantPlan(p.id)
                       const isSelected = selectedIds.includes(p.id)
                       return (
@@ -910,7 +884,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                                 </Badge>
                               </div>
                               <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                                <div className="rounded-xl bg-slate-50 p-2.5"><span className="text-slate-400">Commande</span><p className="mt-1 font-black text-slate-800">Quantité ×{p.quantite || 0}</p></div>
+                                <div className="rounded-xl bg-slate-50 p-2.5"><span className="text-slate-400">Commande</span><p className="mt-1 font-black text-slate-800">×{p.quantite || 0} · {formatMontant(p.montantGele)} FCFA</p></div>
                                 <div className="rounded-xl bg-slate-50 p-2.5"><span className="text-slate-400">Lot prévu</span><p className="mt-1 font-bold text-slate-700">{pPlan.slot ? formatDateTime(pPlan.slot) : 'Non planifié'}</p></div>
                               </div>
                               <div className="mt-3">
@@ -922,10 +896,10 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                               </div>
                               {p.dateLivraisonPrevue && <p className="mt-2 text-xs text-slate-500"><span className="font-bold">Date promise :</span> {formatDateTime(p.dateLivraisonPrevue)}</p>}
                               <div className="mt-3 grid grid-cols-2 gap-2">
-                                <select value={STATUT_LIVRAISON_MANUEL_OPTIONS.includes(p.statutLivraison) ? p.statutLivraison : ''} onChange={e => e.target.value && updateLivraison([p.id], { statutLivraison: e.target.value })}
+                                <select value={p.statutLivraison || 'EN_ATTENTE_QUOTA'} onChange={e => updateLivraison([p.id], { statutLivraison: e.target.value })}
                                   className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-xs outline-none focus:border-violet-400">
-                                  <option value="">Action admin</option>
-                                  {STATUT_LIVRAISON_MANUEL_OPTIONS.map(status => <option key={status} value={status}>{STATUT_LIVRAISON_LABEL[status]}</option>)}
+                                  <option value="EN_ATTENTE_QUOTA">Campagne en cours</option>
+                                  {STATUT_LIVRAISON_OPTIONS.map(status => <option key={status} value={status}>{STATUT_LIVRAISON_LABEL[status]}</option>)}
                                 </select>
                                 <button onClick={() => updateLivraison([p.id], { prioriteTraitement: !p.prioriteTraitement })} disabled={savingLivraison}
                                   className="rounded-lg border border-violet-200 bg-white px-2 py-2 text-xs font-bold text-violet-700 disabled:opacity-50">
@@ -951,12 +925,12 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                           <Th>Commande</Th>
                           <Th>État du dossier</Th>
                           <Th>Lot / créneau</Th>
-                          <Th>Suivi fournisseur</Th>
-                          <Th>Action admin</Th>
+                          <Th>Engagement partenaire</Th>
+                          <Th>Mettre à jour</Th>
                         </tr>
                       </thead>
                       <tbody>
-                        {participantsPageItems.map(p => {
+                        {filteredParticipants.map(p => {
                           const pPlan = participantPlan(p.id)
                           const isSelected = selectedIds.includes(p.id)
                           return (
@@ -973,42 +947,31 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                               </Td>
                               <Td>
                                 <div className="space-y-1">
-                                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Quantité</p>
                                   <p className="font-black text-slate-900 tabular-nums">×{p.quantite || 0}</p>
+                                  <p className="text-xs font-bold text-slate-600 tabular-nums">{formatMontant(p.montantGele)} FCFA</p>
+                                  <Badge color={STATUT_PAIEMENT_COLOR[p.statutPaiement] || STATUT_PARTICIPATION_COLOR[p.statut] || 'gray'}>{STATUT_PAIEMENT_LABEL[p.statutPaiement] || STATUT_PARTICIPATION_LABEL[p.statut] || p.statut}</Badge>
+                                  {Number(p.montantRestant || 0) > 0 && <p className="text-[10px] font-bold text-rose-600">Reste {formatMontant(p.montantRestant)} FCFA</p>}
                                 </div>
                               </Td>
                               <Td>
-                                <div className="min-w-52 space-y-2 rounded-xl bg-slate-50 p-3">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <Badge color={STATUT_LIVRAISON_COLOR[p.statutLivraison] || 'gray'}>
-                                      {STATUT_LIVRAISON_LABEL[p.statutLivraison] || p.statutLivraison || 'Quota non validé'}
-                                    </Badge>
-                                    <Badge color={STATUT_PAIEMENT_COLOR[p.statutPaiement] || STATUT_PARTICIPATION_COLOR[p.statut] || 'gray'}>
-                                      {STATUT_PAIEMENT_LABEL[p.statutPaiement] || STATUT_PARTICIPATION_LABEL[p.statut] || p.statut}
-                                    </Badge>
-                                    {p.prioriteTraitement && (
-                                      <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-1 text-[10px] font-black text-violet-700">
-                                        <Flag size={10} /> Prioritaire
-                                      </span>
-                                    )}
-                                  </div>
-                                  {p.commentaireParticipantLivraison && (
-                                    <div className="rounded-lg border border-rose-100 bg-white px-2.5 py-2">
-                                      <p className="text-[9px] font-black uppercase tracking-wider text-rose-500">Message participant</p>
-                                      <p className="mt-1 text-[11px] leading-4 text-slate-600">{p.commentaireParticipantLivraison}</p>
-                                    </div>
+                                <div className="min-w-44 space-y-2">
+                                  <Badge color={STATUT_LIVRAISON_COLOR[p.statutLivraison] || 'gray'}>
+                                    {STATUT_LIVRAISON_LABEL[p.statutLivraison] || p.statutLivraison || 'Quota non validé'}
+                                  </Badge>
+                                  {p.prioriteTraitement && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-black text-violet-700">
+                                      <Flag size={10} /> Prioritaire
+                                    </span>
                                   )}
-                                  <div>
-                                    <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-slate-500">
-                                      <span>Avancement</span>
-                                      <span className="inline-flex items-center gap-1">
-                                        {p.progressionLivraison || 0}%
-                                        {p.statutLivraison === 'LIVRE_CONFIRME' && <PackageCheck size={12} className="text-emerald-600" />}
-                                        {(p.statutLivraison === 'LITIGE' || p.statutLivraison === 'ECHEC_LIVRAISON') && <AlertTriangle size={12} className="text-rose-600" />}
-                                      </span>
-                                    </div>
-                                    <ProgressBar value={p.progressionLivraison || 0} color={p.statutLivraison === 'LIVRE_CONFIRME' ? 'emerald' : p.statutLivraison === 'LITIGE' ? 'rose' : 'sky'} />
+                                  {p.commentaireParticipantLivraison && (
+                                    <span className="text-[10px] text-slate-400">Participant : {p.commentaireParticipantLivraison}</span>
+                                  )}
+                                  <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-slate-500">
+                                    <span>{p.progressionLivraison || 0}%</span>
+                                    {p.statutLivraison === 'LIVRE_CONFIRME' && <PackageCheck size={12} className="text-emerald-600" />}
+                                    {(p.statutLivraison === 'LITIGE' || p.statutLivraison === 'ECHEC_LIVRAISON') && <AlertTriangle size={12} className="text-rose-600" />}
                                   </div>
+                                  <ProgressBar value={p.progressionLivraison || 0} color={p.statutLivraison === 'LIVRE_CONFIRME' ? 'emerald' : p.statutLivraison === 'LITIGE' ? 'rose' : 'sky'} />
                                 </div>
                               </Td>
                               <Td>
@@ -1023,35 +986,26 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                                 </div>
                               </Td>
                               <Td>
-                                <div className="min-w-44 space-y-2 text-[11px] text-slate-500">
-                                  <div>
-                                    <p className="font-black uppercase tracking-wider text-slate-400">Date promise</p>
-                                    <p className="mt-0.5 font-bold text-slate-700">{formatDateTime(p.dateLivraisonPrevue)}</p>
-                                  </div>
-                                  <div>
-                                    <p className="font-black uppercase tracking-wider text-slate-400">Référence fournisseur</p>
-                                    <p className="mt-0.5 font-bold text-slate-700">{p.referenceLivraison || 'Non renseignée'}</p>
-                                  </div>
-                                  {p.noteLivraison && <p className="rounded-lg bg-slate-50 px-2 py-1.5 text-slate-500">{p.noteLivraison}</p>}
+                                <div className="space-y-1 text-[11px] text-slate-500">
+                                  <p><span className="font-bold text-slate-700">Date promise :</span> {formatDateTime(p.dateLivraisonPrevue)}</p>
+                                  <p><span className="font-bold text-slate-700">Réf. partenaire :</span> {p.referenceLivraison || '—'}</p>
+                                  {p.noteLivraison && <p className="text-slate-400">{p.noteLivraison}</p>}
                                   {p.dateConfirmationParticipant && (
                                     <p className="font-bold text-emerald-700">Confirmé le {formatDateTime(p.dateConfirmationParticipant)}</p>
                                   )}
-                                  {p.confirmationEnRetard && <p className="rounded-lg bg-rose-50 px-2 py-1.5 font-bold text-rose-600">Confirmation en retard</p>}
+                                  {p.confirmationEnRetard && <p className="font-bold text-rose-600">Confirmation en retard</p>}
                                 </div>
                               </Td>
                               <Td>
                                 <div className="flex flex-col gap-1.5">
-                                  <select value={STATUT_LIVRAISON_MANUEL_OPTIONS.includes(p.statutLivraison) ? p.statutLivraison : ''}
-                                    onChange={e => e.target.value && updateLivraison([p.id], { statutLivraison: e.target.value })}
+                                  <select value={p.statutLivraison || 'EN_ATTENTE_QUOTA'}
+                                    onChange={e => updateLivraison([p.id], { statutLivraison: e.target.value })}
                                     className="w-40 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-violet-400">
-                                    <option value="">Choisir une action</option>
-                                    {STATUT_LIVRAISON_MANUEL_OPTIONS.map(status => (
+                                    <option value="EN_ATTENTE_QUOTA">Campagne en cours</option>
+                                    {STATUT_LIVRAISON_OPTIONS.map(status => (
                                       <option key={status} value={status}>{STATUT_LIVRAISON_LABEL[status]}</option>
                                     ))}
                                   </select>
-                                  <p className="w-40 text-[10px] leading-4 text-slate-400">
-                                    Auto : dépôt validé et confirmation client. Manuel : fournisseur, litige, annulation.
-                                  </p>
                                   <button onClick={() => updateLivraison([p.id], { prioriteTraitement: !p.prioriteTraitement })}
                                     disabled={savingLivraison}
                                     className={`rounded-lg border px-2 py-1.5 text-[11px] font-bold transition disabled:opacity-50 ${
@@ -1069,7 +1023,6 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
                       </tbody>
                     </table>
                   </div>
-                  <Pagination page={participantsPage} totalItems={filteredParticipants.length} onPageChange={setParticipantsPage} />
                   </>
                 )}
               </div>
@@ -1077,15 +1030,15 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
               <div className="grid gap-3 lg:grid-cols-3">
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="flex items-center gap-2 text-sm font-black text-slate-900"><CheckSquare size={16} className="text-emerald-600" /> Traitement conseillé</p>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-500">Après la clôture et la validation financière, constituez un lot prioritaire, exportez-le puis transmettez-le au fournisseur hors plateforme.</p>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-500">Après la clôture et la validation financière, constituez un lot prioritaire, exportez-le puis transmettez-le au partenaire hors plateforme.</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <p className="flex items-center gap-2 text-sm font-black text-slate-900"><Truck size={16} className="text-sky-600" /> Suivi fournisseur</p>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-500">Cette zone garde la trace de la promesse du fournisseur : date prévue, référence du lot et note utile. Elle sert aux relances et aux notifications, pas à remplacer le transport réel.</p>
+                  <p className="flex items-center gap-2 text-sm font-black text-slate-900"><Truck size={16} className="text-sky-600" /> Engagement partenaire</p>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-500">Consignez uniquement la date promise et la référence communiquées par le partenaire. Sa préparation et son transport restent hors plateforme.</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="flex items-center gap-2 text-sm font-black text-slate-900"><CalendarClock size={16} className="text-amber-600" /> Décalage</p>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-500">Formez un lot aujourd’hui, demain ou à une date précise. Ce créneau organise votre transmission au fournisseur ; ce n’est pas un planning de transport.</p>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-500">Formez un lot aujourd’hui, demain ou à une date précise. Ce créneau organise votre transmission au partenaire ; ce n’est pas un planning de transport.</p>
                 </div>
               </div>
             </section>
@@ -1209,11 +1162,11 @@ function SpecsEditor({ titre, description, categorie, specs, setSpecs }) {
 }
 
 function NouvelleOpportuniteWizard({ onClose, onSaved }) {
-  const fournisseurs = useFournisseursDisponibles()
+  const commanditaires = useCommanditairesDisponibles()
   const [form, setForm] = useState({
     titre: '', description: '', prixNormal: '', seuilMinimum: '', seuilMaximal: '',
     dateExpiration: '', categorie: '', actif: true,
-    fournisseurId: '',
+    commanditaireId: '',
     messagePartage: MESSAGE_PARTAGE_DEFAUT,
     partenaireNom: '', partenaireLogoUrl: '', partenaireContact: '', partenaireReseauxUrl: '',
     montantDuPartenaire: '', montantPayePartenaire: '', delaiConfirmationReceptionJours: '3', messageNotificationLivraison: '',
@@ -1227,16 +1180,14 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
   const [step, setStep]                   = useState(0)
 
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }))
-  const handleFournisseurChange = (fournisseurId) => {
-    const fournisseur = fournisseurs.find(item => item.id === fournisseurId)
-    setForm(current => fournisseur ? {
+  const handleCommanditaireChange = (commanditaireId) => {
+    const commanditaire = commanditaires.find(item => item.id === commanditaireId)
+    setForm(current => commanditaire ? {
       ...current,
-      fournisseurId,
-      partenaireNom: nomPublicFournisseur(fournisseur),
-      partenaireContact: contactFournisseur(fournisseur),
-      partenaireLogoUrl: fournisseur.logoUrl || current.partenaireLogoUrl,
-      partenaireReseauxUrl: fournisseur.reseauxUrl || current.partenaireReseauxUrl,
-    } : { ...current, fournisseurId: '' })
+      commanditaireId,
+      partenaireNom: nomPublicCommanditaire(commanditaire),
+      partenaireContact: contactCommanditaire(commanditaire),
+    } : { ...current, commanditaireId: '' })
   }
 
   const validateStep = (index) => {
@@ -1291,7 +1242,7 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
         categorie: form.categorie || undefined,
         actif: form.actif,
         messagePartage: form.messagePartage || undefined,
-        fournisseurId: form.fournisseurId || undefined,
+        commanditaireId: form.commanditaireId || undefined,
         partenaireNom: form.partenaireNom || undefined,
         partenaireLogoUrl: form.partenaireLogoUrl || undefined,
         partenaireContact: form.partenaireContact || undefined,
@@ -1366,7 +1317,7 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
               <div>
                 <h3 className="text-base font-black text-slate-900">{CREATION_STEPS[step].label}</h3>
                 <p className="text-xs text-slate-500">{
-                  ['Présentez clairement le produit aux futurs participants.', 'Définissez le prix, les objectifs et les remises de groupe.', 'Identifiez le fournisseur du produit et préparez le suivi de livraison.', 'Enrichissez la fiche avec des arguments et des visuels.', 'Relisez les informations avant de publier.'][step]
+                  ['Présentez clairement le produit aux futurs participants.', 'Définissez le prix, les objectifs et les remises de groupe.', 'Identifiez le client fournisseur et préparez le suivi de livraison.', 'Enrichissez la fiche avec des arguments et des visuels.', 'Relisez les informations avant de publier.'][step]
                 }</p>
               </div>
             </div>
@@ -1395,8 +1346,8 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
             {step === 2 && (
               <div className="space-y-5">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <FilterSelect label="Fournisseur enregistré" value={form.fournisseurId} onChange={handleFournisseurChange} options={[{ value: '', label: '— Sélectionner un fournisseur —' }, ...fournisseurs.map(item => ({ value: item.id, label: nomPublicFournisseur(item) || item.email }))]} />
-                  <p className="mt-2 text-[10px] text-slate-500">Les fournisseurs sont liés aux produits. Les commanditaires restent exclusivement liés aux sondages.</p>
+                  <FilterSelect label="Commanditaire enregistré" value={form.commanditaireId} onChange={handleCommanditaireChange} options={[{ value: '', label: '— Sélectionner un commanditaire —' }, ...commanditaires.map(item => ({ value: item.id, label: nomPublicCommanditaire(item) || item.email }))]} />
+                  <p className="mt-2 text-[10px] text-slate-500">La sélection préremplit l’identité. Les informations publiques restent personnalisables ci-dessous.</p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div><label className={labelCls}>Nom public du fournisseur</label><input value={form.partenaireNom} onChange={e => setField('partenaireNom', e.target.value)} className={inputCls} /></div>
@@ -1423,7 +1374,7 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Produit</p><p className="mt-2 text-sm font-black text-slate-900">{form.titre}</p><p className="mt-1 text-xs text-slate-500">{form.categorie || 'Sans catégorie'}</p></div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Prix normal</p><p className="mt-2 text-sm font-black text-slate-900">{prixLisible}</p><p className="mt-1 text-xs text-slate-500">Objectif : {form.seuilMinimum || '—'} participant(s)</p></div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Fournisseur</p><p className="mt-2 text-sm font-black text-slate-900">{form.partenaireNom || 'À confirmer'}</p><p className="mt-1 text-xs text-slate-500">{form.fournisseurId ? 'Fiche fournisseur liée' : 'Aucune fiche liée'}</p></div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Fournisseur</p><p className="mt-2 text-sm font-black text-slate-900">{form.partenaireNom || 'À confirmer'}</p><p className="mt-1 text-xs text-slate-500">{form.commanditaireId ? 'Fiche commanditaire liée' : 'Aucune fiche liée'}</p></div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Contenu</p><p className="mt-2 text-sm font-black text-slate-900">{images.length} image{images.length !== 1 ? 's' : ''}</p><p className="mt-1 text-xs text-slate-500">{paliers.length} palier{paliers.length !== 1 ? 's' : ''} de prix</p></div>
                 </div>
                 <div className="rounded-2xl border border-violet-100 bg-violet-50/50 p-4 sm:p-5">
@@ -1498,10 +1449,10 @@ function ExistingImages({ opportuniteId, images, setImages }) {
   )
 }
 
-// ── Formulaire dédié de modification ─────────────────────────────────────────
+// ── ModifierOpportuniteModal ─────────────────────────────────────────────────
 
-function ModifierOpportuniteForm({ item, onClose, onSaved }) {
-  const fournisseurs = useFournisseursDisponibles()
+function ModifierOpportuniteModal({ item, onClose, onSaved }) {
+  const commanditaires = useCommanditairesDisponibles()
   const [form, setForm] = useState({
     titre: item.titre || '',
     description: item.description || '',
@@ -1510,7 +1461,7 @@ function ModifierOpportuniteForm({ item, onClose, onSaved }) {
     seuilMaximal: item.seuilMaximal != null ? String(item.seuilMaximal) : '',
     dateExpiration: item.dateExpiration ? item.dateExpiration.slice(0, 16) : '',
     categorie: item.categorie || '',
-    fournisseurId: item.fournisseurId || '',
+    commanditaireId: item.commanditaireId || '',
     messagePartage: item.messagePartage || MESSAGE_PARTAGE_DEFAUT,
     partenaireNom: item.partenaireNom || '',
     partenaireLogoUrl: item.partenaireLogoUrl || '',
@@ -1538,16 +1489,14 @@ function ModifierOpportuniteForm({ item, onClose, onSaved }) {
   const [error, setError]                 = useState('')
 
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }))
-  const handleFournisseurChange = (fournisseurId) => {
-    const fournisseur = fournisseurs.find(candidate => candidate.id === fournisseurId)
-    setForm(current => fournisseur ? {
+  const handleCommanditaireChange = (commanditaireId) => {
+    const commanditaire = commanditaires.find(candidate => candidate.id === commanditaireId)
+    setForm(current => commanditaire ? {
       ...current,
-      fournisseurId,
-      partenaireNom: nomPublicFournisseur(fournisseur),
-      partenaireContact: contactFournisseur(fournisseur),
-      partenaireLogoUrl: fournisseur.logoUrl || current.partenaireLogoUrl,
-      partenaireReseauxUrl: fournisseur.reseauxUrl || current.partenaireReseauxUrl,
-    } : { ...current, fournisseurId: '' })
+      commanditaireId,
+      partenaireNom: nomPublicCommanditaire(commanditaire),
+      partenaireContact: contactCommanditaire(commanditaire),
+    } : { ...current, commanditaireId: '' })
   }
 
   const handleSubmit = async (e) => {
@@ -1567,7 +1516,7 @@ function ModifierOpportuniteForm({ item, onClose, onSaved }) {
         dateExpiration: form.dateExpiration ? new Date(form.dateExpiration).toISOString() : undefined,
         categorie: form.categorie || undefined,
         messagePartage: form.messagePartage,
-        fournisseurId: form.fournisseurId || undefined,
+        commanditaireId: form.commanditaireId || undefined,
         partenaireNom: form.partenaireNom,
         partenaireLogoUrl: form.partenaireLogoUrl,
         partenaireContact: form.partenaireContact,
@@ -1662,30 +1611,30 @@ function ModifierOpportuniteForm({ item, onClose, onSaved }) {
 
           <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="mb-4">
-              <h4 className="text-sm font-black text-slate-900">Fournisseur et engagement financier</h4>
-              <p className="mt-1 text-xs text-slate-500">Le fournisseur approvisionne le produit. Son contact reste privé ; son nom, logo et lien public peuvent apparaître côté client.</p>
+              <h4 className="text-sm font-black text-slate-900">Partenaire et engagement financier</h4>
+              <p className="mt-1 text-xs text-slate-500">Le partenaire est facultatif. Son contact reste réservé à l'administration ; son nom, logo et lien public peuvent apparaître côté client.</p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <FilterSelect
-                  label="Fournisseur enregistré"
-                  value={form.fournisseurId}
-                  onChange={handleFournisseurChange}
+                  label="Commanditaire enregistré"
+                  value={form.commanditaireId}
+                  onChange={handleCommanditaireChange}
                   options={[
-                    { value: '', label: '— Sélectionner un fournisseur —' },
-                    ...fournisseurs.map(fournisseur => ({
-                      value: fournisseur.id,
-                      label: nomPublicFournisseur(fournisseur) || fournisseur.email,
+                    { value: '', label: '— Sélectionner un commanditaire —' },
+                    ...commanditaires.map(commanditaire => ({
+                      value: commanditaire.id,
+                      label: nomPublicCommanditaire(commanditaire) || commanditaire.email,
                     })),
                   ]}
                 />
-                <p className="mt-1.5 text-[10px] leading-4 text-slate-400">Vous pouvez changer le fournisseur lié. Les commanditaires sont gérés séparément pour les sondages.</p>
+                <p className="mt-1.5 text-[10px] leading-4 text-slate-400">Vous pouvez changer le commanditaire lié. Les informations publiques restent modifiables juste en dessous.</p>
               </div>
               <div><label className={labelCls}>Nom public du fournisseur</label><input value={form.partenaireNom} onChange={e => setField('partenaireNom', e.target.value)} className={inputCls} /></div>
               <div><label className={labelCls}>Logo (URL)</label><input type="url" value={form.partenaireLogoUrl} onChange={e => setField('partenaireLogoUrl', e.target.value)} className={inputCls} /></div>
               <div><label className={labelCls}>Contact privé</label><input value={form.partenaireContact} onChange={e => setField('partenaireContact', e.target.value)} className={inputCls} /></div>
               <div><label className={labelCls}>Réseau social / site public</label><input type="url" value={form.partenaireReseauxUrl} onChange={e => setField('partenaireReseauxUrl', e.target.value)} className={inputCls} /></div>
-              <div><label className={labelCls}>Montant dû au fournisseur</label><input type="number" min="0" value={form.montantDuPartenaire} onChange={e => setField('montantDuPartenaire', e.target.value)} className={inputCls} /></div>
+              <div><label className={labelCls}>Montant dû au partenaire</label><input type="number" min="0" value={form.montantDuPartenaire} onChange={e => setField('montantDuPartenaire', e.target.value)} className={inputCls} /></div>
               <div><label className={labelCls}>Montant déjà payé</label><input type="number" min="0" value={form.montantPayePartenaire} onChange={e => setField('montantPayePartenaire', e.target.value)} className={inputCls} /></div>
               <div><label className={labelCls}>Délai avant alerte (jours)</label><input type="number" min="1" value={form.delaiConfirmationReceptionJours} onChange={e => setField('delaiConfirmationReceptionJours', e.target.value)} className={inputCls} /></div>
               <div className="sm:col-span-2"><label className={labelCls}>Message envoyé quand une date est promise</label><textarea rows={3} maxLength={500} value={form.messageNotificationLivraison} onChange={e => setField('messageNotificationLivraison', e.target.value)} placeholder="Votre campagne a été validée. Votre livraison est prévue…" className={`${inputCls} resize-none`} /></div>
@@ -1729,17 +1678,11 @@ export function OpportuniteDetailPage() {
   const [loading, setLoading] = useState(true)
   const [actionId, setActionId] = useState(null)
 
-  const refresh = useCallback((showLoader = true) => {
-    if (showLoader) setLoading(true)
+  const refresh = useCallback(() => {
+    setLoading(true)
     getAdminOpportunite(id).then(setItem).finally(() => setLoading(false))
   }, [id])
-  useEffect(() => {
-    let cancelled = false
-    getAdminOpportunite(id)
-      .then(data => { if (!cancelled) setItem(data) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [id])
+  useEffect(() => { refresh() }, [refresh])
 
   const activer = async (opportuniteId) => {
     setActionId(opportuniteId)
@@ -1752,7 +1695,7 @@ export function OpportuniteDetailPage() {
 
   if (loading) return <Spinner py="py-24" />
   if (!item) return <EmptyState icon={Package} title="Opportunité introuvable" sub="Revenez à la liste et choisissez une autre campagne." />
-  return <DetailDrawer key={item.id} item={item} onClose={() => navigate('/opportunites')} onActiver={activer} onCloturer={cloturer} onModifier={() => navigate(`/opportunites/${id}/modifier`)} actionId={actionId} />
+  return <DetailDrawer item={item} onClose={() => navigate('/opportunites')} onActiver={activer} onCloturer={cloturer} onModifier={() => navigate(`/opportunites/${id}/modifier`)} actionId={actionId} />
 }
 
 export function ModifierOpportunitePage() {
@@ -1765,7 +1708,7 @@ export function ModifierOpportunitePage() {
   }, [id])
   if (loading) return <Spinner py="py-24" />
   if (!item) return <EmptyState icon={Package} title="Opportunité introuvable" />
-  return <ModifierOpportuniteForm item={item} onClose={() => navigate(`/opportunites/${id}`)} onSaved={() => navigate(`/opportunites/${id}`)} />
+  return <ModifierOpportuniteModal item={item} onClose={() => navigate(`/opportunites/${id}`)} onSaved={() => navigate(`/opportunites/${id}`)} />
 }
 
 export function NouvelleOpportunitePage() {
@@ -1773,17 +1716,7 @@ export function NouvelleOpportunitePage() {
   return <NouvelleOpportuniteWizard onClose={() => navigate('/opportunites')} onSaved={() => navigate('/opportunites', { replace: true })} />
 }
 
-const MOTIF_TENTATIVE_LABEL = {
-  SOLDE_INSUFFISANT: 'Solde insuffisant',
-  OFFRE_INDISPONIBLE: 'Offre indisponible',
-  VALIDATION: 'Données invalides',
-  ERREUR_TECHNIQUE: 'Erreur technique',
-}
-
-const TRAITEMENT_LABEL = { A_TRAITER: 'À traiter', EN_COURS: 'Traitement en cours', TERMINE: 'Traité' }
-const TRAITEMENT_COLOR = { A_TRAITER: 'rose', EN_COURS: 'amber', TERMINE: 'emerald' }
-
-export default function Opportunites({ mode = 'encours' }) {
+export default function Opportunites() {
   const navigate = useNavigate()
   const [opportunites, setOpportunites] = useState([])
   const [loading, setLoading]           = useState(true)
@@ -1793,10 +1726,6 @@ export default function Opportunites({ mode = 'encours' }) {
   const [recherche, setRecherche] = useState('')
   const [triListe, setTriListe] = useState('RECENTES')
   const [filtresOuverts, setFiltresOuverts] = useState(false)
-  const [tentatives, setTentatives] = useState([])
-  const [page, setPage] = useState(1)
-  const [tentativesPage, setTentativesPage] = useState(1)
-  const traitementMode = mode === 'traitement'
 
   const fetchData = () => {
     setLoading(true)
@@ -1806,21 +1735,7 @@ export default function Opportunites({ mode = 'encours' }) {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => {
-    let cancelled = false
-    getAdminOpportunites()
-      .then(data => { if (!cancelled) setOpportunites(data) })
-      .catch(() => { if (!cancelled) setOpportunites([]) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [])
-
-  useEffect(() => {
-    if (traitementMode) return
-    getTentativesSouscriptionEchouees()
-      .then(setTentatives)
-      .catch(() => setTentatives([]))
-  }, [traitementMode])
+  useEffect(() => { fetchData() }, [])
 
   // Compteurs/prix/statut mis à jour en direct
   useSSE('events/opportunites', {
@@ -1834,18 +1749,16 @@ export default function Opportunites({ mode = 'encours' }) {
 
   const handleActiver  = async (id) => {
     setActionId(id)
-    try { await activerOpportunite(id); fetchData() } catch { setActionId(null) } finally { setActionId(null) }
+    try { await activerOpportunite(id); fetchData() } catch { } finally { setActionId(null) }
   }
   const handleCloturer = async (id) => {
     setActionId(id)
-    try { await cloturerOpportunite(id); fetchData() } catch { setActionId(null) } finally { setActionId(null) }
+    try { await cloturerOpportunite(id); fetchData() } catch { } finally { setActionId(null) }
   }
 
-  const estTerminee = o => o.statut === 'CLOTUREE' || o.statut === 'ANNULEE'
-  const opportunitesDuParcours = opportunites.filter(o => traitementMode ? estTerminee(o) : !estTerminee(o))
-  const categories = Array.from(new Set(opportunitesDuParcours.map(o => o.categorie).filter(Boolean))).sort()
+  const categories = Array.from(new Set(opportunites.map(o => o.categorie).filter(Boolean))).sort()
   const termesRecherche = normaliserRecherche(recherche).split(/\s+/).filter(Boolean)
-  const opportunitesFiltrees = opportunitesDuParcours
+  const opportunitesFiltrees = opportunites
     .filter(o => categorieFiltre === 'TOUTES' || o.categorie === categorieFiltre)
     .filter(o => statutListeFiltre === 'TOUS' || o.statut === statutListeFiltre)
     .filter(o => {
@@ -1870,68 +1783,30 @@ export default function Opportunites({ mode = 'encours' }) {
     setRecherche('')
     setTriListe('RECENTES')
   }
-  const echecsSolde = tentatives.filter(item => item.motif === 'SOLDE_INSUFFISANT').length
-  const echecsTechniques = tentatives.filter(item => item.motif === 'ERREUR_TECHNIQUE').length
-  useEffect(() => setPage(1), [categorieFiltre, statutListeFiltre, recherche, triListe, mode])
-  const opportunitesPage = opportunitesFiltrees.slice((page - 1) * 10, page * 10)
-  const tentativesPageItems = tentatives.slice((tentativesPage - 1) * 10, tentativesPage * 10)
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
-          <p className="text-[13px] font-bold text-slate-900">{traitementMode ? 'Traitement et livraisons' : 'Opportunités en cours'}</p>
+          <p className="text-[13px] font-bold text-slate-900">Opportunités</p>
           <p className="text-[11px] text-slate-400 mt-0.5">
-            {traitementMode
-              ? 'Campagnes clôturées à préparer, livrer ou finaliser'
-              : 'Campagnes actives ou en préparation, visibles après activation'}
+            {opportunites.length} opportunité{opportunites.length !== 1 ? 's' : ''}
           </p>
         </div>
-        {!traitementMode && <button
+        <button
           onClick={() => navigate('/opportunites/nouvelle')}
           className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-700 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 hover:bg-violet-800 sm:w-auto"
         >
           <Plus size={15} /> Nouvelle opportunité
-        </button>}
+        </button>
       </div>
-
-      {!traitementMode && (
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="flex items-center gap-2"><AlertTriangle size={16} className="text-amber-500" /><h3 className="text-sm font-black text-slate-900">Tentatives de souscription non abouties</h3></div>
-              <p className="mt-1 text-[11px] text-slate-500">Ces essais n’ont pas gelé de dépôt et ne comptent donc jamais comme participations.</p>
-            </div>
-            <div className="flex gap-2">
-              <span className="rounded-full bg-amber-50 px-3 py-1.5 text-[10px] font-black text-amber-700">{echecsSolde} solde insuffisant</span>
-              <span className="rounded-full bg-rose-50 px-3 py-1.5 text-[10px] font-black text-rose-700">{echecsTechniques} erreur{echecsTechniques !== 1 ? 's' : ''} technique{echecsTechniques !== 1 ? 's' : ''}</span>
-            </div>
-          </div>
-          {tentatives.length === 0 ? (
-            <div className="p-5 text-center text-xs text-slate-400">Aucune tentative échouée enregistrée.</div>
-          ) : (
-            <div className="max-h-64 overflow-auto">
-              <Table><thead><tr><Th>Client</Th><Th>Opportunité</Th><Th>Cause</Th><Th>Date</Th><Th>Décision</Th></tr></thead>
-                <tbody>{tentativesPageItems.map(item => <Tr key={item.id}>
-                  <Td><p className="font-bold text-slate-800">{item.utilisateurNom || 'Client'}</p><p className="text-[10px] text-slate-400">{item.utilisateurTelephone || '—'}</p></Td>
-                  <Td><button onClick={() => navigate(`/opportunites/${item.opportuniteId}`)} className="max-w-52 truncate text-left text-xs font-bold text-violet-700 hover:underline">{item.opportuniteTitre}</button><p className="text-[10px] text-slate-400">{item.quantite} unité{item.quantite > 1 ? 's' : ''}</p></Td>
-                  <Td><Badge color={item.motif === 'ERREUR_TECHNIQUE' ? 'rose' : item.motif === 'SOLDE_INSUFFISANT' ? 'amber' : 'gray'}>{MOTIF_TENTATIVE_LABEL[item.motif] || item.motif}</Badge><p title={item.detail} className="mt-1 max-w-64 truncate text-[10px] text-slate-400">{item.detail}</p></Td>
-                  <Td><span className="text-[11px] text-slate-500">{formatDate(item.createdAt)}</span></Td>
-                  <Td><span className="text-[10px] font-semibold text-slate-500">{item.motif === 'SOLDE_INSUFFISANT' ? 'Relance / recharge' : item.motif === 'ERREUR_TECHNIQUE' ? 'Vérifier l’incident' : 'Informer le client'}</span></Td>
-                </Tr>)}</tbody>
-              </Table>
-              <Pagination page={tentativesPage} totalItems={tentatives.length} onPageChange={setTentativesPage} />
-            </div>
-          )}
-        </section>
-      )}
 
       <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="relative min-w-0 flex-1">
             <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input value={recherche} onChange={e => setRecherche(e.target.value)}
-              placeholder="Rechercher par produit, catégorie, fournisseur…"
+              placeholder="Rechercher par produit, catégorie, partenaire…"
               className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50" />
             {recherche && (
               <button onClick={() => setRecherche('')} aria-label="Effacer la recherche"
@@ -1954,7 +1829,7 @@ export default function Opportunites({ mode = 'encours' }) {
         {filtresOuverts && (
           <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2 xl:grid-cols-3">
             <FilterSelect label="Catégorie" value={categorieFiltre} onChange={setCategorieFiltre}
-              options={[{ value: 'TOUTES', label: `Toutes les catégories (${opportunitesDuParcours.length})` }, ...categories.map(cat => ({ value: cat, label: `${cat} (${opportunitesDuParcours.filter(o => o.categorie === cat).length})` }))]} />
+              options={[{ value: 'TOUTES', label: `Toutes les catégories (${opportunites.length})` }, ...categories.map(cat => ({ value: cat, label: `${cat} (${opportunites.filter(o => o.categorie === cat).length})` }))]} />
             <FilterSelect label="Statut" value={statutListeFiltre} onChange={setStatutListeFiltre}
               options={[{ value: 'TOUS', label: 'Tous les statuts' }, ...Object.entries(STATUT_LABEL).map(([optionValue, optionLabel]) => ({ value: optionValue, label: optionLabel }))]} />
             <FilterSelect label="Trier par" value={triListe} onChange={setTriListe} className="sm:col-span-2 xl:col-span-1"
@@ -1984,22 +1859,22 @@ export default function Opportunites({ mode = 'encours' }) {
           <Spinner py="py-12" />
         ) : opportunitesFiltrees.length === 0 ? (
           <EmptyState icon={Package}
-            title={opportunitesDuParcours.length === 0 ? (traitementMode ? 'Aucune campagne à traiter' : 'Aucune opportunité en cours') : 'Aucun résultat'}
-            sub={opportunitesDuParcours.length === 0 ? (traitementMode ? 'Les campagnes clôturées apparaîtront ici avec leur état de traitement.' : 'Créez votre première opportunité.') : 'Modifiez la recherche ou retirez certains filtres.'} />
+            title={opportunites.length === 0 ? 'Aucune opportunité' : 'Aucun résultat'}
+            sub={opportunites.length === 0 ? 'Créez votre première opportunité.' : 'Modifiez la recherche ou retirez certains filtres.'} />
         ) : (
-          <><Table>
+          <Table>
             <thead>
               <tr>
                 <Th>Produit</Th>
                 <Th>Prix normal</Th>
                 <Th>Avancement</Th>
                 <Th>Expiration</Th>
-                <Th>{traitementMode ? 'Traitement' : 'Statut'}</Th>
+                <Th>Statut</Th>
                 <Th>Actions</Th>
               </tr>
             </thead>
             <tbody>
-              {opportunitesPage.map(item => {
+              {opportunitesFiltrees.map(item => {
                 const { pct, valide: seuilValide, phase: phaseProgression, placesRestantes } = calculerProgression(item)
                 return (
                   <Tr key={item.id}>
@@ -2027,7 +1902,7 @@ export default function Opportunites({ mode = 'encours' }) {
                       )}
                     </Td>
                     <Td><span className="text-[12px] text-slate-500">{formatDate(item.dateExpiration)}</span></Td>
-                    <Td>{traitementMode ? <div className="space-y-1"><Badge color={TRAITEMENT_COLOR[item.statutTraitement] || 'red'}>{TRAITEMENT_LABEL[item.statutTraitement] || 'À traiter'}</Badge><p className="text-[10px] text-slate-400">{item.dossiersATraiter || 0} à traiter · {item.dossiersEnCours || 0} en cours · {item.dossiersTermines || 0} terminés</p></div> : <Badge color={STATUT_COLOR[item.statut] || 'gray'}>{STATUT_LABEL[item.statut] || item.statut}</Badge>}</Td>
+                    <Td><Badge color={STATUT_COLOR[item.statut] || 'gray'}>{STATUT_LABEL[item.statut] || item.statut}</Badge></Td>
                     <Td>
                       <div className="flex gap-1.5 items-center">
                         <button onClick={() => navigate(`/opportunites/${item.id}`)}
@@ -2059,7 +1934,6 @@ export default function Opportunites({ mode = 'encours' }) {
               })}
             </tbody>
           </Table>
-          <Pagination page={page} totalItems={opportunitesFiltrees.length} onPageChange={setPage} /></>
         )}
       </Card>
     </div>
