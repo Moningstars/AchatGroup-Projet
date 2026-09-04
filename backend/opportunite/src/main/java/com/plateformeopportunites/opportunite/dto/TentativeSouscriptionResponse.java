@@ -3,6 +3,7 @@ package com.plateformeopportunites.opportunite.dto;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -16,6 +17,7 @@ public class TentativeSouscriptionResponse {
     private String utilisateurNom;
     private String utilisateurTelephone;
     private Integer quantite;
+    private BigDecimal montantTransaction;
     private String motif;
     private String detail;
     private LocalDateTime createdAt;

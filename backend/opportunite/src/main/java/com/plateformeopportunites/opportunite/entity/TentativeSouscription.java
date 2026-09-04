@@ -4,6 +4,7 @@ import com.plateformeopportunites.identity.entity.Utilisateur;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -29,6 +30,9 @@ public class TentativeSouscription {
 
     @Column(nullable = false)
     private Integer quantite;
+
+    @Column(precision = 19, scale = 2)
+    private BigDecimal montantTransaction;
 
     @Column(nullable = false, length = 40)
     private String motif;

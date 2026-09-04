@@ -7,6 +7,7 @@ import com.plateformeopportunites.finance.service.WalletService;
 import com.plateformeopportunites.identity.entity.Administrateur;
 import com.plateformeopportunites.identity.entity.Utilisateur;
 import com.plateformeopportunites.identity.repository.AdministrateurRepository;
+import com.plateformeopportunites.identity.repository.CommanditaireRepository;
 import com.plateformeopportunites.identity.repository.UtilisateurRepository;
 import com.plateformeopportunites.sondage.dto.EligibiliteRequest;
 import com.plateformeopportunites.sondage.dto.RepondreRequest;
@@ -40,6 +41,7 @@ class SondageServiceTest {
     @Mock private QuestionRepository questionRepository;
     @Mock private OptionReponseRepository optionReponseRepository;
     @Mock private AdministrateurRepository administrateurRepository;
+        @Mock private CommanditaireRepository commanditaireRepository;
     @Mock private UtilisateurRepository utilisateurRepository;
     @Mock private WalletService walletService;
     @Mock private ApplicationEventPublisher eventPublisher;
@@ -59,6 +61,11 @@ class SondageServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(sondageRepository.findByIdForUpdate(any(UUID.class)))
+                .thenAnswer(invocation -> sondageRepository.findById(invocation.getArgument(0)));
+        lenient().when(sondageReponseRepository.findByIdForUpdate(any(UUID.class)))
+                .thenAnswer(invocation -> sondageReponseRepository.findById(invocation.getArgument(0)));
+
         q1Id = UUID.randomUUID();
         q2Id = UUID.randomUUID();
         bonneReponse1Id  = UUID.randomUUID();
@@ -92,6 +99,9 @@ class SondageServiceTest {
                 .quotaVise(100)
                 .repondantsActuels(0)
                 .recompense(new BigDecimal("500"))
+                .budgetReserve(new BigDecimal("50000"))
+                .budgetDistribue(BigDecimal.ZERO)
+                .budgetLibere(false)
                 .typeRecompense(TypeRecompense.ARGENT)
                 .seuilEligibilite(new BigDecimal("70"))
                 .niveauVerification(NiveauVerification.AUCUN)
@@ -356,6 +366,7 @@ class SondageServiceTest {
                 .id(UUID.randomUUID())
                 .sondage(sondageAvecSeuil70)
                 .utilisateur(utilisateur())
+                .statutValidation(StatutValidation.EN_ATTENTE_PREUVE)
                 .recompenseVersee(false)
                 .build();
         UUID reponseId = reponse.getId();
@@ -376,6 +387,7 @@ class SondageServiceTest {
                 .id(UUID.randomUUID())
                 .sondage(sondageAvecSeuil70)
                 .utilisateur(utilisateur())
+                .statutValidation(StatutValidation.EN_ATTENTE_PREUVE)
                 .recompenseVersee(false)
                 .build();
         UUID reponseId = reponse.getId();
@@ -402,6 +414,7 @@ class SondageServiceTest {
         when(sondageRepository.findByStatutAndDateExpirationBefore(
                 eq(StatutSondage.ACTIF), any(LocalDateTime.class)))
                 .thenReturn(List.of(expireCeJour));
+        when(sondageRepository.findById(expireCeJour.getId())).thenReturn(Optional.of(expireCeJour));
         when(sondageRepository.save(any())).thenReturn(expireCeJour);
 
         sondageService.cloturerExpires();
