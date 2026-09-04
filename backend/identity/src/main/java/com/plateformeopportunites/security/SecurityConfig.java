@@ -92,6 +92,10 @@ public class SecurityConfig {
                 "http://127.0.0.1:5174",
                 "http://127.0.0.1:4173",
                 "http://127.0.0.1:4174",
+                "http://172.31.240.1:5173",
+                "http://172.31.240.1:5174",
+                "http://172.31.240.1:4173",
+                "http://172.31.240.1:4174",
                 "https://opportunihub.maitrise.app",
                 "https://admin-opportunihub.maitrise.app"
         ));

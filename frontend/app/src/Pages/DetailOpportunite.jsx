@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom'
 import {
-  ShieldCheck, Users, Loader2, ChevronRight, ChevronDown, CheckCircle2, AlertCircle, Layers, Timer, Minus, Plus, Copy, Share2, ShoppingCart, PackageCheck, ExternalLink, Gift, Store, Coins
+  ShieldCheck, Users, Loader2, ChevronRight, ChevronDown, CheckCircle2, AlertCircle, Layers, Timer, Minus, Plus, Copy, Share2, ShoppingCart, PackageCheck, ExternalLink, Gift, Store, Coins, Sparkles
 } from 'lucide-react'
-import { FacebookIcon, InstagramIcon, WhatsAppIcon } from '../common/Footer/SocialIcons'
 import { getOpportunite, getOpportunites, getMesParticipationsOpportunites, getSolde, souscrire, imgUrl } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useCountdown } from '../hooks/useCountdown'
@@ -209,21 +208,6 @@ export default function DetailOpportunite() {
     }
   }
 
-  const handleShareWhatsApp = () => {
-    const url = `${window.location.origin}/opportunity/${id}`
-    const text = `${opportunite?.titre || 'Campagne OpportuniHub'} - ${url}`
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank')
-  }
-
-  const handleShareFacebook = () => {
-    const url = `${window.location.origin}/opportunity/${id}`
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank')
-  }
-
-  const handleShareInstagram = () => {
-    window.open('https://www.instagram.com/', '_blank')
-  }
-
   const handleShare = async () => {
     const url = getShareUrl()
     const message = getShareMessage()
@@ -345,8 +329,8 @@ export default function DetailOpportunite() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 lg:items-start">
 
-          {/* Media : photos + miniatures — toujours en premier, y compris sur mobile */}
-          <div className="order-1 lg:order-none lg:col-start-1 lg:col-span-7 lg:row-start-1 space-y-6">
+          {/* Gallery */}
+          <div className="lg:col-span-7 space-y-6">
 
             {/* Image principale — hauteur fixe, clic = lightbox */}
             <div
@@ -396,10 +380,8 @@ export default function DetailOpportunite() {
                 ))}
               </div>
             )}
-          </div>
 
-          {/* Détails : infos produit + fournisseur — passent après le bloc info sur mobile */}
-          <div className="order-3 lg:order-none lg:col-start-1 lg:col-span-7 lg:row-start-2 space-y-6">
+            {/* Contenu produit : reste sous la galerie pour occuper naturellement la colonne gauche. */}
             <section className="rounded-3xl border-2 border-gray-100 bg-white p-5 sm:p-6">
               <div className="flex items-center gap-2">
                 <PackageCheck size={16} className="text-primary" />
@@ -493,8 +475,8 @@ export default function DetailOpportunite() {
             </div>
           )}
 
-          {/* Info : titre, prix, progression, quantité, CTA — passe avant les détails produit/fournisseur sur mobile */}
-          <div className="order-2 lg:order-none lg:col-start-8 lg:col-span-5 lg:row-start-1 lg:row-span-2 flex flex-col gap-5 lg:sticky lg:top-24">
+          {/* Info */}
+          <div className="lg:col-span-5 flex flex-col gap-5 lg:sticky lg:top-24">
 
             {/* Status + catégorie */}
             <div className="flex items-center gap-2 flex-wrap">
@@ -654,27 +636,27 @@ export default function DetailOpportunite() {
                     Jusqu’à {fmt(reductionPoints)} FCFA déduits de cet achat · ces points ne sont pas retirables.
                   </span>
                 </span>
-                <span className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-primary">
-                  <Share2 size={14} /> Partager avec vos proche
-                </span>
-                {copied && <span className="text-[10px] font-black text-success uppercase tracking-widest">Lien copié</span>}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={handleShareWhatsApp} aria-label="Partager sur WhatsApp" title="Partager sur WhatsApp" className="w-10 h-10 rounded-xl bg-[#25D366]/10 text-[#25D366] flex items-center justify-center hover:bg-[#25D366]/20 transition-colors">
-                  <WhatsAppIcon />
-                </button>
-                <button type="button" onClick={handleShareFacebook} aria-label="Partager sur Facebook" title="Partager sur Facebook" className="w-10 h-10 rounded-xl bg-[#1877F2]/10 text-[#1877F2] flex items-center justify-center hover:bg-[#1877F2]/20 transition-colors">
-                  <FacebookIcon />
-                </button>
-                <button type="button" onClick={handleShareInstagram} aria-label="Partager sur Instagram" title="Partager sur Instagram" className="w-10 h-10 rounded-xl bg-[#E4405F]/10 text-[#E4405F] flex items-center justify-center hover:bg-[#E4405F]/20 transition-colors">
-                  <InstagramIcon />
-                </button>
-                <button type="button" onClick={handleCopyLink} aria-label="Copier le lien" title="Copier le lien" className="w-10 h-10 rounded-xl border-2 border-gray-100 flex items-center justify-center text-primary hover:border-primary/30 transition-colors ml-auto">
-                  <Copy size={16} />
-                </button>
-                <button type="button" onClick={handleShare} aria-label="Plus d'options de partage" title="Plus d'options de partage" className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center hover:brightness-105 transition-colors">
-                  <Share2 size={16} />
->>>>>>> 504d9f4 (fix:détailopportunité)
+              </label>
+            )}
+
+            {/* Partage et parrainage */}
+            <div className={`overflow-hidden rounded-2xl border-2 bg-white transition-all ${shareOpen ? 'border-primary/15 shadow-soft' : 'border-gray-100'}`}>
+              <div className="flex items-center gap-3 p-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/5 text-primary">
+                  {dejaSouscrit ? <Gift size={18} /> : <Share2 size={18} />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-black text-primary">
+                    {dejaSouscrit ? 'Invitez vos proches et gagnez des points' : "Partager l'offre avec vos proches"}
+                  </p>
+                  <p className="mt-0.5 truncate text-[10px] font-semibold text-gray-400">
+                    {dejaSouscrit
+                      ? `${fmt(recompenseParrainage)} points après leur achat confirmé`
+                      : 'Copiez ou envoyez le lien en quelques secondes'}
+                  </p>
+                </div>
+                <button type="button" aria-expanded={shareOpen} onClick={() => setShareOpen(open => !open)} className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-primary px-3 text-[11px] font-black text-white transition hover:brightness-105">
+                  Partager <ChevronDown size={14} className={`transition-transform ${shareOpen ? 'rotate-180' : ''}`} />
                 </button>
               </div>
 
@@ -722,6 +704,32 @@ export default function DetailOpportunite() {
               {joinError && <p className="text-urgency text-xs font-bold text-center bg-urgency/5 p-3 rounded-xl border border-urgency/10">{joinError}</p>}
             </div>
           </div>
+
+          {/* Fiche produit enrichie — sous la galerie en desktop, tout en bas en mobile */}
+          {(opportunite.specsPointsForts || opportunite.specsCasUsage || opportunite.specsFinePrint) && (
+            <div className="lg:col-span-7 bg-white rounded-2xl border-2 border-gray-100 p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles size={14} className="text-primary" />
+                <span className="text-[10px] font-black text-primary uppercase tracking-widest">Points clés</span>
+              </div>
+              {opportunite.specsPointsForts && (
+                <ul className="space-y-1.5">
+                  {opportunite.specsPointsForts.split('\n').filter(Boolean).map((line, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                      <CheckCircle2 size={14} className="text-success shrink-0 mt-0.5" />
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {opportunite.specsCasUsage && (
+                <p className="text-sm text-gray-500 leading-relaxed">{opportunite.specsCasUsage}</p>
+              )}
+              {opportunite.specsFinePrint && (
+                <p className="text-[11px] text-gray-400 italic border-t border-gray-50 pt-2.5">{opportunite.specsFinePrint}</p>
+              )}
+            </div>
+          )}
 
         </div>
 

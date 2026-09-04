@@ -1,6 +1,5 @@
 package com.plateformeopportunites.opportunite.dto;
 
-import com.plateformeopportunites.common.enums.ModePlafond;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -34,8 +33,6 @@ public class CreerOpportuniteRequest {
     @Min(1)
     private Integer seuilMaximal;
 
-    private ModePlafond modePlafond;
-
     @NotNull
     @Future
     private LocalDateTime dateExpiration;
@@ -43,7 +40,7 @@ public class CreerOpportuniteRequest {
     /** Nom de la catégorie (optionnel). Créée automatiquement si inconnue. */
     private String categorie;
 
-    private UUID fournisseurId;
+    private UUID commanditaireId;
     private String partenaireNom;
     private String partenaireLogoUrl;
     private String partenaireContact;

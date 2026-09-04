@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public class ModifierSondageRequest {
     @Size(min = 1, max = 255)
     private String titre;
+    private String imageUrl;
     private String description;
     @Min(1)
     private Integer quotaVise;

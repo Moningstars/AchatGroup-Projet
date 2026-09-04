@@ -44,7 +44,6 @@ export default function Portefeuille() {
   const [isRechargeOpen, setRechargeOpen] = useState(false)
   const [isWithdrawOpen, setWithdrawOpen] = useState(false)
   const [actionError, setActionError]     = useState('')
-  const [retraitLoading, setRetraitLoading] = useState(false)
   const [kycNiveau, setKycNiveau]         = useState(null)
   const [showKycGate, setShowKycGate]     = useState(false)
   const [hideBalance, setHideBalance]     = useState(false)
@@ -65,12 +64,7 @@ export default function Portefeuille() {
   useEffect(() => {
     on('wallet.credited', fetchData)
     on('wallet.debited', fetchData)
-    on('RETRAIT', fetchData)
-    return () => {
-      off('wallet.credited', fetchData)
-      off('wallet.debited', fetchData)
-      off('RETRAIT', fetchData)
-    }
+    return () => { off('wallet.credited', fetchData); off('wallet.debited', fetchData) }
   }, [fetchData, off, on])
 
   useEffect(() => {
@@ -79,18 +73,15 @@ export default function Portefeuille() {
   }, [fetchData])
 
   const handleRetrait = async (amount, coordonnees) => {
-    if (retraitLoading) return
     const val = parseFloat(amount)
     if (!val || val < 1000) { setActionError('Montant minimum 1 000 FCFA'); return }
     if (!coordonnees?.trim()) { setActionError('Numéro requis'); return }
     setActionError('')
-    setRetraitLoading(true)
     try {
       await demanderRetrait(val, coordonnees.trim())
       await fetchData()
       setWithdrawOpen(false)
     } catch (e) { setActionError(e.response?.data?.message || 'Erreur retrait') }
-    finally { setRetraitLoading(false) }
   }
 
   const openRetrait = () => {
@@ -413,7 +404,7 @@ export default function Portefeuille() {
         onClose={() => { setRechargeOpen(false); fetchData() }}
         onSuccess={() => { fetchData() }}
       />
-      <RetraitModal open={isWithdrawOpen} onClose={() => setWithdrawOpen(false)} onConfirm={handleRetrait} balance={solde} loading={retraitLoading} error={isWithdrawOpen ? actionError : ''} />
+      <RetraitModal open={isWithdrawOpen} onClose={() => setWithdrawOpen(false)} onConfirm={handleRetrait} balance={solde} />
 
       {/* KYC Gate Modal */}
       {showKycGate && (

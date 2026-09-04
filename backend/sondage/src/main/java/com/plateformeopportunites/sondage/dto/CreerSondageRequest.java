@@ -16,8 +16,11 @@ public class CreerSondageRequest {
 
     private UUID commanditaireId;
 
-    @NotBlank
+    @NotBlank(message = "Le titre est obligatoire")
+    @Size(max = 255)
     private String titre;
+
+    private String imageUrl;
 
     private String description;
 

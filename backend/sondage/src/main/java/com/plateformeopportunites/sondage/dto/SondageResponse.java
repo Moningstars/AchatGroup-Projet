@@ -16,6 +16,7 @@ public class SondageResponse {
     private String commanditaireNom;
     private String commanditaireSociete;
     private String titre;
+    private String imageUrl;
     private String description;
     private Integer quotaVise;
     private Integer repondantsActuels;

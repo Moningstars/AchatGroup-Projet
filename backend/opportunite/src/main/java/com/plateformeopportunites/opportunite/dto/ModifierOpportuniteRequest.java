@@ -1,6 +1,5 @@
 package com.plateformeopportunites.opportunite.dto;
 
-import com.plateformeopportunites.common.enums.ModePlafond;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.Min;
@@ -35,15 +34,13 @@ public class ModifierOpportuniteRequest {
     @Min(1)
     private Integer seuilMaximal;
 
-    private ModePlafond modePlafond;
-
     @Future
     private LocalDateTime dateExpiration;
 
     /** Nom de la catégorie (optionnel). Créée automatiquement si inconnue. */
     private String categorie;
 
-    private UUID fournisseurId;
+    private UUID commanditaireId;
     private String partenaireNom;
     private String partenaireLogoUrl;
     private String partenaireContact;

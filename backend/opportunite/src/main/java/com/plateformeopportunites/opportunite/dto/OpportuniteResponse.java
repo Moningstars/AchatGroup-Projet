@@ -1,6 +1,5 @@
 package com.plateformeopportunites.opportunite.dto;
 
-import com.plateformeopportunites.common.enums.ModePlafond;
 import com.plateformeopportunites.common.enums.StatutOpportunite;
 import lombok.Builder;
 import lombok.Data;
@@ -22,22 +21,17 @@ public class OpportuniteResponse {
     private BigDecimal prixActuel;
     private Integer seuilMinimum;
     private Integer seuilMaximal;
-    private ModePlafond modePlafond;
     private Integer participantsActuels;
     private Integer placesRestantes;
     private Boolean souscriptionOuverte;
     private Boolean activationAtteinte;
     private String raisonIndisponibilite;
-    private String statutTraitement;
-    private Integer dossiersATraiter;
-    private Integer dossiersEnCours;
-    private Integer dossiersTermines;
     private LocalDateTime dateExpiration;
     private StatutOpportunite statut;
     private LocalDateTime createdAt;
     private String categorie;
     private String categorieIcone;
-    private UUID fournisseurId;
+    private UUID commanditaireId;
     private String partenaireNom;
     private String partenaireLogoUrl;
     private String partenaireContact;

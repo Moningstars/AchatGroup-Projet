@@ -75,6 +75,7 @@ public class SondageService {
                 .admin(admin)
                 .commanditaireId(req.getCommanditaireId())
                 .titre(req.getTitre())
+                .imageUrl(req.getImageUrl())
                 .description(req.getDescription())
                 .quotaVise(req.getQuotaVise())
                 .recompense(req.getRecompense())
@@ -211,11 +212,20 @@ public class SondageService {
             throw new IllegalArgumentException("Le titre ne peut pas être vide");
         }
         if (req.getTitre() != null) sondage.setTitre(req.getTitre().trim());
+        if (req.getImageUrl() != null) sondage.setImageUrl(req.getImageUrl().trim());
         if (req.getDescription() != null) sondage.setDescription(req.getDescription());
         if (req.getQuotaVise() != null) sondage.setQuotaVise(req.getQuotaVise());
         if (req.getRecompense() != null) sondage.setRecompense(req.getRecompense());
         if (req.getDateExpiration() != null) sondage.setDateExpiration(req.getDateExpiration());
         return toResponse(sondageRepository.save(sondage));
+    }
+
+    @Transactional
+    public String mettreAJourImage(UUID sondageId, String imageUrl) {
+        Sondage sondage = getSondage(sondageId);
+        sondage.setImageUrl(imageUrl);
+        sondageRepository.save(sondage);
+        return imageUrl;
     }
 
     @Transactional
@@ -977,6 +987,7 @@ public class SondageService {
                 .commanditaireNom(commanditaireNom)
                 .commanditaireSociete(commanditaireSociete)
                 .titre(s.getTitre())
+                .imageUrl(s.getImageUrl())
                 .description(s.getDescription())
                 .quotaVise(s.getQuotaVise())
                 .repondantsActuels(s.getRepondantsActuels())
