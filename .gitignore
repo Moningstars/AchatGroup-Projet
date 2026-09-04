@@ -1,0 +1,31 @@
+# Java / Maven
+target/
+*.class
+*.log
+spring-boot*.log*
+backend/app/uploads/
+
+# Secrets locaux
+secrets.properties
+.env
+.env.*
+!.env.example
+!.env.*.example
+!secrets.properties.example
+firebase-service-account.json
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+.runtime/
+.kombai/
+
+# Redis
+dump.rdb

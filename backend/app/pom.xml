@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.plateformeopportunites</groupId>
+        <artifactId>plateforme-opportunites-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>app</artifactId>
+    <name>Module App — Point d'entrée Spring Boot</name>
+
+    <!--
+        Ce module est le seul à produire un JAR exécutable.
+        Il assemble tous les modules et contient :
+        - PlateformeOpportunitesApplication (main class)
+        - DataInitializer (peuplement initial)
+        - EventListeners (écoute des événements cross-modules)
+        - ClotureScheduler (jobs planifiés)
+        - StatsController (agrège des données de tous les modules)
+        - application.yml
+    -->
+
+    <dependencies>
+
+        <!-- Tous les modules métier -->
+        <dependency>
+            <groupId>com.plateformeopportunites</groupId>
+            <artifactId>common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.plateformeopportunites</groupId>
+            <artifactId>identity</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.plateformeopportunites</groupId>
+            <artifactId>finance</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.plateformeopportunites</groupId>
+            <artifactId>opportunite</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.plateformeopportunites</groupId>
+            <artifactId>sondage</artifactId>
+        </dependency>
+
+        <!-- Runtime -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Seul ce module produit un JAR Spring Boot exécutable -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <skip>false</skip>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

@@ -1,0 +1,88 @@
+spring:
+  application:
+    name: plateforme-opportunites
+
+  config:
+    import: "optional:file:./secrets.properties"
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/plateforme_opportunites
+    username: postgres
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+
+    open-in-view: false
+    # show-sql: true
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+
+  jackson:
+    default-property-inclusion: non_null
+
+  servlet:
+    multipart:
+      max-file-size: 15MB
+      max-request-size: 15MB
+
+server:
+  port: 8080
+
+app:
+  jwt:
+    secret-participant: ${JWT_SECRET_PARTICIPANT}
+    secret-admin: ${JWT_SECRET_ADMIN}
+    expiration: 86400000
+  upload-dir: ./uploads
+  auth:
+    # Connexion participant sans Firebase, utile seulement en local/demo.
+    # Ne jamais activer sur un déploiement public.
+    dev-login-enabled: ${DEV_AUTH_ENABLED:false}
+
+paygate:
+  auth-token: ${PAYGATE_AUTH_TOKEN}
+  api-url: https://paygateglobal.com/api/v1/pay
+  dev-mode: true
+
+ovh:
+  sms:
+    endpoint: https://eu.api.ovh.com/1.0
+    service-name: ${OVH_SMS_SERVICE_NAME:}
+    application-key: ${OVH_SMS_APPLICATION_KEY:}
+    application-secret: ${OVH_SMS_APPLICATION_SECRET:}
+    consumer-key: ${OVH_SMS_CONSUMER_KEY:}
+    dev-mode: true
+
+firebase:
+  credentials-path: ${FIREBASE_CREDENTIALS_PATH:./firebase-service-account.json}
+  dev-mode: ${FIREBASE_DEV_MODE:false}
+
+anthropic:
+  api-key: ${ANTHROPIC_API_KEY:}
+  api-url: https://api.anthropic.com/v1/messages
+  dev-mode: true
+
+gemini:
+  api-key: ${GEMINI_API_KEY}
+  api-url: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent
+
+pusher:
+  app-id: ${PUSHER_APP_ID}
+  key: ${PUSHER_KEY}
+  secret: ${PUSHER_SECRET}
+  cluster: "eu"
+
+beams:
+  instance-id: ${BEAMS_INSTANCE_ID:}
+  secret-key: ${BEAMS_SECRET_KEY:}
