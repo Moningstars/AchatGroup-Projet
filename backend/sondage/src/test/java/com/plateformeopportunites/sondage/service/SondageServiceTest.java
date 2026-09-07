@@ -239,10 +239,10 @@ class SondageServiceTest {
 
     @Test
     void repondre_dejaRepondu_leveException() {
-        // La base indique déjà une réponse enregistrée
+        // Redis indique déjà voté
                 when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
                 when(sondageRepository.findById(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
-        when(sondageReponseRepository.existsBySondageIdAndUtilisateurId(SONDAGE_ID, PID)).thenReturn(true);
+        when(redisService.aDejaVote(SONDAGE_ID, PID)).thenReturn(true);
 
         assertThrows(IllegalArgumentException.class,
                 () -> sondageService.repondre(PID, SONDAGE_ID, repondreReq()));
@@ -250,7 +250,7 @@ class SondageServiceTest {
 
     @Test
     void repondre_sansResultatEligibilite_leveException() {
-                lenient().when(redisService.aDejaVote(SONDAGE_ID, PID)).thenReturn(false);
+                when(redisService.aDejaVote(SONDAGE_ID, PID)).thenReturn(false);
         when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
         when(sondageRepository.findById(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
         when(resultatEligibiliteRepository.findByUtilisateurIdAndSondageEligibilite_Sondage_Id(PID, SONDAGE_ID))
@@ -264,7 +264,7 @@ class SondageServiceTest {
     void repondre_nonEligible_leveException() {
         ResultatEligibilite nonEligible = ResultatEligibilite.builder()
                 .estEligible(false).tauxObtenu(new BigDecimal("30")).build();
-        lenient().when(redisService.aDejaVote(SONDAGE_ID, PID)).thenReturn(false);
+        when(redisService.aDejaVote(SONDAGE_ID, PID)).thenReturn(false);
         when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
         when(sondageRepository.findById(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
         when(resultatEligibiliteRepository.findByUtilisateurIdAndSondageEligibilite_Sondage_Id(PID, SONDAGE_ID))
@@ -278,7 +278,7 @@ class SondageServiceTest {
     @Test
     void repondre_kycRequis_utilisateurNonVerifie_leveException() {
         sondageAvecSeuil70.setNiveauVerification(NiveauVerification.VERIFIE);
-                lenient().when(redisService.aDejaVote(SONDAGE_ID, PID)).thenReturn(false);
+                when(redisService.aDejaVote(SONDAGE_ID, PID)).thenReturn(false);
 
         Utilisateur u = utilisateur();
         u.setNiveauVerification(NiveauVerification.AUCUN); // pas vérifié
@@ -295,7 +295,7 @@ class SondageServiceTest {
         sondageAvecSeuil70.setModeDistribution(ModeDistribution.AUTO);
 
         UUID questionId = UUID.randomUUID();
-        Question question = Question.builder().id(questionId).typeQuestion(TypeQuestion.TEXTE_LIBRE).obligatoire(true).build();
+        Question question = Question.builder().id(questionId).build();
         ResultatEligibilite eligible = ResultatEligibilite.builder()
                 .estEligible(true).tauxObtenu(new BigDecimal("100")).build();
         SondageReponse savedReponse = SondageReponse.builder()
@@ -308,7 +308,6 @@ class SondageServiceTest {
                 .thenReturn(Optional.of(eligible));
         when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
         when(sondageRepository.findById(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
-        when(questionRepository.findBySondageIdOrderByOrdre(SONDAGE_ID)).thenReturn(List.of(question));
         when(questionRepository.findById(questionId)).thenReturn(Optional.of(question));
         when(sondageRepository.save(any())).thenReturn(sondageAvecSeuil70);
         when(sondageReponseRepository.save(any())).thenReturn(savedReponse);
@@ -316,7 +315,6 @@ class SondageServiceTest {
         RepondreRequest req = new RepondreRequest();
         RepondreRequest.ReponseDetailRequest detail = new RepondreRequest.ReponseDetailRequest();
         detail.setQuestionId(questionId);
-        detail.setValeurTexte("Réponse");
         req.setReponses(List.of(detail));
 
         sondageService.repondre(PID, SONDAGE_ID, req);
@@ -330,7 +328,7 @@ class SondageServiceTest {
         sondageAvecSeuil70.setModeDistribution(ModeDistribution.MANUEL);
 
         UUID questionId = UUID.randomUUID();
-        Question question = Question.builder().id(questionId).typeQuestion(TypeQuestion.TEXTE_LIBRE).obligatoire(true).build();
+        Question question = Question.builder().id(questionId).build();
         ResultatEligibilite eligible = ResultatEligibilite.builder()
                 .estEligible(true).tauxObtenu(new BigDecimal("100")).build();
         SondageReponse savedReponse = SondageReponse.builder()
@@ -343,14 +341,12 @@ class SondageServiceTest {
                 .thenReturn(Optional.of(eligible));
         when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
         when(sondageRepository.findById(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
-        when(questionRepository.findBySondageIdOrderByOrdre(SONDAGE_ID)).thenReturn(List.of(question));
         when(questionRepository.findById(questionId)).thenReturn(Optional.of(question));
         when(sondageReponseRepository.save(any())).thenReturn(savedReponse);
 
         RepondreRequest req = new RepondreRequest();
         RepondreRequest.ReponseDetailRequest detail = new RepondreRequest.ReponseDetailRequest();
         detail.setQuestionId(questionId);
-        detail.setValeurTexte("Réponse");
         req.setReponses(List.of(detail));
 
         sondageService.repondre(PID, SONDAGE_ID, req);
@@ -376,7 +372,6 @@ class SondageServiceTest {
         UUID reponseId = reponse.getId();
         when(sondageReponseRepository.findById(reponseId)).thenReturn(Optional.of(reponse));
         when(sondageReponseRepository.save(any())).thenReturn(reponse);
-        when(sondageRepository.findByIdForUpdate(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
         when(sondageRepository.save(any())).thenReturn(sondageAvecSeuil70);
 
         sondageService.validerPreuve(reponseId, true);
@@ -398,7 +393,6 @@ class SondageServiceTest {
         UUID reponseId = reponse.getId();
         when(sondageReponseRepository.findById(reponseId)).thenReturn(Optional.of(reponse));
         when(sondageReponseRepository.save(any())).thenReturn(reponse);
-        when(sondageRepository.findByIdForUpdate(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
 
         sondageService.validerPreuve(reponseId, false);
 
@@ -411,7 +405,7 @@ class SondageServiceTest {
     // ── cloturerExpires ───────────────────────────────────────────────────────
 
     @Test
-    void cloturerExpires_sansDecisionEnAttente_clotureDefinitivement() {
+    void cloturerExpires_sondageExpire_passeEnAttenteDistribution() {
         Sondage expireCeJour = Sondage.builder()
                 .id(UUID.randomUUID())
                 .statut(StatutSondage.ACTIF)
@@ -425,8 +419,8 @@ class SondageServiceTest {
 
         sondageService.cloturerExpires();
 
-        assertEquals(StatutSondage.CLOTURE, expireCeJour.getStatut());
-        verify(sondageRepository, times(2)).save(expireCeJour);
+        assertEquals(StatutSondage.EN_ATTENTE_DISTRIBUTION, expireCeJour.getStatut());
+        verify(sondageRepository).save(expireCeJour);
     }
 
     @Test
@@ -452,7 +446,7 @@ class SondageServiceTest {
     }
 
     private void stubRedisLibre() {
-        lenient().when(redisService.aDejaVote(SONDAGE_ID, PID)).thenReturn(false);
+        when(redisService.aDejaVote(SONDAGE_ID, PID)).thenReturn(false);
                 lenient().when(redisService.marquerVoteSiAbsent(eq(SONDAGE_ID), eq(PID), anyLong())).thenReturn(true);
     }
 
@@ -463,9 +457,6 @@ class SondageServiceTest {
                 .statut(StatutSondage.BROUILLON)
                 .niveauVerification(NiveauVerification.AUCUN)
                 .modeDistribution(ModeDistribution.AUTO)
-                .quotaVise(10)
-                .recompense(BigDecimal.TEN)
-                .dateExpiration(LocalDateTime.now().plusDays(7))
                 .build();
     }
 
