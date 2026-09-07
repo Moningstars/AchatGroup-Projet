@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Loader2, ShoppingBag, ClipboardList, ChevronRight, PackageCheck, AlertTriangle } from 'lucide-react'
 import { confirmerReceptionOpportunite, getMesParticipationsOpportunites, getMesParticipationsSondages, imgUrl } from '../services/api'
+import { formatMontant } from '../utils/format'
 
-function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
+const fmt = formatMontant
 
 function fmtDate(dt) {
   if (!dt) return '—'

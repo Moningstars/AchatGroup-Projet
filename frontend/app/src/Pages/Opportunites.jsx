@@ -4,13 +4,14 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { getOpportunites, getSondages, getBannieres, imgUrl } from '../services/api'
 import ProductCard from '../components/ProductCard'
 import { useSSE } from '../hooks/useSSE'
+import { formatMontant } from '../utils/format'
 
 const CATS = [
   'Tout', 'Mode', 'Électronique', 'Alimentaire', 'Maison',
   'Beauté', 'Informatique', 'Véhicules', 'Mobilier', 'Sport'
 ]
 
-function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
+const fmt = formatMontant
 function formatDate(dt) {
   if (!dt) return null
   const d = new Date(dt)

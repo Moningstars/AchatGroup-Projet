@@ -10,8 +10,9 @@ import { useCountdown } from '../hooks/useCountdown'
 import { useSSE } from '../hooks/useSSE'
 import ProductCard from '../components/ProductCard'
 import { calculerProgression } from '../utils/progression'
+import { formatMontant } from '../utils/format'
 
-function fmt(val) { return Number(val || 0).toLocaleString('fr-FR') }
+const fmt = formatMontant
 function pad(n) { return String(n).padStart(2, '0') }
 
 function WhatsAppLogo({ className = 'h-5 w-5' }) {

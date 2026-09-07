@@ -4,8 +4,9 @@ import { Loader2 } from 'lucide-react'
 import { getSondages, getBannieres, imgUrl } from '../services/api'
 import PageCarousel from '../components/PageCarousel'
 import { useSSE } from '../hooks/useSSE'
+import { formatMontant } from '../utils/format'
 
-function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
+const fmt = formatMontant
 
 
 function formatDate(dt) {

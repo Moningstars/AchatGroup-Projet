@@ -11,13 +11,12 @@ import {
 } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useSSE } from '../hooks/useSSE'
+import { formatMontant } from '../utils/format'
 
 function formatDate(dt) {
   if (!dt) return '—'
   return new Date(dt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
 }
-function formatMontant(n) { return Number(n || 0).toLocaleString('fr-FR') }
-
 // ─── Composant question ───────────────────────────────────────────────────────
 
 function QuestionField({ q, value, onChange }) {

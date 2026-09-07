@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Loader2, X, CheckCircle2, AlertCircle, Smartphone, FlaskConical } from 'lucide-react'
 import { initierRechargePaygate, getPaygateMode } from '../services/api'
+import { formatMontant } from '../utils/format'
 
 const NETWORKS = [
   { value: 'FLOOZ', label: 'Moov Money (FLOOZ)', icon: '🟠', color: 'orange' },
@@ -169,7 +170,7 @@ export default function RechargeModal({ open, onClose, onSuccess }) {
                           : 'bg-gray-50 text-gray-500 border-gray-100 hover:border-gray-300'
                       }`}
                     >
-                      {a.toLocaleString('fr-FR')}
+                      {formatMontant(a)}
                     </button>
                   ))}
                 </div>
@@ -201,7 +202,7 @@ export default function RechargeModal({ open, onClose, onSuccess }) {
               >
                 {loading
                   ? <Loader2 size={18} className="animate-spin" />
-                  : <>Payer {montant ? `${Number(montant).toLocaleString('fr-FR')} FCFA` : ''} →</>
+                  : <>Payer {montant ? `${formatMontant(montant)} FCFA` : ''} →</>
                 }
               </button>
             </div>

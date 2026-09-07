@@ -1,10 +1,11 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { usePusher } from './PusherContext'
 import { useAuth } from './AuthContext'
+import { formatMontant } from '../utils/format'
 
 const NotificationsContext = createContext(null)
 
-function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
+const fmt = formatMontant
 
 // Raisons de wallet.credited/wallet.debited qui n'ont pas déjà leur propre notification
 // spécifique (RECOMPENSE a son propre événement Pusher "RECOMPENSE").

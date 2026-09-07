@@ -2,8 +2,9 @@ import { Link } from 'react-router-dom'
 import { imgUrl } from '../services/api'
 import { calculerProgression } from '../utils/progression'
 import { useCountdown } from '../hooks/useCountdown'
+import { formatMontant } from '../utils/format'
 
-function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
+const fmt = formatMontant
 
 function CountdownBadge({ dateExpiration }) {
   const countdown = useCountdown(dateExpiration, 60_000)

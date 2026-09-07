@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { formatMontant } from '../utils/format'
 
 export default function ConversionModal({ open, onClose, points, onConvert }) {
   const [amount, setAmount] = useState('')
@@ -30,7 +31,7 @@ export default function ConversionModal({ open, onClose, points, onConvert }) {
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg">
         <h4 className="mb-2 text-lg font-semibold">Convertir des points</h4>
         <p className="mb-4 text-sm text-slate-600">
-          Vous avez <span className="font-semibold">{points.toLocaleString('fr-FR')}</span> points disponibles.
+          Vous avez <span className="font-semibold">{formatMontant(points)}</span> points disponibles.
         </p>
 
         <label className="mb-2 block text-sm font-medium text-slate-700">Points à convertir</label>
