@@ -67,6 +67,7 @@ export const souscrire = (id, quantite = 1, options = {}) =>
       parrainId: options.parrainId || undefined,
       utiliserPoints: Boolean(options.utiliserPoints),
     },
+    headers: options.idempotencyKey ? { 'Idempotency-Key': options.idempotencyKey } : undefined,
   }).then((r) => r.data)
 
 export const getMesParticipationsOpportunites = () =>

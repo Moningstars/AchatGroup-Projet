@@ -1,10 +1,13 @@
 package com.plateformeopportunites.identity.controller;
 
 import com.plateformeopportunites.common.enums.StatutCommanditaire;
+import com.plateformeopportunites.identity.dto.AlimenterCommanditaireRequest;
 import com.plateformeopportunites.identity.dto.CommanditaireResponse;
 import com.plateformeopportunites.identity.dto.CreerCommanditaireRequest;
+import com.plateformeopportunites.identity.dto.MouvementCommanditaireResponse;
 import com.plateformeopportunites.identity.entity.Commanditaire;
 import com.plateformeopportunites.identity.repository.CommanditaireRepository;
+import com.plateformeopportunites.identity.service.CommanditaireHistoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +23,7 @@ import java.util.UUID;
 public class AdminCommanditaireController {
 
     private final CommanditaireRepository commanditaireRepository;
+    private final CommanditaireHistoryService commanditaireHistoryService;
 
     @GetMapping
     public ResponseEntity<List<CommanditaireResponse>> lister() {
@@ -62,6 +66,20 @@ public class AdminCommanditaireController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
+    @PostMapping("/{id}/alimentations")
+    public ResponseEntity<CommanditaireResponse> alimenter(@PathVariable UUID id,
+                                                            @Valid @RequestBody AlimenterCommanditaireRequest request) {
+        return commanditaireRepository.findById(id)
+                .map(commanditaire -> ResponseEntity.ok(toResponse(commanditaireHistoryService.alimenter(id, request))))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/{id}/mouvements")
+    public ResponseEntity<List<MouvementCommanditaireResponse>> mouvements(@PathVariable UUID id) {
+        if (!commanditaireRepository.existsById(id)) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(commanditaireHistoryService.mouvements(id));
+    }
+
     private CommanditaireResponse toResponse(Commanditaire c) {
         return CommanditaireResponse.builder()
                 .id(c.getId())
@@ -71,6 +89,13 @@ public class AdminCommanditaireController {
                 .email(c.getEmail())
                 .telephone(c.getTelephone())
                 .statut(c.getStatut())
+                .soldeDisponible(c.getSoldeDisponible())
+                .soldeReserve(c.getSoldeReserve())
+                .totalAlimente(c.getTotalAlimente())
+                .totalDistribue(c.getTotalDistribue())
+                .motifStatut(c.getMotifStatut())
+                .createdAt(c.getCreatedAt())
+                .updatedAt(c.getUpdatedAt())
                 .build();
     }
 }

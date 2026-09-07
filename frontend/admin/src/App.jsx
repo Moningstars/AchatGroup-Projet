@@ -11,6 +11,7 @@ import Fournisseurs, { NouveauFournisseurPage } from './Pages/Fournisseurs'
 import Parametres from './Pages/Parametres'
 import Kyc from './Pages/Kyc'
 import Bannieres, { BanniereEditorPage } from './Pages/Bannieres'
+import JournalActivite from './Pages/JournalActivite'
 import Login from './Pages/Login'
 import { useBeams } from './hooks/useBeams'
 import './App.css'
@@ -52,6 +53,7 @@ function App() {
           <Route path="bannieres/:id/modifier" element={<BanniereEditorPage />} />
           <Route path="kyc" element={<Kyc />} />
           <Route path="parametres" element={<Parametres />} />
+          <Route path="journal-activite" element={<JournalActivite />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -29,6 +29,7 @@
         <module>finance</module>
         <module>opportunite</module>
         <module>sondage</module>
+        <module>audit</module>
         <module>app</module>
     </modules>
 
@@ -74,6 +75,11 @@
             <dependency>
                 <groupId>com.plateformeopportunites</groupId>
                 <artifactId>sondage</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.plateformeopportunites</groupId>
+                <artifactId>audit</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

@@ -48,6 +48,10 @@
             <groupId>com.plateformeopportunites</groupId>
             <artifactId>sondage</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.plateformeopportunites</groupId>
+            <artifactId>audit</artifactId>
+        </dependency>
 
         <!-- Runtime -->
         <dependency>

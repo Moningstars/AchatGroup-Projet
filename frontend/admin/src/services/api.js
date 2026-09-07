@@ -147,6 +147,12 @@ export const activerCommanditaire = (id) =>
 export const suspendreCommanditaire = (id) =>
   api.patch(`/admin/commanditaires/${id}/suspendre`).then(r => r.data)
 
+export const alimenterCommanditaire = (id, data) =>
+  api.post(`/admin/commanditaires/${id}/alimentations`, data).then(r => r.data)
+
+export const getCommanditaireMouvements = (id) =>
+  api.get(`/admin/commanditaires/${id}/mouvements`).then(r => r.data)
+
 // Fournisseurs d'opportunités (admin)
 export const getAdminFournisseurs = () =>
   api.get('/admin/fournisseurs').then(r => r.data)
@@ -163,6 +169,12 @@ export const suspendreFournisseur = (id) =>
 // Stats admin
 export const getAdminStats = () =>
   api.get('/admin/stats').then(r => r.data)
+
+export const getAuditLogs = (params = {}) =>
+  api.get('/admin/audit-logs', { params }).then(r => r.data)
+
+export const getAuditStats = () =>
+  api.get('/admin/audit-logs/stats').then(r => r.data)
 
 // Wallet plateforme (admin)
 export const getAdminWallet = () =>

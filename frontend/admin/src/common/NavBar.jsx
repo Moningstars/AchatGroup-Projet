@@ -15,6 +15,7 @@ const iconMap = {
     "Bannières": IconBanniere,
     "KYC": IconKyc,
     "Paramètres": IconSettings,
+    "Journal d’activité": IconSettings,
 }
 
 function SidebarItem({ label, to, onNavigate }) {

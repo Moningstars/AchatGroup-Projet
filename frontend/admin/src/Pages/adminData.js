@@ -29,6 +29,7 @@ export const menuSections = [
     items: [
       { label: 'KYC', path: 'kyc' },
       { label: 'Paramètres', path: 'parametres' },
+      { label: 'Journal d’activité', path: 'journal-activite' },
     ],
   },
 ]

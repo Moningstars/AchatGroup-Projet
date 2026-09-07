@@ -47,8 +47,9 @@ public class OpportuniteController {
                                           @PathVariable UUID id,
                                           @RequestParam(defaultValue = "1") @Min(1) Integer quantite,
                                           @RequestParam(required = false) UUID parrainId,
-                                          @RequestParam(defaultValue = "false") boolean utiliserPoints) {
-        opportuniteService.souscrire(UUID.fromString(auth.getName()), id, quantite, parrainId, utiliserPoints);
+                                          @RequestParam(defaultValue = "false") boolean utiliserPoints,
+                                          @RequestHeader(value = "Idempotency-Key", required = false) UUID requestId) {
+        opportuniteService.souscrire(UUID.fromString(auth.getName()), id, quantite, parrainId, utiliserPoints, requestId);
         return ResponseEntity.ok().build();
     }
 

@@ -81,8 +81,33 @@ CREATE TABLE public.commanditaires (
     societe character varying(255),
     statut character varying(255) NOT NULL,
     telephone character varying(255) NOT NULL,
+    solde_disponible numeric(15,2) DEFAULT 0 NOT NULL,
+    solde_reserve numeric(15,2) DEFAULT 0 NOT NULL,
+    total_alimente numeric(15,2) DEFAULT 0 NOT NULL,
+    total_distribue numeric(15,2) DEFAULT 0 NOT NULL,
+    motif_statut text,
+    created_at timestamp(6) without time zone,
+    updated_at timestamp(6) without time zone,
+    statut_changed_at timestamp(6) without time zone,
     CONSTRAINT commanditaires_statut_check CHECK (((statut)::text = ANY ((ARRAY['ACTIF'::character varying, 'SUSPENDU'::character varying, 'EN_ATTENTE'::character varying])::text[])))
 );
+
+CREATE TABLE public.mouvements_commanditaire (
+    id uuid NOT NULL,
+    commanditaire_id uuid NOT NULL,
+    type character varying(32) NOT NULL,
+    montant numeric(15,2) NOT NULL,
+    solde_apres numeric(15,2) NOT NULL,
+    sondage_id uuid,
+    reference character varying(255),
+    description text,
+    created_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT mouvements_commanditaire_pkey PRIMARY KEY (id),
+    CONSTRAINT fk_mouvement_commanditaire FOREIGN KEY (commanditaire_id) REFERENCES public.commanditaires(id)
+);
+
+CREATE INDEX idx_mvt_commanditaire_date ON public.mouvements_commanditaire (commanditaire_id, created_at);
+CREATE INDEX idx_mvt_commanditaire_sondage ON public.mouvements_commanditaire (sondage_id);
 
 
 --
@@ -310,6 +335,44 @@ CREATE TABLE public.tentatives_souscription (
 
 CREATE INDEX tentatives_souscription_created_idx ON public.tentatives_souscription (created_at DESC);
 CREATE INDEX tentatives_souscription_opportunite_idx ON public.tentatives_souscription (opportunite_id);
+
+-- Clé rejouable pour éviter un double débit lors d'un retry HTTP.
+CREATE TABLE public.souscriptions_idempotence (
+    request_id uuid NOT NULL,
+    utilisateur_id uuid NOT NULL,
+    opportunite_id uuid NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT souscriptions_idempotence_pkey PRIMARY KEY (request_id)
+);
+
+CREATE INDEX souscriptions_idempotence_created_idx
+    ON public.souscriptions_idempotence USING btree (created_at);
+
+CREATE TABLE public.audit_logs (
+    id uuid NOT NULL,
+    occurred_at timestamp(6) with time zone NOT NULL,
+    actor_id character varying(100) NOT NULL,
+    actor_type character varying(30) NOT NULL,
+    action character varying(80) NOT NULL,
+    module character varying(60) NOT NULL,
+    http_method character varying(10) NOT NULL,
+    path character varying(500) NOT NULL,
+    resource_type character varying(80),
+    resource_id character varying(100),
+    status_code integer NOT NULL,
+    success boolean NOT NULL,
+    ip_address character varying(45),
+    user_agent character varying(500),
+    correlation_id character varying(100) NOT NULL,
+    duration_ms bigint NOT NULL,
+    description character varying(500),
+    CONSTRAINT audit_logs_pkey PRIMARY KEY (id)
+);
+
+CREATE INDEX idx_audit_occurred_at ON public.audit_logs (occurred_at);
+CREATE INDEX idx_audit_actor_id ON public.audit_logs (actor_id);
+CREATE INDEX idx_audit_module ON public.audit_logs (module);
+CREATE INDEX idx_audit_action ON public.audit_logs (action);
 
 
 --

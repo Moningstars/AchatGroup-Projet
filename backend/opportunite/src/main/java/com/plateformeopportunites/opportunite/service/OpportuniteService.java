@@ -28,12 +28,14 @@ import com.plateformeopportunites.opportunite.entity.Opportunite;
 import com.plateformeopportunites.opportunite.entity.OpportuniteImage;
 import com.plateformeopportunites.opportunite.entity.PalierPrix;
 import com.plateformeopportunites.opportunite.entity.Participation;
+import com.plateformeopportunites.opportunite.entity.SouscriptionIdempotence;
 import com.plateformeopportunites.opportunite.entity.Categorie;
 import com.plateformeopportunites.opportunite.repository.CategorieRepository;
 import com.plateformeopportunites.opportunite.repository.OpportuniteImageRepository;
 import com.plateformeopportunites.opportunite.repository.OpportuniteRepository;
 import com.plateformeopportunites.opportunite.repository.PalierPrixRepository;
 import com.plateformeopportunites.opportunite.repository.ParticipationRepository;
+import com.plateformeopportunites.opportunite.repository.SouscriptionIdempotenceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -62,6 +64,7 @@ public class OpportuniteService {
     private final ApplicationEventPublisher eventPublisher;
     private final RedisService redisService;
     private final PusherNotificationService pusherNotificationService;
+    private final SouscriptionIdempotenceRepository souscriptionIdempotenceRepository;
 
     @Transactional
     public OpportuniteResponse creer(UUID adminId, CreerOpportuniteRequest req) {
@@ -434,11 +437,20 @@ public class OpportuniteService {
 
     @Transactional
     public void souscrire(UUID participantId, UUID opportuniteId, Integer quantite) {
-        souscrire(participantId, opportuniteId, quantite, null, false);
+        souscrire(participantId, opportuniteId, quantite, null, false, null);
     }
 
     @Transactional
     public void souscrire(UUID participantId, UUID opportuniteId, Integer quantite, UUID parrainId, boolean utiliserPoints) {
+        souscrire(participantId, opportuniteId, quantite, parrainId, utiliserPoints, null);
+    }
+
+    @Transactional
+    public void souscrire(UUID participantId, UUID opportuniteId, Integer quantite, UUID parrainId,
+                          boolean utiliserPoints, UUID requestId) {
+        if (requestId != null && souscriptionIdempotenceRepository.existsById(requestId)) {
+            return;
+        }
         if (quantite == null || quantite <= 0) {
             throw new IllegalArgumentException("La quantité doit être supérieure ou égale à 1");
         }
@@ -458,6 +470,15 @@ public class OpportuniteService {
 
         Utilisateur utilisateur = utilisateurRepository.findById(participantId)
                 .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable"));
+
+        if (requestId != null) {
+            souscriptionIdempotenceRepository.save(SouscriptionIdempotence.builder()
+                .requestId(requestId)
+                .utilisateurId(participantId)
+                .opportuniteId(opportuniteId)
+                .createdAt(LocalDateTime.now())
+                .build());
+        }
 
         Participation participationExistante = participationRepository
                 .findByUtilisateurIdAndOpportuniteId(participantId, opportuniteId)
