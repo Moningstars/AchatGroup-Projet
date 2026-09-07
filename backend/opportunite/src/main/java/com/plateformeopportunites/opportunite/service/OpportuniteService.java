@@ -1,21 +1,27 @@
 package com.plateformeopportunites.opportunite.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import com.plateformeopportunites.common.enums.ModePlafond;
 import com.plateformeopportunites.common.enums.StatutOpportunite;
 import org.springframework.security.access.prepost.PreAuthorize;
 import com.plateformeopportunites.common.enums.StatutLivraison;
 import com.plateformeopportunites.common.enums.StatutParticipation;
 import com.plateformeopportunites.common.event.QuotaAtteintEvent;
-import com.plateformeopportunites.common.event.RemboursementEvent;
+
 import com.plateformeopportunites.common.event.SseNotificationEvent;
 import com.plateformeopportunites.common.redis.RedisService;
 import com.plateformeopportunites.common.service.PusherNotificationService;
 import com.plateformeopportunites.finance.service.WalletService;
 import com.plateformeopportunites.identity.entity.Administrateur;
-import com.plateformeopportunites.identity.entity.Commanditaire;
+import com.plateformeopportunites.identity.entity.Fournisseur;
 import com.plateformeopportunites.identity.entity.Utilisateur;
 import com.plateformeopportunites.identity.repository.AdministrateurRepository;
-import com.plateformeopportunites.identity.repository.CommanditaireRepository;
+import com.plateformeopportunites.identity.repository.FournisseurRepository;
 import com.plateformeopportunites.identity.repository.UtilisateurRepository;
+import com.plateformeopportunites.opportunite.dto.ChampFormulaireComplementaire;
 import com.plateformeopportunites.opportunite.dto.CreerOpportuniteRequest;
 import com.plateformeopportunites.opportunite.dto.ConfirmerReceptionRequest;
 import com.plateformeopportunites.opportunite.dto.MaParticipationOpportuniteResponse;
@@ -44,8 +50,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -55,16 +63,17 @@ public class OpportuniteService {
     private final OpportuniteRepository opportuniteRepository;
     private final PalierPrixRepository palierPrixRepository;
     private final ParticipationRepository participationRepository;
+    private final SouscriptionIdempotenceRepository souscriptionIdempotenceRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final AdministrateurRepository administrateurRepository;
-    private final CommanditaireRepository commanditaireRepository;
+    private final FournisseurRepository fournisseurRepository;
     private final OpportuniteImageRepository imageRepository;
     private final CategorieRepository categorieRepository;
     private final WalletService walletService;
     private final ApplicationEventPublisher eventPublisher;
     private final RedisService redisService;
     private final PusherNotificationService pusherNotificationService;
-    private final SouscriptionIdempotenceRepository souscriptionIdempotenceRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional
     public OpportuniteResponse creer(UUID adminId, CreerOpportuniteRequest req) {
@@ -74,20 +83,27 @@ public class OpportuniteService {
 
         Categorie categorie = null;
         if (req.getCategorie() != null && !req.getCategorie().isBlank()) {
-            categorie = categorieRepository.findByNom(req.getCategorie())
+            String nomCategorie = req.getCategorie().trim();
+            categorie = categorieRepository.findByNomIgnoreCase(nomCategorie)
                     .orElseGet(() -> categorieRepository.save(
-                            Categorie.builder().nom(req.getCategorie()).build()));
+                            Categorie.builder().nom(nomCategorie).build()));
         }
 
         StatutOpportunite statut = req.isActif() ? StatutOpportunite.ACTIVE : StatutOpportunite.BROUILLON;
-        Commanditaire commanditaire = trouverCommanditaire(req.getCommanditaireId());
+        Fournisseur fournisseur = trouverFournisseur(req.getFournisseurId());
         String partenaireNom = nettoyer(req.getPartenaireNom());
         String partenaireContact = nettoyer(req.getPartenaireContact());
-        if (commanditaire != null) {
-            if (partenaireNom == null) partenaireNom = nomPublicCommanditaire(commanditaire);
-            if (partenaireContact == null) partenaireContact = contactCommanditaire(commanditaire);
+        String partenaireLogoUrl = nettoyer(req.getPartenaireLogoUrl());
+        String partenaireReseauxUrl = nettoyer(req.getPartenaireReseauxUrl());
+        if (fournisseur != null) {
+            if (partenaireNom == null) partenaireNom = nomPublicFournisseur(fournisseur);
+            if (partenaireContact == null) partenaireContact = contactFournisseur(fournisseur);
+            if (partenaireLogoUrl == null) partenaireLogoUrl = nettoyer(fournisseur.getLogoUrl());
+            if (partenaireReseauxUrl == null) partenaireReseauxUrl = nettoyer(fournisseur.getReseauxUrl());
         }
 
+        ModePlafond modePlafond = modePlafond(req.getModePlafond(), req.getSeuilMaximal());
+        Integer seuilMaximal = modePlafond == ModePlafond.PLAFONNE ? req.getSeuilMaximal() : null;
         Opportunite opportunite = Opportunite.builder()
                 .admin(admin)
                 .categorie(categorie)
@@ -98,17 +114,19 @@ public class OpportuniteService {
                 .specsFinePrint(req.getSpecsFinePrint())
                 .prixNormal(req.getPrixNormal())
                 .seuilMinimum(req.getSeuilMinimum())
-                .seuilMaximal(req.getSeuilMaximal())
-                .commanditaireId(req.getCommanditaireId())
+                .seuilMaximal(seuilMaximal)
+                .modePlafond(modePlafond)
+                .fournisseurId(req.getFournisseurId())
                 .partenaireNom(partenaireNom)
-                .partenaireLogoUrl(nettoyer(req.getPartenaireLogoUrl()))
+                .partenaireLogoUrl(partenaireLogoUrl)
                 .partenaireContact(partenaireContact)
-                .partenaireReseauxUrl(nettoyer(req.getPartenaireReseauxUrl()))
+                .partenaireReseauxUrl(partenaireReseauxUrl)
                 .montantDuPartenaire(valeurPositiveOuZero(req.getMontantDuPartenaire()))
                 .montantPayePartenaire(valeurPositiveOuZero(req.getMontantPayePartenaire()))
                 .delaiConfirmationReceptionJours(req.getDelaiConfirmationReceptionJours() == null ? 3 : req.getDelaiConfirmationReceptionJours())
                 .messageNotificationLivraison(nettoyer(req.getMessageNotificationLivraison()))
                 .messagePartage(nettoyer(req.getMessagePartage()))
+                .formulaireComplementaire(encoderFormulaireComplementaire(req.getFormulaireComplementaire()))
                 .dateExpiration(req.getDateExpiration())
                 .statut(statut)
                 .participantsActuels(0)
@@ -118,7 +136,9 @@ public class OpportuniteService {
         validerPaliers(req.getPaliers());
         int maxPalier = req.getPaliers().stream()
                 .mapToInt(CreerOpportuniteRequest.PalierPrixRequest::getSeuilMax).max().orElse(0);
-        validerSeuilMaximal(req.getSeuilMaximal(), req.getSeuilMinimum(), maxPalier);
+        validerSeuilMaximal(modePlafond, seuilMaximal, req.getSeuilMinimum(), maxPalier);
+        validerSeuilMinimumPlafonne(modePlafond, req.getSeuilMinimum(), req.getPaliers().stream()
+            .map(CreerOpportuniteRequest.PalierPrixRequest::getSeuilMax).toList());
 
         for (CreerOpportuniteRequest.PalierPrixRequest p : req.getPaliers()) {
             palierPrixRepository.save(PalierPrix.builder()
@@ -172,6 +192,15 @@ public class OpportuniteService {
     }
 
     @Transactional(readOnly = true)
+    public OpportuniteResponse getActiveById(UUID id) {
+        Opportunite opportunite = getOpportunite(id);
+        if (opportunite.getStatut() != StatutOpportunite.ACTIVE) {
+            throw new IllegalArgumentException("Opportunité introuvable ou indisponible");
+        }
+        return toResponse(opportunite);
+    }
+
+    @Transactional(readOnly = true)
     public List<MaParticipationOpportuniteResponse> listerMesParticipations(UUID utilisateurId) {
         return participationRepository.findByUtilisateurIdFetch(utilisateurId)
                 .stream()
@@ -201,6 +230,7 @@ public class OpportuniteService {
                             .transporteur(p.getTransporteur())
                             .referenceLivraison(p.getReferenceLivraison())
                             .commentaireParticipantLivraison(p.getCommentaireParticipantLivraison())
+                            .reponsesComplementaires(lireReponsesComplementaires(p.getReponsesComplementaires()))
                             .createdAt(p.getCreatedAt())
                             .dateExpiration(op.getDateExpiration())
                             .statutOpportunite(op.getStatut())
@@ -240,6 +270,7 @@ public class OpportuniteService {
                         .adresseLivraison(p.getAdresseLivraison())
                         .noteLivraison(p.getNoteLivraison())
                         .commentaireParticipantLivraison(p.getCommentaireParticipantLivraison())
+                        .reponsesComplementaires(lireReponsesComplementaires(p.getReponsesComplementaires()))
                         .createdAt(p.getCreatedAt())
                         .build())
                 .toList();
@@ -247,10 +278,14 @@ public class OpportuniteService {
 
     @Transactional
     public List<ParticipantOpportuniteResponse> planifierParticipants(UUID opportuniteId, PlanifierParticipantsRequest req) {
-        List<Participation> participations = participationRepository.findAllById(req.getParticipationIds());
-        if (participations.size() != req.getParticipationIds().size()) {
-            throw new IllegalArgumentException("Une ou plusieurs participations sont introuvables");
+        List<UUID> participationIds = req.getParticipationIds().stream().distinct().toList();
+        if (participationIds.size() != req.getParticipationIds().size()) {
+            throw new IllegalArgumentException("La liste contient des participations en double");
         }
+        List<Participation> participations = participationIds.stream()
+                .map(id -> participationRepository.findByIdForUpdate(id)
+                        .orElseThrow(() -> new IllegalArgumentException("Une ou plusieurs participations sont introuvables")))
+                .toList();
         for (Participation p : participations) {
             if (!p.getOpportunite().getId().equals(opportuniteId)) {
                 throw new IllegalArgumentException("Une participation ne correspond pas à cette opportunité");
@@ -264,13 +299,19 @@ public class OpportuniteService {
 
     @Transactional
     public List<ParticipantOpportuniteResponse> mettreAJourLivraison(UUID opportuniteId, MettreAJourLivraisonRequest req) {
-        List<Participation> participations = participationRepository.findAllById(req.getParticipationIds());
-        if (participations.size() != req.getParticipationIds().size()) {
-            throw new IllegalArgumentException("Une ou plusieurs participations sont introuvables");
+        List<UUID> participationIds = req.getParticipationIds().stream().distinct().toList();
+        if (participationIds.size() != req.getParticipationIds().size()) {
+            throw new IllegalArgumentException("La liste contient des participations en double");
         }
+        List<Participation> participations = participationIds.stream()
+                .map(id -> participationRepository.findByIdForUpdate(id)
+                        .orElseThrow(() -> new IllegalArgumentException("Une ou plusieurs participations sont introuvables")))
+                .toList();
 
         LocalDateTime now = LocalDateTime.now();
         for (Participation p : participations) {
+            LocalDateTime dateLivraisonAvant = p.getDateLivraisonPrevue();
+            boolean passageAutomatiqueEnLivraison = false;
             if (!p.getOpportunite().getId().equals(opportuniteId)) {
                 throw new IllegalArgumentException("Une participation ne correspond pas à cette opportunité");
             }
@@ -291,7 +332,7 @@ public class OpportuniteService {
             if (req.getCreneauTraitement() != null) {
                 p.setCreneauTraitement(req.getCreneauTraitement());
             }
-            if (req.getDateLivraisonPrevue() != null) {
+            if (req.getDateLivraisonPrevue() != null && !req.getDateLivraisonPrevue().equals(dateLivraisonAvant)) {
                 if (req.getDateLivraisonPrevue().isBefore(now)) {
                     throw new IllegalArgumentException("La date promise au participant doit être future");
                 }
@@ -312,20 +353,33 @@ public class OpportuniteService {
             if (req.getNoteLivraison() != null) {
                 p.setNoteLivraison(req.getNoteLivraison().isBlank() ? null : req.getNoteLivraison().trim());
             }
+
+            // L'accord du fournisseur + une date promise constituent un événement
+            // suffisamment fiable pour annoncer automatiquement la livraison au client.
+            if (statutLivraisonOuDefaut(p) == StatutLivraison.PRET_LIVRAISON
+                    && p.getDateLivraisonPrevue() != null) {
+                appliquerStatutLivraison(p, StatutLivraison.EN_LIVRAISON, now);
+                passageAutomatiqueEnLivraison = true;
+            }
             participationRepository.save(p);
 
-            if (req.getDateLivraisonPrevue() != null) {
+            boolean datePromiseModifiee = req.getDateLivraisonPrevue() != null
+                    && !req.getDateLivraisonPrevue().equals(dateLivraisonAvant);
+            if ((datePromiseModifiee || passageAutomatiqueEnLivraison)
+                    && statutLivraisonOuDefaut(p) == StatutLivraison.EN_LIVRAISON) {
                 String message = p.getOpportunite().getMessageNotificationLivraison();
                 if (message == null || message.isBlank()) {
                     message = "Votre commande pour « " + p.getOpportunite().getTitre()
-                            + " » a été validée. Livraison prévue le " + req.getDateLivraisonPrevue().toLocalDate() + ".";
+                            + " » a été validée. Livraison prévue le " + p.getDateLivraisonPrevue().toLocalDate() + ".";
                 }
-                pusherNotificationService.notifierUtilisateur(p.getUtilisateur().getId(), "LIVRAISON_PLANIFIEE", Map.of(
-                        "opportuniteId", opportuniteId,
-                        "participationId", p.getId(),
-                        "dateLivraisonPrevue", req.getDateLivraisonPrevue().toString(),
-                        "message", message
-                ));
+                String messageFinal = message;
+                notifierApresCommit(() -> pusherNotificationService.notifierUtilisateur(
+                        p.getUtilisateur().getId(), "LIVRAISON_PLANIFIEE", Map.of(
+                                "opportuniteId", opportuniteId,
+                                "participationId", p.getId(),
+                                "dateLivraisonPrevue", p.getDateLivraisonPrevue().toString(),
+                                "message", messageFinal
+                        )));
             }
         }
         return listerParticipants(opportuniteId);
@@ -333,7 +387,7 @@ public class OpportuniteService {
 
     @Transactional
     public MaParticipationOpportuniteResponse confirmerReception(UUID utilisateurId, UUID participationId, ConfirmerReceptionRequest req) {
-        Participation participation = participationRepository.findById(participationId)
+        Participation participation = participationRepository.findByIdForUpdate(participationId)
                 .orElseThrow(() -> new IllegalArgumentException("Participation introuvable"));
         if (!participation.getUtilisateur().getId().equals(utilisateurId)) {
             throw new IllegalArgumentException("Cette participation n'appartient pas à l'utilisateur connecté");
@@ -356,12 +410,70 @@ public class OpportuniteService {
             participation.setStatutLivraison(StatutLivraison.LITIGE);
         }
         participationRepository.save(participation);
+        Map<String, Object> payload = Map.of(
+                "opportuniteId", participation.getOpportunite().getId(),
+                "participationId", participation.getId(),
+                "utilisateurId", utilisateurId,
+                "recu", recu,
+                "statut", participation.getStatutLivraison().name()
+        );
+        String payloadSse = "{\"opportuniteId\":\"" + participation.getOpportunite().getId()
+                + "\",\"participationId\":\"" + participation.getId()
+                + "\",\"utilisateurId\":\"" + utilisateurId
+                + "\",\"recu\":" + recu
+                + ",\"statut\":\"" + participation.getStatutLivraison().name() + "\"}";
+        eventPublisher.publishEvent(new SseNotificationEvent(this, "admin:global", "RECEPTION_PARTICIPANT", payloadSse));
+        notifierApresCommit(() -> pusherNotificationService.notifierAdmins("RECEPTION_PARTICIPANT", payload));
         return toMaParticipationResponse(participation);
+    }
+
+    /**
+     * À la date promise, le système demande automatiquement au participant de
+     * confirmer la réception. Il ne marque jamais le colis comme reçu à sa place.
+     */
+    @Transactional
+    public int demanderConfirmationsReceptionArrivees() {
+        LocalDateTime now = LocalDateTime.now();
+        List<Participation> arrivees = participationRepository
+                .findByStatutLivraisonAndDateLivraisonPrevueLessThanEqual(StatutLivraison.EN_LIVRAISON, now);
+        for (Participation p : arrivees) {
+            p.setStatutLivraison(StatutLivraison.LIVRE_A_CONFIRMER);
+            participationRepository.save(p);
+            Map<String, Object> payload = Map.of(
+                    "opportuniteId", p.getOpportunite().getId(),
+                    "participationId", p.getId(),
+                    "datePromise", p.getDateLivraisonPrevue().toString(),
+                    "message", "La date de livraison prévue est arrivée. Confirmez la réception ou signalez un problème."
+            );
+            String payloadSse = "{\"opportuniteId\":\"" + p.getOpportunite().getId()
+                    + "\",\"participationId\":\"" + p.getId()
+                    + "\",\"datePromise\":\"" + p.getDateLivraisonPrevue()
+                    + "\",\"message\":\"La date de livraison prévue est arrivée. Confirmez la réception ou signalez un problème.\"}";
+            eventPublisher.publishEvent(new SseNotificationEvent(this, "user:" + p.getUtilisateur().getId(), "CONFIRMATION_RECEPTION_REQUISE", payloadSse));
+            notifierApresCommit(() -> pusherNotificationService.notifierUtilisateur(
+                    p.getUtilisateur().getId(), "CONFIRMATION_RECEPTION_REQUISE", payload));
+        }
+        return arrivees.size();
     }
 
     @Transactional
     public OpportuniteResponse modifier(UUID opportuniteId, ModifierOpportuniteRequest req) {
-        Opportunite opp = getOpportunite(opportuniteId);
+        Opportunite opp = getOpportuniteForUpdate(opportuniteId);
+        if (opp.getStatut() == StatutOpportunite.CLOTUREE || opp.getStatut() == StatutOpportunite.ANNULEE) {
+            throw new IllegalStateException("Une opportunité clôturée ou annulée est en lecture seule");
+        }
+        boolean conditionsFinancieresModifiees = req.getPrixNormal() != null
+                || req.getSeuilMinimum() != null
+                || req.getSeuilMaximal() != null
+                || req.getModePlafond() != null
+                || req.getDateExpiration() != null
+                || req.getFournisseurId() != null
+                || (req.getPaliers() != null && !req.getPaliers().isEmpty());
+        if (opp.getStatut() == StatutOpportunite.ACTIVE
+                && opp.getParticipantsActuels() > 0
+                && conditionsFinancieresModifiees) {
+            throw new IllegalStateException("Les prix, seuils, dates et fournisseur sont figés dès la première réservation");
+        }
 
         if (req.getTitre() != null && !req.getTitre().isBlank()) opp.setTitre(req.getTitre());
         if (req.getDescription() != null) opp.setDescription(req.getDescription());
@@ -370,19 +482,28 @@ public class OpportuniteService {
         if (req.getSpecsFinePrint() != null) opp.setSpecsFinePrint(req.getSpecsFinePrint());
         if (req.getPrixNormal() != null) opp.setPrixNormal(req.getPrixNormal());
         if (req.getSeuilMinimum() != null) opp.setSeuilMinimum(req.getSeuilMinimum());
-        if (req.getSeuilMaximal() != null) opp.setSeuilMaximal(req.getSeuilMaximal());
+        if (req.getModePlafond() != null) {
+            opp.setModePlafond(req.getModePlafond());
+            opp.setSeuilMaximal(req.getModePlafond() == ModePlafond.PLAFONNE ? req.getSeuilMaximal() : null);
+        } else if (req.getSeuilMaximal() != null) {
+            opp.setModePlafond(ModePlafond.PLAFONNE);
+            opp.setSeuilMaximal(req.getSeuilMaximal());
+        }
         if (req.getDateExpiration() != null) opp.setDateExpiration(req.getDateExpiration());
         if (req.getCategorie() != null && !req.getCategorie().isBlank()) {
-            Categorie categorie = categorieRepository.findByNom(req.getCategorie())
+            String nomCategorie = req.getCategorie().trim();
+            Categorie categorie = categorieRepository.findByNomIgnoreCase(nomCategorie)
                     .orElseGet(() -> categorieRepository.save(
-                            Categorie.builder().nom(req.getCategorie()).build()));
+                            Categorie.builder().nom(nomCategorie).build()));
             opp.setCategorie(categorie);
         }
-        if (req.getCommanditaireId() != null) {
-            Commanditaire commanditaire = trouverCommanditaire(req.getCommanditaireId());
-            opp.setCommanditaireId(commanditaire.getId());
-            if (req.getPartenaireNom() == null) opp.setPartenaireNom(nomPublicCommanditaire(commanditaire));
-            if (req.getPartenaireContact() == null) opp.setPartenaireContact(contactCommanditaire(commanditaire));
+        if (req.getFournisseurId() != null) {
+            Fournisseur fournisseur = trouverFournisseur(req.getFournisseurId());
+            opp.setFournisseurId(fournisseur.getId());
+            if (req.getPartenaireNom() == null) opp.setPartenaireNom(nomPublicFournisseur(fournisseur));
+            if (req.getPartenaireContact() == null) opp.setPartenaireContact(contactFournisseur(fournisseur));
+            if (req.getPartenaireLogoUrl() == null) opp.setPartenaireLogoUrl(nettoyer(fournisseur.getLogoUrl()));
+            if (req.getPartenaireReseauxUrl() == null) opp.setPartenaireReseauxUrl(nettoyer(fournisseur.getReseauxUrl()));
         }
         if (req.getPartenaireNom() != null) opp.setPartenaireNom(nettoyer(req.getPartenaireNom()));
         if (req.getPartenaireLogoUrl() != null) opp.setPartenaireLogoUrl(nettoyer(req.getPartenaireLogoUrl()));
@@ -398,6 +519,7 @@ public class OpportuniteService {
         if (req.getDelaiConfirmationReceptionJours() != null) opp.setDelaiConfirmationReceptionJours(req.getDelaiConfirmationReceptionJours());
         if (req.getMessageNotificationLivraison() != null) opp.setMessageNotificationLivraison(nettoyer(req.getMessageNotificationLivraison()));
         if (req.getMessagePartage() != null) opp.setMessagePartage(nettoyer(req.getMessagePartage()));
+        if (req.getFormulaireComplementaire() != null) opp.setFormulaireComplementaire(encoderFormulaireComplementaire(req.getFormulaireComplementaire()));
         validerPaiementPartenaire(opp.getMontantDuPartenaire(), opp.getMontantPayePartenaire());
 
         boolean paliersFournis = req.getPaliers() != null && !req.getPaliers().isEmpty();
@@ -405,7 +527,14 @@ public class OpportuniteService {
                 ? req.getPaliers().stream().mapToInt(CreerOpportuniteRequest.PalierPrixRequest::getSeuilMax).max().orElse(0)
                 : palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(opportuniteId)
                         .stream().mapToInt(PalierPrix::getSeuilMax).max().orElse(0);
-        validerSeuilMaximal(opp.getSeuilMaximal(), opp.getSeuilMinimum(), maxPalier);
+        validerSeuilMaximal(modePlafond(opp.getModePlafond(), opp.getSeuilMaximal()), opp.getSeuilMaximal(), opp.getSeuilMinimum(), maxPalier);
+        if (opp.getSeuilMaximal() != null && opp.getSeuilMaximal() < opp.getParticipantsActuels()) {
+            throw new IllegalArgumentException("Le plafond ne peut pas être inférieur aux unités déjà réservées");
+        }
+        if (paliersFournis) {
+            validerSeuilMinimumPlafonne(modePlafond(opp.getModePlafond(), opp.getSeuilMaximal()), opp.getSeuilMinimum(),
+                req.getPaliers().stream().map(CreerOpportuniteRequest.PalierPrixRequest::getSeuilMax).toList());
+        }
 
         opportuniteRepository.save(opp);
 
@@ -427,9 +556,19 @@ public class OpportuniteService {
 
     @Transactional
     public void activer(UUID adminId, UUID opportuniteId) {
-        Opportunite opp = getOpportunite(opportuniteId);
+        Opportunite opp = getOpportuniteForUpdate(opportuniteId);
         if (opp.getStatut() != StatutOpportunite.BROUILLON) {
             throw new IllegalStateException("Seule une opportunité en brouillon peut être activée");
+        }
+        if (opp.getDateExpiration() == null || !opp.getDateExpiration().isAfter(LocalDateTime.now())) {
+            throw new IllegalStateException("La date d'expiration doit être future avant publication");
+        }
+        if (opp.getPrixNormal() == null || opp.getPrixNormal().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("Le prix normal doit être strictement positif");
+        }
+        List<PalierPrix> paliers = palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(opportuniteId);
+        if (paliers.isEmpty()) {
+            throw new IllegalStateException("Au moins un palier de prix est requis avant publication");
         }
         opp.setStatut(StatutOpportunite.ACTIVE);
         opportuniteRepository.save(opp);
@@ -437,24 +576,28 @@ public class OpportuniteService {
 
     @Transactional
     public void souscrire(UUID participantId, UUID opportuniteId, Integer quantite) {
-        souscrire(participantId, opportuniteId, quantite, null, false, null);
+        souscrire(participantId, opportuniteId, quantite, null, false);
     }
 
-    @Transactional
     public void souscrire(UUID participantId, UUID opportuniteId, Integer quantite, UUID parrainId, boolean utiliserPoints) {
         souscrire(participantId, opportuniteId, quantite, parrainId, utiliserPoints, null);
     }
 
-    @Transactional
     public void souscrire(UUID participantId, UUID opportuniteId, Integer quantite, UUID parrainId,
                           boolean utiliserPoints, UUID requestId) {
-        if (requestId != null && souscriptionIdempotenceRepository.existsById(requestId)) {
-            return;
-        }
+        souscrire(participantId, opportuniteId, quantite, parrainId, utiliserPoints, requestId, null);
+    }
+
+    @Transactional
+    public void souscrire(UUID participantId, UUID opportuniteId, Integer quantite, UUID parrainId,
+                          boolean utiliserPoints, UUID requestId, Map<String, String> reponsesComplementaires) {
         if (quantite == null || quantite <= 0) {
             throw new IllegalArgumentException("La quantité doit être supérieure ou égale à 1");
         }
-        Opportunite opp = getOpportunite(opportuniteId);
+        Opportunite opp = getOpportuniteForUpdate(opportuniteId);
+        if (requestId != null && souscriptionIdempotenceRepository.existsById(requestId)) {
+            return;
+        }
         if (opp.getStatut() != StatutOpportunite.ACTIVE) {
             throw new IllegalArgumentException("Cette opportunité n'est pas active");
         }
@@ -464,24 +607,17 @@ public class OpportuniteService {
         if (opp.getSeuilMaximal() != null && opp.getParticipantsActuels() + quantite > opp.getSeuilMaximal()) {
             int restantes = opp.getSeuilMaximal() - opp.getParticipantsActuels();
             throw new IllegalArgumentException(restantes <= 0
-                ? "Cette opportunité a atteint son plafond de participants."
+                ? "Cette opportunité a atteint son plafond d’unités."
                 : "Il ne reste que " + restantes + " place(s) disponible(s) pour cette opportunité.");
         }
+        String reponsesComplementairesJson = encoderReponsesComplementaires(
+                lireFormulaireComplementaire(opp.getFormulaireComplementaire()), reponsesComplementaires);
 
         Utilisateur utilisateur = utilisateurRepository.findById(participantId)
                 .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable"));
 
-        if (requestId != null) {
-            souscriptionIdempotenceRepository.save(SouscriptionIdempotence.builder()
-                .requestId(requestId)
-                .utilisateurId(participantId)
-                .opportuniteId(opportuniteId)
-                .createdAt(LocalDateTime.now())
-                .build());
-        }
-
         Participation participationExistante = participationRepository
-                .findByUtilisateurIdAndOpportuniteId(participantId, opportuniteId)
+                .findByUtilisateurIdAndOpportuniteIdForUpdate(participantId, opportuniteId)
                 .orElse(null);
         if (participationExistante != null && participationExistante.getStatut() != StatutParticipation.EN_ATTENTE) {
             throw new IllegalStateException("Cette commande est déjà validée ou clôturée : elle ne peut plus être augmentée");
@@ -519,6 +655,7 @@ public class OpportuniteService {
                         .build();
         participation.setQuantite(participation.getQuantite() + quantite);
         participation.setMontantGele(participation.getMontantGele().add(montantTotal));
+        participation.setReponsesComplementaires(reponsesComplementairesJson);
         BigDecimal pointsDejaUtilises = participation.getPointsUtilises() == null ? BigDecimal.ZERO : participation.getPointsUtilises();
         BigDecimal valeurPointsDejaUtilises = participation.getValeurPointsUtilises() == null ? BigDecimal.ZERO : participation.getValeurPointsUtilises();
         participation.setPointsUtilises(pointsDejaUtilises.add(paiement.pointsUtilises()));
@@ -535,15 +672,13 @@ public class OpportuniteService {
         opportuniteRepository.save(opp);
 
         try {
-            redisService.initialiserCompteurSiAbsent(opportuniteId, opp.getParticipantsActuels() - quantite);
-            long compteurRedis = redisService.incrementerParticipants(opportuniteId, quantite);
-            if (compteurRedis >= opp.getSeuilMinimum()) {
-                eventPublisher.publishEvent(new QuotaAtteintEvent(this, opportuniteId));
-            }
-        } catch (Exception e) {
-            if (opp.getParticipantsActuels() >= opp.getSeuilMinimum()) {
-                eventPublisher.publishEvent(new QuotaAtteintEvent(this, opportuniteId));
-            }
+            // PostgreSQL est la source de vérité ; Redis ne fait que refléter la valeur validée.
+            redisService.definirParticipants(opportuniteId, opp.getParticipantsActuels());
+        } catch (Exception ignored) {
+            // Une panne de cache ne doit pas annuler une souscription financièrement valide.
+        }
+        if (opp.getParticipantsActuels() >= opp.getSeuilMinimum()) {
+            eventPublisher.publishEvent(new QuotaAtteintEvent(this, opportuniteId));
         }
 
         BigDecimal prixApres = calculerPrixActuel(opp);
@@ -553,6 +688,14 @@ public class OpportuniteService {
                 "opportunite:" + opportuniteId, "COMPTEUR", payloadCompteur));
         eventPublisher.publishEvent(new SseNotificationEvent(this,
                 "opportunites:global", "COMPTEUR", payloadCompteur));
+
+        if (requestId != null) {
+            souscriptionIdempotenceRepository.save(SouscriptionIdempotence.builder()
+                    .requestId(requestId)
+                    .utilisateurId(participantId)
+                    .opportuniteId(opportuniteId)
+                    .build());
+        }
 
         if (opp.getSeuilMaximal() != null) {
             if (opp.getParticipantsActuels() >= opp.getSeuilMaximal()) {
@@ -564,12 +707,13 @@ public class OpportuniteService {
                     eventPublisher.publishEvent(new SseNotificationEvent(this, "admin:global", "OPPORTUNITE_PRESQUE_COMPLETE",
                         "{\"id\":\"" + opportuniteId + "\",\"titre\":\"" + opp.getTitre().replace("\"", "\\\"") + "\","
                         + "\"participantsActuels\":" + opp.getParticipantsActuels() + ",\"seuilMaximal\":" + opp.getSeuilMaximal() + "}"));
-                    pusherNotificationService.notifierAdmins("OPPORTUNITE_PRESQUE_COMPLETE", Map.of(
-                            "id", opportuniteId,
-                            "titre", opp.getTitre(),
-                            "participantsActuels", opp.getParticipantsActuels(),
-                            "seuilMaximal", opp.getSeuilMaximal()
-                    ));
+                    notifierApresCommit(() -> pusherNotificationService.notifierAdmins(
+                            "OPPORTUNITE_PRESQUE_COMPLETE", Map.of(
+                                    "id", opportuniteId,
+                                    "titre", opp.getTitre(),
+                                    "participantsActuels", opp.getParticipantsActuels(),
+                                    "seuilMaximal", opp.getSeuilMaximal()
+                            )));
                 }
             }
         }
@@ -577,7 +721,7 @@ public class OpportuniteService {
 
     @Transactional
     public void cloturerManuellement(UUID opportuniteId) {
-        Opportunite opp = getOpportunite(opportuniteId);
+        Opportunite opp = getOpportuniteForUpdate(opportuniteId);
         if (opp.getStatut() != StatutOpportunite.ACTIVE) {
             throw new IllegalStateException("Seule une opportunité active peut être clôturée");
         }
@@ -590,7 +734,7 @@ public class OpportuniteService {
 
     @Transactional
     public void cloturerAvecSucces(UUID opportuniteId) {
-        Opportunite opp = getOpportunite(opportuniteId);
+        Opportunite opp = getOpportuniteForUpdate(opportuniteId);
         if (opp.getStatut() == StatutOpportunite.CLOTUREE) return;
         if (opp.getParticipantsActuels() < opp.getSeuilMinimum()) {
             throw new IllegalStateException("Impossible de clôturer avec succès : quota minimum non atteint");
@@ -633,7 +777,7 @@ public class OpportuniteService {
 
     @Transactional
     public void cloturerAvecEchec(UUID opportuniteId) {
-        Opportunite opp = getOpportunite(opportuniteId);
+        Opportunite opp = getOpportuniteForUpdate(opportuniteId);
         if (opp.getStatut() == StatutOpportunite.ANNULEE) return;
         opp.setStatut(StatutOpportunite.ANNULEE);
         opportuniteRepository.save(opp);
@@ -644,7 +788,9 @@ public class OpportuniteService {
                 "opportunite:" + opportuniteId, "STATUT", payloadAnnulation));
         eventPublisher.publishEvent(new SseNotificationEvent(this,
                 "opportunites:global", "STATUT", payloadAnnulation));
-        eventPublisher.publishEvent(new RemboursementEvent(this, opportuniteId));
+        // Le remboursement fait partie de la même transaction que l'annulation.
+        // Si un seul remboursement échoue, l'annulation entière est annulée.
+        rembourserTous(opportuniteId);
     }
 
     @Transactional
@@ -662,7 +808,7 @@ public class OpportuniteService {
     @PreAuthorize("hasAuthority('SUPER_ADMIN')")
     @Transactional
     public void forcerRemboursement(UUID participationId) {
-        Participation participation = participationRepository.findById(participationId)
+        Participation participation = participationRepository.findByIdForUpdate(participationId)
                 .orElseThrow(() -> new IllegalArgumentException("Participation introuvable"));
         if (participation.getStatut() != StatutParticipation.EN_ATTENTE) {
             throw new IllegalStateException("Seules les participations EN_ATTENTE peuvent être remboursées individuellement");
@@ -742,7 +888,7 @@ public class OpportuniteService {
 
     @Transactional
     public OpportuniteResponse.ImageResponse ajouterImage(UUID opportuniteId, String url, String legende) {
-        Opportunite opp = getOpportunite(opportuniteId);
+        Opportunite opp = getOpportuniteForUpdate(opportuniteId);
         int ordre = (int) imageRepository.countByOpportuniteId(opportuniteId);
         OpportuniteImage image = OpportuniteImage.builder()
                 .opportunite(opp)
@@ -796,8 +942,15 @@ public class OpportuniteService {
         }
     }
 
-    private void validerSeuilMaximal(Integer seuilMaximal, Integer seuilMinimum, int maxPalier) {
-        if (seuilMaximal == null) return;
+    private ModePlafond modePlafond(ModePlafond mode, Integer seuilMaximal) {
+        return mode != null ? mode : seuilMaximal == null ? ModePlafond.ILLIMITE : ModePlafond.PLAFONNE;
+    }
+
+    private void validerSeuilMaximal(ModePlafond modePlafond, Integer seuilMaximal, Integer seuilMinimum, int maxPalier) {
+        if (modePlafond == ModePlafond.ILLIMITE) return;
+        if (seuilMaximal == null) {
+            throw new IllegalArgumentException("Un seuil maximal est obligatoire pour une opportunité plafonnée");
+        }
         if (seuilMaximal < maxPalier) {
             throw new IllegalArgumentException(
                 "Le seuil maximal (" + seuilMaximal + ") ne peut pas être inférieur au plafond du dernier palier (" + maxPalier + ")");
@@ -807,23 +960,30 @@ public class OpportuniteService {
         }
     }
 
+    private void validerSeuilMinimumPlafonne(ModePlafond modePlafond, Integer seuilMinimum, List<Integer> seuilsMax) {
+        if (modePlafond != ModePlafond.PLAFONNE || seuilMinimum == null) return;
+        if (!seuilsMax.contains(seuilMinimum)) {
+            throw new IllegalArgumentException("Le seuil minimum doit correspondre au seuil maximal d'un palier");
+        }
+    }
+
     // ── Private helpers ──────────────────────────────────────────────────────
 
-    private Commanditaire trouverCommanditaire(UUID commanditaireId) {
-        if (commanditaireId == null) return null;
-        return commanditaireRepository.findById(commanditaireId)
-                .orElseThrow(() -> new IllegalArgumentException("Commanditaire introuvable"));
+    private Fournisseur trouverFournisseur(UUID fournisseurId) {
+        if (fournisseurId == null) return null;
+        return fournisseurRepository.findById(fournisseurId)
+                .orElseThrow(() -> new IllegalArgumentException("Fournisseur introuvable"));
     }
 
-    private String nomPublicCommanditaire(Commanditaire commanditaire) {
-        String societe = nettoyer(commanditaire.getSociete());
+    private String nomPublicFournisseur(Fournisseur fournisseur) {
+        String societe = nettoyer(fournisseur.getSociete());
         if (societe != null) return societe;
-        return (commanditaire.getPrenom() + " " + commanditaire.getNom()).trim();
+        return fournisseur.getNom().trim();
     }
 
-    private String contactCommanditaire(Commanditaire commanditaire) {
-        String telephone = nettoyer(commanditaire.getTelephone());
-        String email = nettoyer(commanditaire.getEmail());
+    private String contactFournisseur(Fournisseur fournisseur) {
+        String telephone = nettoyer(fournisseur.getTelephone());
+        String email = nettoyer(fournisseur.getEmail());
         if (telephone == null) return email;
         if (email == null) return telephone;
         return telephone + " · " + email;
@@ -838,7 +998,9 @@ public class OpportuniteService {
                 .map(PalierPrix::getPrix)
                 .findFirst()
                 .orElseGet(() -> {
-                    // Le premier palier s'applique dès l'ouverture, avant la première inscription.
+                    // Avant le seuil du premier palier (y compris à 0 participant) : le prix
+                    // dégressif du premier palier s'applique déjà, prixNormal ne sert plus
+                    // que de référence barrée pour afficher la réduction.
                     if (premier != null && opp.getParticipantsActuels() < premier.getSeuilMin()) {
                         return premier.getPrix();
                     }
@@ -880,6 +1042,7 @@ public class OpportuniteService {
                 .transporteur(p.getTransporteur())
                 .referenceLivraison(p.getReferenceLivraison())
                 .commentaireParticipantLivraison(p.getCommentaireParticipantLivraison())
+                .reponsesComplementaires(lireReponsesComplementaires(p.getReponsesComplementaires()))
                 .createdAt(p.getCreatedAt())
                 .dateExpiration(op.getDateExpiration())
                 .statutOpportunite(op.getStatut())
@@ -908,16 +1071,38 @@ public class OpportuniteService {
     }
 
     private void validerTransitionLivraisonAdmin(Participation p, StatutLivraison statutCible) {
+        StatutLivraison actuel = statutLivraisonOuDefaut(p);
+        if (statutCible == actuel) return;
         if (statutCible == StatutLivraison.LIVRE_CONFIRME) {
-            throw new IllegalStateException("La réception finale doit être confirmée par le participant, pas par l'administration");
+            throw new IllegalStateException("La réception finale doit être confirmée par le participant");
         }
-        if (p.getStatut() != StatutParticipation.CONFIRMEE
-                && statutCible != StatutLivraison.EN_ATTENTE_QUOTA
-                && statutCible != StatutLivraison.ANNULE) {
-            throw new IllegalStateException("La livraison ne peut démarrer qu'après validation financière de la participation");
+        if (p.getStatut() == StatutParticipation.REMBOURSEE) {
+            if (statutCible != StatutLivraison.ANNULE) {
+                throw new IllegalStateException("Une participation remboursée ne peut pas être remise en livraison");
+            }
+            return;
         }
-        if (p.getStatut() == StatutParticipation.REMBOURSEE && statutCible != StatutLivraison.ANNULE) {
-            throw new IllegalStateException("Une participation remboursée ne peut pas être remise en livraison");
+        if (p.getStatut() != StatutParticipation.CONFIRMEE) {
+            throw new IllegalStateException("La livraison ne peut démarrer qu'après validation financière");
+        }
+
+        boolean autorisee = switch (actuel) {
+            case EN_ATTENTE_QUOTA -> statutCible == StatutLivraison.A_PREPARER || statutCible == StatutLivraison.ANNULE;
+            case A_PREPARER -> statutCible == StatutLivraison.PREPARATION || statutCible == StatutLivraison.ANNULE;
+            case PREPARATION -> statutCible == StatutLivraison.PRET_LIVRAISON
+                    || statutCible == StatutLivraison.ECHEC_LIVRAISON || statutCible == StatutLivraison.ANNULE;
+            case PRET_LIVRAISON -> statutCible == StatutLivraison.EN_LIVRAISON
+                    || statutCible == StatutLivraison.ECHEC_LIVRAISON || statutCible == StatutLivraison.ANNULE;
+            case EN_LIVRAISON -> statutCible == StatutLivraison.LIVRE_A_CONFIRMER
+                    || statutCible == StatutLivraison.ECHEC_LIVRAISON || statutCible == StatutLivraison.LITIGE;
+            case LIVRE_A_CONFIRMER -> statutCible == StatutLivraison.ECHEC_LIVRAISON
+                    || statutCible == StatutLivraison.LITIGE;
+            case ECHEC_LIVRAISON, LITIGE -> statutCible == StatutLivraison.A_PREPARER
+                    || statutCible == StatutLivraison.ANNULE;
+            case LIVRE_CONFIRME, ANNULE -> false;
+        };
+        if (!autorisee) {
+            throw new IllegalStateException("Transition de livraison interdite : " + actuel + " → " + statutCible);
         }
     }
 
@@ -929,8 +1114,10 @@ public class OpportuniteService {
                 if (p.getDatePreparation() == null) p.setDatePreparation(now);
             }
             case PRET_LIVRAISON, EN_LIVRAISON, LIVRE_A_CONFIRMER -> {
-                // OpportuniHub ne prépare et n'expédie rien : il mémorise uniquement
-                // les engagements communiqués par le partenaire et la remise déclarée.
+                if ((statut == StatutLivraison.EN_LIVRAISON || statut == StatutLivraison.LIVRE_A_CONFIRMER)
+                        && p.getDateExpedition() == null) {
+                    p.setDateExpedition(now);
+                }
                 if (statut == StatutLivraison.LIVRE_A_CONFIRMER && p.getDateRemise() == null) {
                     p.setDateRemise(now);
                 }
@@ -947,8 +1134,25 @@ public class OpportuniteService {
         }
     }
 
+    private void notifierApresCommit(Runnable notification) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+                && org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override public void afterCommit() { notification.run(); }
+                    });
+        } else {
+            notification.run();
+        }
+    }
+
     private Opportunite getOpportunite(UUID id) {
         return opportuniteRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Opportunité introuvable"));
+    }
+
+    private Opportunite getOpportuniteForUpdate(UUID id) {
+        return opportuniteRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new IllegalArgumentException("Opportunité introuvable"));
     }
 
@@ -979,19 +1183,15 @@ public class OpportuniteService {
                 .map(this::toImageResponse)
                 .toList();
 
-        Integer compteurRedis;
+        int quantitesReservees = opp.getParticipantsActuels();
         try {
-            compteurRedis = redisService.getParticipants(opp.getId());
-            if (compteurRedis == null) {
-                redisService.initialiserCompteurSiAbsent(opp.getId(), opp.getParticipantsActuels());
-                compteurRedis = opp.getParticipantsActuels();
-            }
-        } catch (Exception e) {
-            compteurRedis = opp.getParticipantsActuels();
+            redisService.definirParticipants(opp.getId(), quantitesReservees);
+        } catch (Exception ignored) {
+            // La réponse reste exacte même si le cache est indisponible.
         }
 
         boolean expiree = opp.getDateExpiration().isBefore(LocalDateTime.now());
-        boolean plafondAtteint = opp.getSeuilMaximal() != null && compteurRedis >= opp.getSeuilMaximal();
+        boolean plafondAtteint = opp.getSeuilMaximal() != null && quantitesReservees >= opp.getSeuilMaximal();
         boolean souscriptionOuverte = opp.getStatut() == StatutOpportunite.ACTIVE && !expiree && !plafondAtteint;
         String raisonIndisponibilite = null;
         if (opp.getStatut() != StatutOpportunite.ACTIVE) {
@@ -1001,6 +1201,21 @@ public class OpportuniteService {
         } else if (plafondAtteint) {
             raisonIndisponibilite = "Le stock disponible est déjà réservé";
         }
+
+        List<Participation> dossiers = participationRepository.findByOpportuniteId(opp.getId());
+        int dossiersTermines = (int) dossiers.stream().filter(p -> {
+            StatutLivraison statut = statutLivraisonOuDefaut(p);
+            return statut == StatutLivraison.LIVRE_CONFIRME || statut == StatutLivraison.ANNULE;
+        }).count();
+        int dossiersEnCours = (int) dossiers.stream().filter(p -> {
+            StatutLivraison statut = statutLivraisonOuDefaut(p);
+            return statut != StatutLivraison.EN_ATTENTE_QUOTA && statut != StatutLivraison.A_PREPARER
+                    && statut != StatutLivraison.LIVRE_CONFIRME && statut != StatutLivraison.ANNULE;
+        }).count();
+        int dossiersATraiter = Math.max(dossiers.size() - dossiersTermines - dossiersEnCours, 0);
+        String statutTraitement = dossiers.isEmpty() || dossiersTermines == dossiers.size()
+                ? "TERMINE"
+                : dossiersEnCours > 0 ? "EN_COURS" : "A_TRAITER";
 
         return OpportuniteResponse.builder()
                 .id(opp.getId())
@@ -1013,17 +1228,22 @@ public class OpportuniteService {
                 .prixActuel(calculerPrixActuel(opp))
                 .seuilMinimum(opp.getSeuilMinimum())
                 .seuilMaximal(opp.getSeuilMaximal())
-                .participantsActuels(compteurRedis)
-                .placesRestantes(opp.getSeuilMaximal() == null ? null : Math.max(opp.getSeuilMaximal() - compteurRedis, 0))
+                .modePlafond(modePlafond(opp.getModePlafond(), opp.getSeuilMaximal()))
+                .participantsActuels(quantitesReservees)
+                .placesRestantes(opp.getSeuilMaximal() == null ? null : Math.max(opp.getSeuilMaximal() - quantitesReservees, 0))
                 .souscriptionOuverte(souscriptionOuverte)
-                .activationAtteinte(compteurRedis >= opp.getSeuilMinimum())
+                .activationAtteinte(quantitesReservees >= opp.getSeuilMinimum())
                 .raisonIndisponibilite(raisonIndisponibilite)
+                .statutTraitement(statutTraitement)
+                .dossiersATraiter(dossiersATraiter)
+                .dossiersEnCours(dossiersEnCours)
+                .dossiersTermines(dossiersTermines)
                 .dateExpiration(opp.getDateExpiration())
                 .statut(opp.getStatut())
                 .createdAt(opp.getCreatedAt())
                 .categorie(opp.getCategorie() != null ? opp.getCategorie().getNom() : null)
                 .categorieIcone(opp.getCategorie() != null ? opp.getCategorie().getIcone() : null)
-                .commanditaireId(opp.getCommanditaireId())
+                .fournisseurId(opp.getFournisseurId())
                 .partenaireNom(opp.getPartenaireNom())
                 .partenaireLogoUrl(opp.getPartenaireLogoUrl())
                 .partenaireContact(opp.getPartenaireContact())
@@ -1036,6 +1256,7 @@ public class OpportuniteService {
                 .delaiConfirmationReceptionJours(opp.getDelaiConfirmationReceptionJours() == null ? 3 : opp.getDelaiConfirmationReceptionJours())
                 .messageNotificationLivraison(opp.getMessageNotificationLivraison())
                 .messagePartage(opp.getMessagePartage())
+                .formulaireComplementaire(lireFormulaireComplementaire(opp.getFormulaireComplementaire()))
                 .paliers(paliers)
                 .images(images)
                 .build();
@@ -1104,5 +1325,96 @@ public class OpportuniteService {
 
     private String nettoyer(String valeur) {
         return valeur == null || valeur.isBlank() ? null : valeur.trim();
+    }
+
+    private String encoderFormulaireComplementaire(List<ChampFormulaireComplementaire> champs) {
+        List<ChampFormulaireComplementaire> normalises = normaliserFormulaireComplementaire(champs);
+        if (normalises.isEmpty()) return null;
+        try {
+            return objectMapper.writeValueAsString(normalises);
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Le formulaire complémentaire est invalide");
+        }
+    }
+
+    private List<ChampFormulaireComplementaire> normaliserFormulaireComplementaire(List<ChampFormulaireComplementaire> champs) {
+        if (champs == null) return List.of();
+        if (champs.size() > 12) throw new IllegalArgumentException("Le formulaire complémentaire est limité à 12 champs");
+        Set<String> typesAutorises = Set.of("TEXT", "TEXTAREA", "NUMBER", "PHONE", "SELECT", "RADIO", "CHECKBOX", "DATE");
+        Map<String, Boolean> cles = new LinkedHashMap<>();
+        return champs.stream()
+                .filter(champ -> champ != null && nettoyer(champ.getLibelle()) != null)
+                .map(champ -> {
+                    ChampFormulaireComplementaire normalise = new ChampFormulaireComplementaire();
+                    String libelle = nettoyer(champ.getLibelle());
+                    String cle = nettoyer(champ.getCle());
+                    if (cle == null) cle = libelle;
+                    cle = cle.toLowerCase().replaceAll("[^a-z0-9]+", "_").replaceAll("(^_+|_+$)", "");
+                    if (cle.isBlank()) throw new IllegalArgumentException("Chaque champ complémentaire doit avoir une clé lisible");
+                    if (cles.putIfAbsent(cle, true) != null) throw new IllegalArgumentException("Deux champs complémentaires utilisent la même clé : " + cle);
+                    String type = nettoyer(champ.getType());
+                    type = type == null ? "TEXT" : type.toUpperCase();
+                    if (!typesAutorises.contains(type)) throw new IllegalArgumentException("Type de champ complémentaire non supporté : " + type);
+                    List<String> options = champ.getOptions() == null ? List.of() : champ.getOptions().stream()
+                            .map(this::nettoyer)
+                            .filter(option -> option != null)
+                            .distinct()
+                            .limit(20)
+                            .toList();
+                    if ((type.equals("SELECT") || type.equals("RADIO")) && options.isEmpty()) {
+                        throw new IllegalArgumentException("Un champ à choix doit contenir au moins une option");
+                    }
+                    normalise.setCle(cle);
+                    normalise.setLibelle(libelle);
+                    normalise.setAide(nettoyer(champ.getAide()));
+                    normalise.setType(type);
+                    normalise.setObligatoire(champ.isObligatoire());
+                    normalise.setOptions(options);
+                    return normalise;
+                })
+                .toList();
+    }
+
+    private List<ChampFormulaireComplementaire> lireFormulaireComplementaire(String json) {
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            return normaliserFormulaireComplementaire(objectMapper.readValue(json, new TypeReference<List<ChampFormulaireComplementaire>>() {}));
+        } catch (JsonProcessingException | IllegalArgumentException e) {
+            return List.of();
+        }
+    }
+
+    private String encoderReponsesComplementaires(List<ChampFormulaireComplementaire> formulaire, Map<String, String> reponses) {
+        if (formulaire == null || formulaire.isEmpty()) return null;
+        Map<String, String> source = reponses == null ? Map.of() : reponses;
+        Map<String, String> normalisees = new LinkedHashMap<>();
+        for (ChampFormulaireComplementaire champ : formulaire) {
+            String valeur = nettoyer(source.get(champ.getCle()));
+            if (champ.isObligatoire() && valeur == null) {
+                throw new IllegalArgumentException("Complétez le champ : " + champ.getLibelle());
+            }
+            if (valeur == null) continue;
+            if (valeur.length() > 500) throw new IllegalArgumentException("La réponse est trop longue pour : " + champ.getLibelle());
+            if (("SELECT".equals(champ.getType()) || "RADIO".equals(champ.getType())) && !champ.getOptions().contains(valeur)) {
+                throw new IllegalArgumentException("Choix invalide pour : " + champ.getLibelle());
+            }
+            normalisees.put(champ.getCle(), valeur);
+        }
+        if (normalisees.isEmpty()) return null;
+        try {
+            return objectMapper.writeValueAsString(normalisees);
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Les réponses complémentaires sont invalides");
+        }
+    }
+
+    private Map<String, String> lireReponsesComplementaires(String json) {
+        if (json == null || json.isBlank()) return Map.of();
+        try {
+            Map<String, String> valeurs = objectMapper.readValue(json, new TypeReference<Map<String, String>>() {});
+            return valeurs == null ? Map.of() : valeurs;
+        } catch (JsonProcessingException e) {
+            return Map.of();
+        }
     }
 }

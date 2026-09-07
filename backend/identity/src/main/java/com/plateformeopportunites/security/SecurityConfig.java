@@ -27,6 +27,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final AuditHttpFilter auditHttpFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -42,13 +43,14 @@ public class SecurityConfig {
                                 new AntPathRequestMatcher("/api/opportunites/mes-participations/*/reception", HttpMethod.PATCH.name()),
                                 new AntPathRequestMatcher("/api/sondages/mes-participations", HttpMethod.GET.name())
                         ).hasRole("PARTICIPANT")
+                        .requestMatchers(AntPathRequestMatcher.antMatcher("/uploads/preuves/**")).denyAll()
                         .requestMatchers(
                                 AntPathRequestMatcher.antMatcher("/api/auth/verifier-token"),
                                 AntPathRequestMatcher.antMatcher("/api/auth/dev/**"),
                                 AntPathRequestMatcher.antMatcher("/api/admin/auth/**"),
                                 AntPathRequestMatcher.antMatcher("/api/health"),
                                 AntPathRequestMatcher.antMatcher("/api/stats"),
-                                AntPathRequestMatcher.antMatcher("/api/bannieres"),
+                                AntPathRequestMatcher.antMatcher("/api/bannieres/**"),
                                 AntPathRequestMatcher.antMatcher("/api/events/opportunite/**"),
                                 AntPathRequestMatcher.antMatcher("/api/events/sondage/**"),
                                 AntPathRequestMatcher.antMatcher("/api/events/opportunites"),
@@ -72,6 +74,7 @@ public class SecurityConfig {
                         .anyRequest().hasRole("PARTICIPANT")
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(auditHttpFilter, JwtAuthFilter.class)
                 .build();
     }
 
@@ -83,19 +86,28 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-                "http://localhost:5173",
-                "http://localhost:5174",
-                "http://localhost:4173",
-                "http://localhost:4174",
-                "http://127.0.0.1:5173",
-                "http://127.0.0.1:5174",
-                "http://127.0.0.1:4173",
-                "http://127.0.0.1:4174",
-                "http://172.31.240.1:5173",
-                "http://172.31.240.1:5174",
-                "http://172.31.240.1:4173",
-                "http://172.31.240.1:4174",
+        config.setAllowedOriginPatterns(List.of(
+                "http://localhost:*",
+                "http://127.0.0.1:*",
+                "http://[::1]:*",
+                "http://10.*.*.*:*",
+                "http://192.168.*.*:*",
+                "http://172.16.*.*:*",
+                "http://172.17.*.*:*",
+                "http://172.18.*.*:*",
+                "http://172.19.*.*:*",
+                "http://172.20.*.*:*",
+                "http://172.21.*.*:*",
+                "http://172.22.*.*:*",
+                "http://172.23.*.*:*",
+                "http://172.24.*.*:*",
+                "http://172.25.*.*:*",
+                "http://172.26.*.*:*",
+                "http://172.27.*.*:*",
+                "http://172.28.*.*:*",
+                "http://172.29.*.*:*",
+                "http://172.30.*.*:*",
+                "http://172.31.*.*:*",
                 "https://opportunihub.maitrise.app",
                 "https://admin-opportunihub.maitrise.app"
         ));

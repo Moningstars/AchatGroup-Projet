@@ -42,6 +42,9 @@ CREATE TABLE public.administrateurs (
 
 CREATE TABLE public.bannieres (
     actif boolean NOT NULL,
+    brouillon boolean DEFAULT false,
+    impressions bigint DEFAULT 0,
+    clics bigint DEFAULT 0,
     ordre integer NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     date_debut timestamp(6) without time zone,
@@ -101,14 +104,17 @@ CREATE TABLE public.mouvements_commanditaire (
     sondage_id uuid,
     reference character varying(255),
     description text,
-    created_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT mouvements_commanditaire_pkey PRIMARY KEY (id),
-    CONSTRAINT fk_mouvement_commanditaire FOREIGN KEY (commanditaire_id) REFERENCES public.commanditaires(id)
+    created_at timestamp(6) without time zone NOT NULL
 );
 
-CREATE INDEX idx_mvt_commanditaire_date ON public.mouvements_commanditaire (commanditaire_id, created_at);
-CREATE INDEX idx_mvt_commanditaire_sondage ON public.mouvements_commanditaire (sondage_id);
+ALTER TABLE ONLY public.mouvements_commanditaire
+    ADD CONSTRAINT mouvements_commanditaire_pkey PRIMARY KEY (id);
 
+ALTER TABLE ONLY public.mouvements_commanditaire
+    ADD CONSTRAINT fk_mouvement_commanditaire FOREIGN KEY (commanditaire_id) REFERENCES public.commanditaires(id);
+
+CREATE INDEX idx_mvt_commanditaire_date ON public.mouvements_commanditaire USING btree (commanditaire_id, created_at);
+CREATE INDEX idx_mvt_commanditaire_sondage ON public.mouvements_commanditaire USING btree (sondage_id);
 
 --
 -- Name: fournisseurs; Type: TABLE; Schema: public; Owner: -
@@ -174,6 +180,7 @@ CREATE TABLE public.opportunite_images (
 --
 
 CREATE TABLE public.opportunites (
+    version bigint DEFAULT 0 NOT NULL,
     participants_actuels integer NOT NULL,
     prix_normal numeric(38,2) NOT NULL,
     seuil_minimum integer NOT NULL,
@@ -186,6 +193,7 @@ CREATE TABLE public.opportunites (
     fournisseur_id uuid,
     id uuid NOT NULL,
     description text,
+    formulaire_complementaire text,
     specs_cas_usage text,
     specs_fine_print text,
     specs_points_forts text,
@@ -294,6 +302,7 @@ CREATE TABLE public.participants (
 --
 
 CREATE TABLE public.participations (
+    version bigint DEFAULT 0 NOT NULL,
     montant_gele numeric(38,2) NOT NULL,
     quantite integer NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
@@ -312,6 +321,7 @@ CREATE TABLE public.participations (
     commentaire_participant_livraison character varying(500),
     note_livraison character varying(500),
     note_traitement character varying(500),
+    reponses_complementaires text,
     reference_livraison character varying(120),
     statut_livraison character varying(255) DEFAULT 'EN_ATTENTE_QUOTA'::character varying,
     transporteur character varying(120),
@@ -335,8 +345,7 @@ CREATE TABLE public.tentatives_souscription (
 
 CREATE INDEX tentatives_souscription_created_idx ON public.tentatives_souscription (created_at DESC);
 CREATE INDEX tentatives_souscription_opportunite_idx ON public.tentatives_souscription (opportunite_id);
-
--- Clé rejouable pour éviter un double débit lors d'un retry HTTP.
+-- Clés rejouables empêchant un retry HTTP de débiter deux fois la même commande.
 CREATE TABLE public.souscriptions_idempotence (
     request_id uuid NOT NULL,
     utilisateur_id uuid NOT NULL,
@@ -344,35 +353,7 @@ CREATE TABLE public.souscriptions_idempotence (
     created_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT souscriptions_idempotence_pkey PRIMARY KEY (request_id)
 );
-
-CREATE INDEX souscriptions_idempotence_created_idx
-    ON public.souscriptions_idempotence USING btree (created_at);
-
-CREATE TABLE public.audit_logs (
-    id uuid NOT NULL,
-    occurred_at timestamp(6) with time zone NOT NULL,
-    actor_id character varying(100) NOT NULL,
-    actor_type character varying(30) NOT NULL,
-    action character varying(80) NOT NULL,
-    module character varying(60) NOT NULL,
-    http_method character varying(10) NOT NULL,
-    path character varying(500) NOT NULL,
-    resource_type character varying(80),
-    resource_id character varying(100),
-    status_code integer NOT NULL,
-    success boolean NOT NULL,
-    ip_address character varying(45),
-    user_agent character varying(500),
-    correlation_id character varying(100) NOT NULL,
-    duration_ms bigint NOT NULL,
-    description character varying(500),
-    CONSTRAINT audit_logs_pkey PRIMARY KEY (id)
-);
-
-CREATE INDEX idx_audit_occurred_at ON public.audit_logs (occurred_at);
-CREATE INDEX idx_audit_actor_id ON public.audit_logs (actor_id);
-CREATE INDEX idx_audit_module ON public.audit_logs (module);
-CREATE INDEX idx_audit_action ON public.audit_logs (action);
+CREATE INDEX souscriptions_idempotence_created_idx ON public.souscriptions_idempotence (created_at);
 
 
 --
@@ -787,6 +768,9 @@ ALTER TABLE ONLY public.participants
 ALTER TABLE ONLY public.participations
     ADD CONSTRAINT participations_pkey PRIMARY KEY (id);
 
+ALTER TABLE ONLY public.participations
+    ADD CONSTRAINT uk_participation_utilisateur_opportunite UNIQUE (utilisateur_id, opportunite_id);
+
 
 --
 -- Name: portefeuilles portefeuilles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -994,6 +978,9 @@ ALTER TABLE ONLY public.sondages_reponses
 
 ALTER TABLE ONLY public.sondages
     ADD CONSTRAINT fkedbiitohu5gv2cjqf96ho0lio FOREIGN KEY (admin_id) REFERENCES public.administrateurs(id);
+
+ALTER TABLE ONLY public.sondages
+    ADD CONSTRAINT fk_sondage_commanditaire FOREIGN KEY (commanditaire_id) REFERENCES public.commanditaires(id);
 
 
 --

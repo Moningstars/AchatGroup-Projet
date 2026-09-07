@@ -37,23 +37,27 @@ public class Commanditaire {
     @Column(nullable = false)
     private StatutCommanditaire statut;
 
-    @Column(nullable = false, precision = 15, scale = 2)
+    @Column(nullable = false, precision = 15, scale = 2, columnDefinition = "numeric(15,2) default 0")
     private BigDecimal soldeDisponible;
 
-    @Column(nullable = false, precision = 15, scale = 2)
+    @Column(nullable = false, precision = 15, scale = 2, columnDefinition = "numeric(15,2) default 0")
     private BigDecimal soldeReserve;
 
-    @Column(nullable = false, precision = 15, scale = 2)
+    @Column(nullable = false, precision = 15, scale = 2, columnDefinition = "numeric(15,2) default 0")
     private BigDecimal totalAlimente;
 
-    @Column(nullable = false, precision = 15, scale = 2)
+    @Column(nullable = false, precision = 15, scale = 2, columnDefinition = "numeric(15,2) default 0")
     private BigDecimal totalDistribue;
 
     @Column(columnDefinition = "TEXT")
     private String motifStatut;
 
+    @Column(updatable = false)
     private LocalDateTime createdAt;
+
+    @Column
     private LocalDateTime updatedAt;
+
     private LocalDateTime statutChangedAt;
 
     @PrePersist
@@ -69,7 +73,5 @@ public class Commanditaire {
     }
 
     @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
+    protected void onUpdate() { this.updatedAt = LocalDateTime.now(); }
 }

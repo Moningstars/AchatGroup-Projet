@@ -15,6 +15,7 @@ import java.util.UUID;
 public interface SondageRepository extends JpaRepository<Sondage, UUID> {
     List<Sondage> findByStatut(StatutSondage statut);
     long countByStatut(StatutSondage statut);
+    long countByCommanditaireId(UUID commanditaireId);
     List<Sondage> findByStatutAndDateExpirationBefore(StatutSondage statut, LocalDateTime date);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

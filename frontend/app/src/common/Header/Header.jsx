@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
-import { User, Wallet, ShieldCheck, ShieldX, ShieldAlert, Clock, LogOut, Bell, CheckCircle2, XCircle, Trash2, X } from 'lucide-react'
+import { User, Wallet, ShieldCheck, ShieldX, ShieldAlert, Clock, LogOut, Bell, CheckCircle2, XCircle, Trash2, X, Home, ClipboardList } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { usePusher } from '../../context/PusherContext'
 import { useNotifications } from '../../context/NotificationsContext'
@@ -123,9 +123,9 @@ const Header = () => {
         <nav className="hidden md:flex items-center gap-6">
           {isAuthenticated ? (
             <>
+              <Link to="/" className={`text-sm font-bold transition-colors ${pathname === '/' ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}>Accueil</Link>
               <Link to="/opportunites" className={`text-sm font-bold transition-colors ${pathname === '/opportunites' ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}>Opportunités</Link>
               <Link to="/sondages"    className={`text-sm font-bold transition-colors ${pathname === '/sondages'    ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}>Sondages</Link>
-              <Link to="/historique"  className={`text-sm font-bold transition-colors ${pathname === '/historique'  ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}>Participations</Link>
             </>
           ) : (
             <>
@@ -242,6 +242,22 @@ const Header = () => {
 
                   {/* Navigation */}
                   <div className="py-1">
+                    <Link
+                      to="/"
+                      onClick={() => setOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors md:hidden"
+                    >
+                      <Home size={16} className="text-gray-400" />
+                      Accueil
+                    </Link>
+                    <Link
+                      to="/historique"
+                      onClick={() => setOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <ClipboardList size={16} className="text-gray-400" />
+                      Mes participations
+                    </Link>
                     <Link
                       to="/portefeuille"
                       onClick={() => setOpen(false)}

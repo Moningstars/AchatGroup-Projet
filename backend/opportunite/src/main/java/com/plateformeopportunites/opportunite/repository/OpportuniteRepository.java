@@ -4,12 +4,18 @@ import com.plateformeopportunites.common.enums.StatutOpportunite;
 import com.plateformeopportunites.opportunite.entity.Opportunite;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.repository.query.Param;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
 public interface OpportuniteRepository extends JpaRepository<Opportunite, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT o FROM Opportunite o WHERE o.id = :id")
+    java.util.Optional<Opportunite> findByIdForUpdate(@Param("id") UUID id);
+
     List<Opportunite> findByStatut(StatutOpportunite statut);
     long countByStatut(StatutOpportunite statut);
     List<Opportunite> findByStatutAndDateExpirationBefore(StatutOpportunite statut, LocalDateTime date);

@@ -24,4 +24,6 @@ public class CommanditaireResponse {
     private String motifStatut;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private long nombreSondages;
+    private long sondagesActifs;
 }

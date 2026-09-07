@@ -48,9 +48,9 @@ public class Utilisateur {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        this.statut = StatutCompte.EN_ATTENTE;
-        this.profilComplete = false;
-        this.niveauVerification = NiveauVerification.AUCUN;
+        if (this.createdAt == null) this.createdAt = LocalDateTime.now();
+        if (this.statut == null) this.statut = StatutCompte.EN_ATTENTE;
+        if (this.profilComplete == null) this.profilComplete = false;
+        if (this.niveauVerification == null) this.niveauVerification = NiveauVerification.AUCUN;
     }
 }

@@ -1,5 +1,6 @@
 package com.plateformeopportunites.opportunite.dto;
 
+import com.plateformeopportunites.common.enums.ModePlafond;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.Min;
@@ -24,7 +25,7 @@ public class ModifierOpportuniteRequest {
 
     private String specsFinePrint;
 
-    @DecimalMin("0")
+    @DecimalMin(value = "0", inclusive = false)
     private BigDecimal prixNormal;
 
     @Min(1)
@@ -34,13 +35,15 @@ public class ModifierOpportuniteRequest {
     @Min(1)
     private Integer seuilMaximal;
 
+    private ModePlafond modePlafond;
+
     @Future
     private LocalDateTime dateExpiration;
 
     /** Nom de la catégorie (optionnel). Créée automatiquement si inconnue. */
     private String categorie;
 
-    private UUID commanditaireId;
+    private UUID fournisseurId;
     private String partenaireNom;
     private String partenaireLogoUrl;
     private String partenaireContact;
@@ -50,6 +53,7 @@ public class ModifierOpportuniteRequest {
     @Min(1) private Integer delaiConfirmationReceptionJours;
     @Size(max = 500) private String messageNotificationLivraison;
     @Size(max = 500) private String messagePartage;
+    private List<ChampFormulaireComplementaire> formulaireComplementaire;
 
     /** Si fourni, remplace intégralement les paliers existants. */
     private List<CreerOpportuniteRequest.PalierPrixRequest> paliers;

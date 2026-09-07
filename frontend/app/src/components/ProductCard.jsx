@@ -51,10 +51,10 @@ const ProductCard = ({ opportunity }) => {
   return (
     <Link
       to={`/opportunity/${id}`}
-      className="group flex overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm shadow-primary/5 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/10 active:scale-[0.99] sm:block"
+      className="group flex aspect-square min-w-0 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm shadow-primary/5 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/10 active:scale-[0.99]"
     >
-      {/* Image — horizontal sur mobile (w fixe), portrait ratio sur sm+ */}
-      <div className="relative w-32 shrink-0 overflow-hidden bg-gray-100 sm:w-auto sm:pb-[72%]">
+      {/* Visuel compact : la carte conserve un format carré sur tous les écrans. */}
+      <div className="relative min-h-0 w-full flex-[1.05] overflow-hidden bg-gray-100">
         <img
           src={heroImg}
           alt={titre}
@@ -74,15 +74,13 @@ const ProductCard = ({ opportunity }) => {
           <CountdownBadge dateExpiration={dateExpiration} />
         </div>
 
-        {/* Badge Opportunité — visible seulement en mode vertical (sm+) */}
-        <div className="absolute bottom-12 left-3 hidden sm:block">
+        <div className="absolute bottom-10 left-3">
           <span className="inline-flex items-center gap-1 rounded-lg bg-primary px-2 py-1 text-[8px] font-black uppercase tracking-wider text-white shadow-sm">
             <i className="ti ti-users-group text-[9px]" /> Opportunité
           </span>
         </div>
 
-        {/* Barre de progression sur l'image — sm+ seulement */}
-        <div className="absolute bottom-0 left-0 right-0 hidden bg-primary/85 px-3 py-2 backdrop-blur-sm sm:block">
+        <div className="absolute bottom-0 left-0 right-0 bg-primary/85 px-3 py-2 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-1">
             <span className="text-[8px] font-black text-white/70 uppercase tracking-wider">Progression</span>
             <span className="text-[8px] font-black text-accent">{progress}%</span>
@@ -94,12 +92,12 @@ const ProductCard = ({ opportunity }) => {
       </div>
 
       {/* Infos produit */}
-      <div className="flex flex-1 flex-col justify-between gap-2 px-3 py-3 sm:min-h-[148px] sm:flex-none sm:px-4 sm:py-3">
-        <p className="line-clamp-2 text-sm font-black leading-snug text-primary sm:min-h-[2.7em] sm:text-[13px]">{titre}</p>
+      <div className="flex min-h-0 flex-1 flex-col justify-between gap-1.5 px-3 py-2.5">
+        <p className="line-clamp-2 min-h-[2.45em] text-[13px] font-black leading-tight text-primary">{titre}</p>
 
         <div>
           <div className="flex items-baseline gap-1.5 flex-wrap">
-            <span className="text-lg font-black leading-none tabular-nums text-urgency sm:text-xl">
+            <span className="text-lg font-black leading-none tabular-nums text-urgency">
               {fmt(prixAffiche)}<span className="text-[9px] font-bold ml-0.5">F</span>
             </span>
             {prixNormal && Number(prixNormal) > Number(prixAffiche) && (
@@ -114,19 +112,9 @@ const ProductCard = ({ opportunity }) => {
                 : `${participantsActuels} / ${objectifFinal || seuilMinimum} unités`}
           </p>
 
-          {/* Barre de progression inline — mobile seulement */}
-          <div className="mt-2 space-y-1 sm:hidden">
-            <div className="flex justify-between text-[9px] font-bold text-gray-400">
-              <span>Progression</span>
-              <span className="text-accent">{progress}%</span>
-            </div>
-            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${progress}%` }} />
-            </div>
-          </div>
         </div>
 
-        <div className="mt-2 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
+        <div className="flex items-center justify-between gap-2 border-t border-gray-100 pt-1.5">
           <span className="text-[9px] font-black uppercase tracking-wider text-primary">
             Voir l’offre
           </span>

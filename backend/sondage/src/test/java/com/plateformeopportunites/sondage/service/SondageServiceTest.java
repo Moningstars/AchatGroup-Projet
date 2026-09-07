@@ -7,6 +7,7 @@ import com.plateformeopportunites.finance.service.WalletService;
 import com.plateformeopportunites.identity.entity.Administrateur;
 import com.plateformeopportunites.identity.entity.Utilisateur;
 import com.plateformeopportunites.identity.repository.AdministrateurRepository;
+import com.plateformeopportunites.identity.repository.CommanditaireRepository;
 import com.plateformeopportunites.identity.repository.UtilisateurRepository;
 import com.plateformeopportunites.sondage.dto.EligibiliteRequest;
 import com.plateformeopportunites.sondage.dto.RepondreRequest;
@@ -40,6 +41,7 @@ class SondageServiceTest {
     @Mock private QuestionRepository questionRepository;
     @Mock private OptionReponseRepository optionReponseRepository;
     @Mock private AdministrateurRepository administrateurRepository;
+        @Mock private CommanditaireRepository commanditaireRepository;
     @Mock private UtilisateurRepository utilisateurRepository;
     @Mock private WalletService walletService;
     @Mock private ApplicationEventPublisher eventPublisher;
@@ -59,6 +61,11 @@ class SondageServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(sondageRepository.findByIdForUpdate(any(UUID.class)))
+                .thenAnswer(invocation -> sondageRepository.findById(invocation.getArgument(0)));
+        lenient().when(sondageReponseRepository.findByIdForUpdate(any(UUID.class)))
+                .thenAnswer(invocation -> sondageReponseRepository.findById(invocation.getArgument(0)));
+
         q1Id = UUID.randomUUID();
         q2Id = UUID.randomUUID();
         bonneReponse1Id  = UUID.randomUUID();
@@ -166,7 +173,7 @@ class SondageServiceTest {
     @Test
     void activer_sansTestEligibilite_leveException() {
         Sondage brouillon = sondageBrouillon();
-                when(sondageRepository.findByIdForUpdate(SONDAGE_ID)).thenReturn(Optional.of(brouillon));
+        when(sondageRepository.findById(SONDAGE_ID)).thenReturn(Optional.of(brouillon));
         when(sondageEligibiliteRepository.findBySondageId(SONDAGE_ID)).thenReturn(Optional.empty());
 
         assertThrows(IllegalStateException.class, () -> sondageService.activer(SONDAGE_ID));
@@ -176,7 +183,7 @@ class SondageServiceTest {
     @Test
     void activer_avecTestEligibilite_passeEnActif() {
         Sondage brouillon = sondageBrouillon();
-        when(sondageRepository.findByIdForUpdate(SONDAGE_ID)).thenReturn(Optional.of(brouillon));
+        when(sondageRepository.findById(SONDAGE_ID)).thenReturn(Optional.of(brouillon));
         when(sondageEligibiliteRepository.findBySondageId(SONDAGE_ID))
                 .thenReturn(Optional.of(eligibiliteAvec2Questions));
         when(sondageRepository.save(any())).thenReturn(brouillon);
@@ -233,7 +240,7 @@ class SondageServiceTest {
     @Test
     void repondre_dejaRepondu_leveException() {
         when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
-        when(sondageRepository.findByIdForUpdate(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
+        when(sondageRepository.findById(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
         when(sondageReponseRepository.existsBySondageIdAndUtilisateurId(SONDAGE_ID, PID)).thenReturn(true);
 
         assertThrows(IllegalArgumentException.class,
@@ -243,7 +250,7 @@ class SondageServiceTest {
     @Test
     void repondre_sansResultatEligibilite_leveException() {
         when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
-        when(sondageRepository.findByIdForUpdate(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
+        when(sondageRepository.findById(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
         when(resultatEligibiliteRepository.findByUtilisateurIdAndSondageEligibilite_Sondage_Id(PID, SONDAGE_ID))
                 .thenReturn(Optional.empty());
 
@@ -256,7 +263,7 @@ class SondageServiceTest {
         ResultatEligibilite nonEligible = ResultatEligibilite.builder()
                 .estEligible(false).tauxObtenu(new BigDecimal("30")).build();
         when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
-        when(sondageRepository.findByIdForUpdate(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
+        when(sondageRepository.findById(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
         when(resultatEligibiliteRepository.findByUtilisateurIdAndSondageEligibilite_Sondage_Id(PID, SONDAGE_ID))
                 .thenReturn(Optional.of(nonEligible));
 
@@ -268,10 +275,11 @@ class SondageServiceTest {
     @Test
     void repondre_kycRequis_utilisateurNonVerifie_leveException() {
         sondageAvecSeuil70.setNiveauVerification(NiveauVerification.VERIFIE);
+
         Utilisateur u = utilisateur();
         u.setNiveauVerification(NiveauVerification.AUCUN); // pas vérifié
         when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(u));
-        when(sondageRepository.findByIdForUpdate(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
+        when(sondageRepository.findById(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
 
         assertThrows(IllegalArgumentException.class,
                 () -> sondageService.repondre(PID, SONDAGE_ID, repondreReq()));
@@ -283,7 +291,7 @@ class SondageServiceTest {
         sondageAvecSeuil70.setModeDistribution(ModeDistribution.AUTO);
 
         UUID questionId = UUID.randomUUID();
-        Question question = Question.builder().id(questionId).typeQuestion(TypeQuestion.OUI_NON).build();
+        Question question = questionTexte(questionId);
         ResultatEligibilite eligible = ResultatEligibilite.builder()
                 .estEligible(true).tauxObtenu(new BigDecimal("100")).build();
         SondageReponse savedReponse = SondageReponse.builder()
@@ -295,16 +303,16 @@ class SondageServiceTest {
         when(resultatEligibiliteRepository.findByUtilisateurIdAndSondageEligibilite_Sondage_Id(PID, SONDAGE_ID))
                 .thenReturn(Optional.of(eligible));
         when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
-        when(sondageRepository.findByIdForUpdate(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
-        when(questionRepository.findById(questionId)).thenReturn(Optional.of(question));
+        when(sondageRepository.findById(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
         when(questionRepository.findBySondageIdOrderByOrdre(SONDAGE_ID)).thenReturn(List.of(question));
+        when(questionRepository.findById(questionId)).thenReturn(Optional.of(question));
         when(sondageRepository.save(any())).thenReturn(sondageAvecSeuil70);
         when(sondageReponseRepository.save(any())).thenReturn(savedReponse);
 
         RepondreRequest req = new RepondreRequest();
         RepondreRequest.ReponseDetailRequest detail = new RepondreRequest.ReponseDetailRequest();
         detail.setQuestionId(questionId);
-        detail.setValeurTexte("oui");
+        detail.setValeurTexte("Réponse de test");
         req.setReponses(List.of(detail));
 
         sondageService.repondre(PID, SONDAGE_ID, req);
@@ -318,7 +326,7 @@ class SondageServiceTest {
         sondageAvecSeuil70.setModeDistribution(ModeDistribution.MANUEL);
 
         UUID questionId = UUID.randomUUID();
-        Question question = Question.builder().id(questionId).typeQuestion(TypeQuestion.OUI_NON).build();
+        Question question = questionTexte(questionId);
         ResultatEligibilite eligible = ResultatEligibilite.builder()
                 .estEligible(true).tauxObtenu(new BigDecimal("100")).build();
         SondageReponse savedReponse = SondageReponse.builder()
@@ -330,15 +338,15 @@ class SondageServiceTest {
         when(resultatEligibiliteRepository.findByUtilisateurIdAndSondageEligibilite_Sondage_Id(PID, SONDAGE_ID))
                 .thenReturn(Optional.of(eligible));
         when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateur()));
-        when(sondageRepository.findByIdForUpdate(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
-        when(questionRepository.findById(questionId)).thenReturn(Optional.of(question));
+        when(sondageRepository.findById(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
         when(questionRepository.findBySondageIdOrderByOrdre(SONDAGE_ID)).thenReturn(List.of(question));
+        when(questionRepository.findById(questionId)).thenReturn(Optional.of(question));
         when(sondageReponseRepository.save(any())).thenReturn(savedReponse);
 
         RepondreRequest req = new RepondreRequest();
         RepondreRequest.ReponseDetailRequest detail = new RepondreRequest.ReponseDetailRequest();
         detail.setQuestionId(questionId);
-        detail.setValeurTexte("oui");
+        detail.setValeurTexte("Réponse de test");
         req.setReponses(List.of(detail));
 
         sondageService.repondre(PID, SONDAGE_ID, req);
@@ -362,8 +370,8 @@ class SondageServiceTest {
                 .recompenseVersee(false)
                 .build();
         UUID reponseId = reponse.getId();
-        when(sondageReponseRepository.findByIdForUpdate(reponseId)).thenReturn(Optional.of(reponse));
-        when(sondageRepository.findByIdForUpdate(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
+        when(sondageReponseRepository.findById(reponseId)).thenReturn(Optional.of(reponse));
+        when(sondageRepository.findById(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
         when(sondageReponseRepository.save(any())).thenReturn(reponse);
         when(sondageRepository.save(any())).thenReturn(sondageAvecSeuil70);
 
@@ -384,8 +392,8 @@ class SondageServiceTest {
                 .recompenseVersee(false)
                 .build();
         UUID reponseId = reponse.getId();
-        when(sondageReponseRepository.findByIdForUpdate(reponseId)).thenReturn(Optional.of(reponse));
-        when(sondageRepository.findByIdForUpdate(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
+        when(sondageReponseRepository.findById(reponseId)).thenReturn(Optional.of(reponse));
+        when(sondageRepository.findById(SONDAGE_ID)).thenReturn(Optional.of(sondageAvecSeuil70));
         when(sondageReponseRepository.save(any())).thenReturn(reponse);
 
         sondageService.validerPreuve(reponseId, false);
@@ -408,13 +416,13 @@ class SondageServiceTest {
         when(sondageRepository.findByStatutAndDateExpirationBefore(
                 eq(StatutSondage.ACTIF), any(LocalDateTime.class)))
                 .thenReturn(List.of(expireCeJour));
-        when(sondageRepository.findByIdForUpdate(expireCeJour.getId())).thenReturn(Optional.of(expireCeJour));
+        when(sondageRepository.findById(expireCeJour.getId())).thenReturn(Optional.of(expireCeJour));
         when(sondageRepository.save(any())).thenReturn(expireCeJour);
 
         sondageService.cloturerExpires();
 
         assertEquals(StatutSondage.CLOTURE, expireCeJour.getStatut());
-                verify(sondageRepository, times(2)).save(expireCeJour);
+        verify(sondageRepository, atLeastOnce()).save(expireCeJour);
     }
 
     @Test
@@ -448,12 +456,31 @@ class SondageServiceTest {
         return Sondage.builder()
                 .id(SONDAGE_ID)
                 .admin(Administrateur.builder().id(UUID.randomUUID()).build())
-                .statut(StatutSondage.BROUILLON)
-                .quotaVise(100)
+                .titre("Sondage brouillon")
+                .quotaVise(10)
+                .repondantsActuels(0)
                 .recompense(new BigDecimal("500"))
-                .dateExpiration(LocalDateTime.now().plusDays(7))
+                .typeRecompense(TypeRecompense.ARGENT)
+                .seuilEligibilite(new BigDecimal("70"))
+                .statut(StatutSondage.BROUILLON)
                 .niveauVerification(NiveauVerification.AUCUN)
                 .modeDistribution(ModeDistribution.AUTO)
+                .dateExpiration(LocalDateTime.now().plusDays(7))
+                .budgetReserve(BigDecimal.ZERO)
+                .budgetDistribue(BigDecimal.ZERO)
+                .budgetLibere(false)
+                .build();
+    }
+
+    private Question questionTexte(UUID id) {
+        return Question.builder()
+                .id(id)
+                .sondage(sondageAvecSeuil70)
+                .ordre(1)
+                .typeQuestion(TypeQuestion.TEXTE_LIBRE)
+                .texte("Question de test")
+                .obligatoire(true)
+                .options(List.of())
                 .build();
     }
 

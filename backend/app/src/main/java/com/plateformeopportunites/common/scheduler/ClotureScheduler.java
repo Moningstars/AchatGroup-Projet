@@ -54,6 +54,18 @@ public class ClotureScheduler {
     }
 
     @Scheduled(fixedDelay = 60_000)
+    public void demanderConfirmationsReceptionArrivees() {
+        try {
+            int dossiers = opportuniteService.demanderConfirmationsReceptionArrivees();
+            if (dossiers > 0) {
+                log.info("{} dossier(s) passé(s) automatiquement en attente de confirmation client", dossiers);
+            }
+        } catch (Exception e) {
+            log.error("Erreur de mise en attente automatique des confirmations de réception", e);
+        }
+    }
+
+    @Scheduled(fixedDelay = 60_000)
     public void cloturerSondagesExpires() {
         log.debug("Job clôture sondages — début");
         try {
@@ -63,23 +75,15 @@ public class ClotureScheduler {
         }
     }
 
-    // Synchronise les compteurs Redis → PostgreSQL toutes les 5 minutes.
-    // Garantit la cohérence si Redis redémarre entre deux souscriptions.
+    // PostgreSQL est l'unique source de vérité ; Redis est reconstruit comme cache.
     @Scheduled(fixedDelay = 300_000)
-    public void syncCompteursRedisVersDb() {
-        log.debug("Job sync compteurs Redis → DB — début");
+    public void syncCompteursDbVersRedis() {
+        log.debug("Job sync compteurs DB → Redis — début");
         try {
-            opportuniteRepository.findByStatut(StatutOpportunite.ACTIVE).forEach(opp -> {
-                Integer compteurRedis = redisService.getParticipants(opp.getId());
-                if (compteurRedis != null && !compteurRedis.equals(opp.getParticipantsActuels())) {
-                    opp.setParticipantsActuels(compteurRedis);
-                    opportuniteRepository.save(opp);
-                    log.debug("Sync opportunité {} : {} → {}", opp.getId(),
-                            opp.getParticipantsActuels(), compteurRedis);
-                }
-            });
+            opportuniteRepository.findByStatut(StatutOpportunite.ACTIVE)
+                    .forEach(opp -> redisService.definirParticipants(opp.getId(), opp.getParticipantsActuels()));
         } catch (Exception e) {
-            log.error("Erreur sync compteurs Redis → DB", e);
+            log.error("Erreur sync compteurs DB → Redis", e);
         }
     }
 }

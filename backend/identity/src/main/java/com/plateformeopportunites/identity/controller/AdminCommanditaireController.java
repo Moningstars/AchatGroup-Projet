@@ -1,20 +1,13 @@
 package com.plateformeopportunites.identity.controller;
 
 import com.plateformeopportunites.common.enums.StatutCommanditaire;
-import com.plateformeopportunites.identity.dto.AlimenterCommanditaireRequest;
-import com.plateformeopportunites.identity.dto.CommanditaireResponse;
-import com.plateformeopportunites.identity.dto.CreerCommanditaireRequest;
-import com.plateformeopportunites.identity.dto.ChangerStatutCommanditaireRequest;
-import com.plateformeopportunites.identity.dto.MouvementCommanditaireResponse;
-import com.plateformeopportunites.identity.entity.Commanditaire;
-import com.plateformeopportunites.identity.repository.CommanditaireRepository;
-import com.plateformeopportunites.identity.service.CommanditaireHistoryService;
+import com.plateformeopportunites.identity.dto.*;
+import com.plateformeopportunites.identity.service.CommanditaireService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 import java.util.UUID;
 
@@ -22,85 +15,36 @@ import java.util.UUID;
 @RequestMapping("/api/admin/commanditaires")
 @RequiredArgsConstructor
 public class AdminCommanditaireController {
+    private final CommanditaireService service;
 
-    private final CommanditaireRepository commanditaireRepository;
-    private final CommanditaireHistoryService commanditaireHistoryService;
-
-    @GetMapping
-    public ResponseEntity<List<CommanditaireResponse>> lister() {
-        return ResponseEntity.ok(
-                commanditaireRepository.findAll().stream().map(this::toResponse).toList()
-        );
-    }
+    @GetMapping public List<CommanditaireResponse> lister() { return service.lister(); }
+    @GetMapping("/{id}") public CommanditaireResponse consulter(@PathVariable UUID id) { return service.consulter(id); }
 
     @PostMapping
-    @Transactional
     public ResponseEntity<CommanditaireResponse> creer(@Valid @RequestBody CreerCommanditaireRequest req) {
-        if (commanditaireRepository.existsByEmail(req.getEmail())) {
-            return ResponseEntity.status(409).build();
-        }
-        Commanditaire c = Commanditaire.builder()
-                .nom(req.getNom())
-                .prenom(req.getPrenom())
-                .societe(req.getSociete())
-                .email(req.getEmail())
-                .telephone(req.getTelephone())
-                .build();
-        return ResponseEntity.ok(toResponse(commanditaireRepository.save(c)));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.creer(req));
+    }
+
+    @PutMapping("/{id}")
+    public CommanditaireResponse modifier(@PathVariable UUID id, @Valid @RequestBody ModifierCommanditaireRequest req) {
+        return service.modifier(id, req);
     }
 
     @PatchMapping("/{id}/activer")
-    @Transactional
-    public ResponseEntity<CommanditaireResponse> activer(@PathVariable UUID id,
-                                                          @RequestBody(required = false) ChangerStatutCommanditaireRequest request) {
-        return commanditaireRepository.findById(id).map(c -> {
-            c.setStatut(StatutCommanditaire.ACTIF);
-            c.setMotifStatut(request == null ? null : request.getMotif());
-            return ResponseEntity.ok(toResponse(commanditaireRepository.save(c)));
-        }).orElse(ResponseEntity.notFound().build());
+    public CommanditaireResponse activer(@PathVariable UUID id, @Valid @RequestBody ChangerStatutCommanditaireRequest req) {
+        return service.changerStatut(id, StatutCommanditaire.ACTIF, req.getMotif());
     }
 
     @PatchMapping("/{id}/suspendre")
-    @Transactional
-    public ResponseEntity<CommanditaireResponse> suspendre(@PathVariable UUID id,
-                                                            @RequestBody(required = false) ChangerStatutCommanditaireRequest request) {
-        return commanditaireRepository.findById(id).map(c -> {
-            c.setStatut(StatutCommanditaire.SUSPENDU);
-            c.setMotifStatut(request == null ? null : request.getMotif());
-            return ResponseEntity.ok(toResponse(commanditaireRepository.save(c)));
-        }).orElse(ResponseEntity.notFound().build());
+    public CommanditaireResponse suspendre(@PathVariable UUID id, @Valid @RequestBody ChangerStatutCommanditaireRequest req) {
+        return service.changerStatut(id, StatutCommanditaire.SUSPENDU, req.getMotif());
     }
 
     @PostMapping("/{id}/alimentations")
-    public ResponseEntity<CommanditaireResponse> alimenter(@PathVariable UUID id,
-                                                            @Valid @RequestBody AlimenterCommanditaireRequest request) {
-        return commanditaireRepository.findById(id)
-                .map(commanditaire -> ResponseEntity.ok(toResponse(commanditaireHistoryService.alimenter(id, request))))
-                .orElse(ResponseEntity.notFound().build());
+    public CommanditaireResponse alimenter(@PathVariable UUID id, @Valid @RequestBody AlimenterCommanditaireRequest req) {
+        return service.alimenter(id, req);
     }
 
     @GetMapping("/{id}/mouvements")
-    public ResponseEntity<List<MouvementCommanditaireResponse>> mouvements(@PathVariable UUID id) {
-        if (!commanditaireRepository.existsById(id)) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(commanditaireHistoryService.mouvements(id));
-    }
-
-    private CommanditaireResponse toResponse(Commanditaire c) {
-        return CommanditaireResponse.builder()
-                .id(c.getId())
-                .nom(c.getNom())
-                .prenom(c.getPrenom())
-                .societe(c.getSociete())
-                .email(c.getEmail())
-                .telephone(c.getTelephone())
-                .statut(c.getStatut())
-                .soldeDisponible(c.getSoldeDisponible())
-                .soldeReserve(c.getSoldeReserve())
-                .totalAlimente(c.getTotalAlimente())
-                .totalDistribue(c.getTotalDistribue())
-                .motifStatut(c.getMotifStatut())
-                .createdAt(c.getCreatedAt())
-                .updatedAt(c.getUpdatedAt())
-                .build();
-    }
+    public List<MouvementCommanditaireResponse> mouvements(@PathVariable UUID id) { return service.mouvements(id); }
 }

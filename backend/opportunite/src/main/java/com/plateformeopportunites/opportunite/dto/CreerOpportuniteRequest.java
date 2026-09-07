@@ -1,5 +1,6 @@
 package com.plateformeopportunites.opportunite.dto;
 
+import com.plateformeopportunites.common.enums.ModePlafond;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -22,7 +23,7 @@ public class CreerOpportuniteRequest {
     private String specsFinePrint;
 
     @NotNull
-    @DecimalMin("0")
+    @DecimalMin(value = "0", inclusive = false)
     private BigDecimal prixNormal;
 
     @NotNull
@@ -33,6 +34,8 @@ public class CreerOpportuniteRequest {
     @Min(1)
     private Integer seuilMaximal;
 
+    private ModePlafond modePlafond;
+
     @NotNull
     @Future
     private LocalDateTime dateExpiration;
@@ -40,7 +43,7 @@ public class CreerOpportuniteRequest {
     /** Nom de la catégorie (optionnel). Créée automatiquement si inconnue. */
     private String categorie;
 
-    private UUID commanditaireId;
+    private UUID fournisseurId;
     private String partenaireNom;
     private String partenaireLogoUrl;
     private String partenaireContact;
@@ -50,9 +53,10 @@ public class CreerOpportuniteRequest {
     @Min(1) private Integer delaiConfirmationReceptionJours;
     @Size(max = 500) private String messageNotificationLivraison;
     @Size(max = 500) private String messagePartage;
+    private List<ChampFormulaireComplementaire> formulaireComplementaire;
 
     /** true = ACTIVE immédiatement, false (défaut) = BROUILLON */
-    private boolean actif = true;
+    private boolean actif = false;
 
     @NotEmpty
     private List<PalierPrixRequest> paliers;
@@ -63,7 +67,7 @@ public class CreerOpportuniteRequest {
         private Integer seuilMin;
         @NotNull @Min(1)
         private Integer seuilMax;
-        @NotNull @DecimalMin("0")
+        @NotNull @DecimalMin(value = "0", inclusive = false)
         private BigDecimal prix;
     }
 }

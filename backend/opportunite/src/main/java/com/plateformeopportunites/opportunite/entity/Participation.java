@@ -10,12 +10,16 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "participations")
+@Table(name = "participations", uniqueConstraints = @UniqueConstraint(
+        name = "uk_participation_utilisateur_opportunite", columnNames = {"utilisateur_id", "opportunite_id"}))
 @Getter @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class Participation {
+
+    @Version
+    private Long version;
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -84,6 +88,9 @@ public class Participation {
 
     @Column(length = 500)
     private String commentaireParticipantLivraison;
+
+    @Column(columnDefinition = "TEXT")
+    private String reponsesComplementaires;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

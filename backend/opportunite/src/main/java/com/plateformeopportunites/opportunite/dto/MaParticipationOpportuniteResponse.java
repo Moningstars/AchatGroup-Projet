@@ -8,6 +8,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 @Data
@@ -34,6 +35,7 @@ public class MaParticipationOpportuniteResponse {
     private String transporteur;
     private String referenceLivraison;
     private String commentaireParticipantLivraison;
+    private Map<String, String> reponsesComplementaires;
     private LocalDateTime createdAt;
     private LocalDateTime dateExpiration;
     private StatutOpportunite statutOpportunite;

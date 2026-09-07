@@ -31,6 +31,9 @@ public class SondageResponse {
     private BigDecimal budgetDistribue;
     private BigDecimal budgetRestant;
     private Boolean budgetLibere;
+    private Long reponsesTotal;
+    private Long reponsesAValider;
+    private Long reponsesRejetees;
     private LocalDateTime createdAt;
     private List<QuestionResponse> questions;
     private boolean hasEligibilite;

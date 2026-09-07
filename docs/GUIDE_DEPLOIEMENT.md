@@ -142,7 +142,7 @@ Des fichiers d'exemple ont aussi été ajoutés au projet pour accélérer la pr
 docker-compose.prod.example.yml
 deploy/Caddyfile.example
 frontend/admin/.env.production.example
-frontend/Opportunités de sondage et réduction/.env.production.example
+frontend/app/.env.example
 ```
 
 Avant le déploiement, copiez-les vers leurs noms réels :
@@ -152,7 +152,7 @@ Copy-Item .env.prod.example .env.prod
 Copy-Item docker-compose.prod.example.yml docker-compose.prod.yml
 Copy-Item deploy\Caddyfile.example deploy\Caddyfile
 Copy-Item frontend\admin\.env.production.example frontend\admin\.env.production
-Copy-Item "frontend\Opportunités de sondage et réduction\.env.production.example" "frontend\Opportunités de sondage et réduction\.env.production"
+Copy-Item frontend\app\.env.example frontend\app\.env.production
 ```
 
 ## 6. Préparation frontend pour un domaine
@@ -169,7 +169,7 @@ Créer des fichiers d'environnement côté frontend :
 
 ```text
 frontend/admin/.env.production
-frontend/Opportunités de sondage et réduction/.env.production
+frontend/app/.env.production
 ```
 
 Exemple :
@@ -236,7 +236,7 @@ frontend/admin/dist
 Sur Windows PowerShell :
 
 ```powershell
-cd "frontend\Opportunités de sondage et réduction"
+cd frontend\app
 npm ci
 npm run build
 cd ..\..
@@ -245,7 +245,7 @@ cd ..\..
 Le résultat est :
 
 ```text
-frontend/Opportunités de sondage et réduction/dist
+frontend/app/dist
 ```
 
 ## 8. Déploiement Docker Compose professionnel
@@ -311,7 +311,7 @@ services:
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./frontend/admin/dist:/srv/admin:ro
-      - ./frontend/Opportunités de sondage et réduction/dist:/srv/app:ro
+      - ./frontend/app/dist:/srv/app:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
@@ -468,7 +468,7 @@ cd backend
 cd ../frontend/admin
 npm ci
 npm run build
-cd "../Opportunités de sondage et réduction"
+cd ../app
 npm ci
 npm run build
 cd ../..
@@ -526,7 +526,7 @@ cd backend
 cd ../frontend/admin
 npm ci
 npm run build
-cd "../Opportunités de sondage et réduction"
+cd ../app
 npm ci
 npm run build
 cd ../..

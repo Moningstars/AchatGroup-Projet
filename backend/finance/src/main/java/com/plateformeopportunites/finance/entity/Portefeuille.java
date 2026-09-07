@@ -39,11 +39,11 @@ public class Portefeuille {
 
     @PrePersist
     protected void onCreate() {
-        this.soldeDisponible = BigDecimal.ZERO;
-        this.soldeGele = BigDecimal.ZERO;
-        this.soldePoints = BigDecimal.ZERO;
-        this.devise = "XOF";
-        this.updatedAt = LocalDateTime.now();
+        if (this.soldeDisponible == null) this.soldeDisponible = BigDecimal.ZERO;
+        if (this.soldeGele == null) this.soldeGele = BigDecimal.ZERO;
+        if (this.soldePoints == null) this.soldePoints = BigDecimal.ZERO;
+        if (this.devise == null) this.devise = "XOF";
+        if (this.updatedAt == null) this.updatedAt = LocalDateTime.now();
     }
 
     @PreUpdate

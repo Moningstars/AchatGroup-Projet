@@ -2,13 +2,11 @@ package com.plateformeopportunites.identity.dto;
 
 import lombok.Builder;
 import lombok.Data;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Data
-@Builder
+@Data @Builder
 public class MouvementCommanditaireResponse {
     private UUID id;
     private String type;

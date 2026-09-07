@@ -16,6 +16,7 @@ import com.plateformeopportunites.identity.entity.Utilisateur;
 import com.plateformeopportunites.identity.repository.AdministrateurRepository;
 import com.plateformeopportunites.identity.repository.CommanditaireRepository;
 import com.plateformeopportunites.identity.repository.UtilisateurRepository;
+import com.plateformeopportunites.identity.service.CommanditaireService;
 import com.plateformeopportunites.sondage.dto.CreerEligibiliteRequest;
 import com.plateformeopportunites.sondage.dto.CreerSondageRequest;
 import com.plateformeopportunites.sondage.dto.MaParticipationSondageResponse;
@@ -59,6 +60,7 @@ public class SondageService {
     private final OptionReponseRepository optionReponseRepository;
     private final AdministrateurRepository administrateurRepository;
     private final CommanditaireRepository commanditaireRepository;
+    private final CommanditaireService commanditaireService;
     private final UtilisateurRepository utilisateurRepository;
     private final WalletService walletService;
     private final ApplicationEventPublisher eventPublisher;
@@ -70,6 +72,8 @@ public class SondageService {
     public SondageResponse creer(UUID adminId, CreerSondageRequest req) {
         Administrateur admin = administrateurRepository.findById(adminId)
                 .orElseThrow(() -> new IllegalArgumentException("Admin introuvable"));
+
+        if (req.getCommanditaireId() != null) commanditaireService.exigerActif(req.getCommanditaireId());
 
         Sondage sondage = Sondage.builder()
                 .admin(admin)
@@ -165,7 +169,7 @@ public class SondageService {
         if (sondageEligibiliteRepository.findBySondageId(sondageId).isEmpty()) {
             throw new IllegalStateException("Impossible d'activer : aucun test d'éligibilité configuré pour ce sondage");
         }
-        if (!sondage.getDateExpiration().isAfter(LocalDateTime.now())) {
+        if (sondage.getDateExpiration() == null || !sondage.getDateExpiration().isAfter(LocalDateTime.now())) {
             throw new IllegalStateException("La date d'expiration doit être future avant l'activation");
         }
         if (sondage.getQuotaVise() == null || sondage.getQuotaVise() < 1
@@ -173,9 +177,13 @@ public class SondageService {
             throw new IllegalStateException("Le quota et la récompense du sondage sont invalides");
         }
 
-        // Réserve le budget nécessaire depuis le wallet plateforme
+        // Le sponsor finance son sondage. Sans sponsor, le portefeuille plateforme reste le payeur.
         BigDecimal budgetNecessaire = calculerBudgetNecessaire(sondage);
-        walletService.reserverBudgetSondage(sondageId, sondage.getAdmin().getId(), budgetNecessaire);
+        if (sondage.getCommanditaireId() != null) {
+            commanditaireService.reserverBudget(sondage.getCommanditaireId(), sondageId, budgetNecessaire);
+        } else {
+            walletService.reserverBudgetSondage(sondageId, sondage.getAdmin().getId(), budgetNecessaire);
+        }
 
         sondage.setBudgetReserve(budgetNecessaire);
         sondage.setBudgetDistribue(BigDecimal.ZERO);
@@ -204,7 +212,7 @@ public class SondageService {
     @Transactional
     public SondageResponse modifier(UUID sondageId, ModifierSondageRequest req) {
         Sondage sondage = getSondage(sondageId);
-        boolean modifieBudget = req.getQuotaVise() != null || req.getRecompense() != null;
+        boolean modifieBudget = req.getQuotaVise() != null || req.getRecompense() != null || req.getCommanditaireId() != null;
         if (modifieBudget && sondage.getStatut() != StatutSondage.BROUILLON) {
             throw new IllegalStateException("Le quota et la récompense ne peuvent plus être modifiés après réservation du budget");
         }
@@ -216,6 +224,10 @@ public class SondageService {
         if (req.getDescription() != null) sondage.setDescription(req.getDescription());
         if (req.getQuotaVise() != null) sondage.setQuotaVise(req.getQuotaVise());
         if (req.getRecompense() != null) sondage.setRecompense(req.getRecompense());
+        if (req.getCommanditaireId() != null) {
+            commanditaireService.exigerActif(req.getCommanditaireId());
+            sondage.setCommanditaireId(req.getCommanditaireId());
+        }
         if (req.getDateExpiration() != null) sondage.setDateExpiration(req.getDateExpiration());
         return toResponse(sondageRepository.save(sondage));
     }
@@ -499,15 +511,36 @@ public class SondageService {
 
     // ─── Soumission de preuve (participant, mode MANUEL) ─────────────────────
 
-    @Transactional
-    public void soumettrePreuve(UUID participantId, UUID sondageId, String fichierUrl) {
+    @Transactional(readOnly = true)
+    public void verifierSoumissionPreuve(UUID participantId, UUID sondageId) {
         SondageReponse reponse = sondageReponseRepository.findBySondageIdAndUtilisateurId(sondageId, participantId)
                 .orElseThrow(() -> new IllegalArgumentException("Vous n'avez pas encore répondu à ce sondage"));
         if (reponse.getStatutValidation() != StatutValidation.EN_ATTENTE_PREUVE) {
             throw new IllegalStateException("Cette réponse n'est plus en attente de preuve");
         }
+    }
+
+    @Transactional
+    public String soumettrePreuve(UUID participantId, UUID sondageId, String fichierUrl) {
+        SondageReponse reponse = sondageReponseRepository.findBySondageIdAndUtilisateurId(sondageId, participantId)
+                .orElseThrow(() -> new IllegalArgumentException("Vous n'avez pas encore répondu à ce sondage"));
+        if (reponse.getStatutValidation() != StatutValidation.EN_ATTENTE_PREUVE) {
+            throw new IllegalStateException("Cette réponse n'est plus en attente de preuve");
+        }
+        String anciennePreuve = reponse.getFichierPreuve();
         reponse.setFichierPreuve(fichierUrl);
         sondageReponseRepository.save(reponse);
+        return anciennePreuve;
+    }
+
+    @Transactional(readOnly = true)
+    public String getCheminPreuve(UUID reponseId) {
+        SondageReponse reponse = sondageReponseRepository.findById(reponseId)
+                .orElseThrow(() -> new IllegalArgumentException("Réponse introuvable"));
+        if (reponse.getFichierPreuve() == null || reponse.getFichierPreuve().isBlank()) {
+            throw new IllegalArgumentException("Aucun justificatif n'est associé à cette réponse");
+        }
+        return reponse.getFichierPreuve();
     }
 
     // ─── Validation admin ─────────────────────────────────────────────────────
@@ -575,18 +608,10 @@ public class SondageService {
 
     @Transactional(readOnly = true)
     public List<ReponseAValiderDTO> listerReponsesAValider(UUID sondageId) {
-        return sondageReponseRepository.findBySondageIdAndStatutValidation(
+        return sondageReponseRepository.findBySondageIdAndStatutValidationWithDetails(
                         sondageId, StatutValidation.EN_ATTENTE_PREUVE)
                 .stream()
-                .map(r -> ReponseAValiderDTO.builder()
-                        .id(r.getId())
-                        .participantNom(r.getUtilisateur().getNom())
-                        .participantContact(r.getUtilisateur().getTelephone())
-                        .statutValidation(r.getStatutValidation())
-                        .createdAt(r.getCreatedAt())
-                        .valideeAt(r.getValideeAt())
-                        .recompenseVersee(r.getRecompenseVersee())
-                        .build())
+                .map(this::toReponseAdmin)
                 .toList();
     }
 
@@ -594,15 +619,7 @@ public class SondageService {
     public List<ReponseAValiderDTO> listerRepondants(UUID sondageId) {
         return sondageReponseRepository.findBySondageIdOrderByCreatedAtDesc(sondageId)
                 .stream()
-                .map(r -> ReponseAValiderDTO.builder()
-                        .id(r.getId())
-                        .participantNom(r.getUtilisateur().getNom())
-                        .participantContact(r.getUtilisateur().getTelephone())
-                        .statutValidation(r.getStatutValidation())
-                        .createdAt(r.getCreatedAt())
-                        .valideeAt(r.getValideeAt())
-                        .recompenseVersee(r.getRecompenseVersee())
-                        .build())
+                .map(this::toReponseAdmin)
                 .toList();
     }
 
@@ -737,8 +754,12 @@ public class SondageService {
             throw new IllegalStateException("Budget du sondage insuffisant pour distribuer cette récompense");
         }
 
-        // 1. Débiter soldeReserve du wallet plateforme
-        walletService.debiterPourDistribution(sondage.getId(), sondage.getAdmin().getId(), montantFCFA, sondage.getTypeRecompense(), mode);
+        // 1. Débiter le budget réservé chez le véritable financeur.
+        if (sondage.getCommanditaireId() != null) {
+            commanditaireService.distribuer(sondage.getCommanditaireId(), sondage.getId(), montantFCFA);
+        } else {
+            walletService.debiterPourDistribution(sondage.getId(), sondage.getAdmin().getId(), montantFCFA, sondage.getTypeRecompense(), mode);
+        }
 
         // 2. Créditer le participant
         if (sondage.getTypeRecompense() == TypeRecompense.POINTS) {
@@ -900,13 +921,43 @@ public class SondageService {
         if (Boolean.TRUE.equals(sondage.getBudgetLibere())) return;
         BigDecimal reliquat = budgetRestant(sondage);
         if (reliquat.compareTo(BigDecimal.ZERO) > 0) {
-            walletService.libererBudgetSondage(sondage.getId(), sondage.getAdmin().getId(), reliquat);
+            if (sondage.getCommanditaireId() != null) {
+                commanditaireService.liberer(sondage.getCommanditaireId(), sondage.getId(), reliquat);
+            } else {
+                walletService.libererBudgetSondage(sondage.getId(), sondage.getAdmin().getId(), reliquat);
+            }
         }
         sondage.setBudgetLibere(true);
     }
 
     private BigDecimal zero(BigDecimal value) {
         return value != null ? value : BigDecimal.ZERO;
+    }
+
+    private ReponseAValiderDTO toReponseAdmin(SondageReponse r) {
+        List<ReponseAValiderDTO.DetailReponse> details = r.getDetails() == null ? List.of() : r.getDetails().stream()
+                .sorted(java.util.Comparator.comparing(d -> d.getQuestion().getOrdre()))
+                .map(d -> ReponseAValiderDTO.DetailReponse.builder()
+                        .questionId(d.getQuestion().getId())
+                        .ordre(d.getQuestion().getOrdre())
+                        .question(d.getQuestion().getTexte())
+                        .reponse(d.getOptionReponse() != null
+                                ? d.getOptionReponse().getLibelle()
+                                : d.getValeurTexte())
+                        .build())
+                .toList();
+        return ReponseAValiderDTO.builder()
+                .id(r.getId())
+                .participantId(r.getUtilisateur().getId())
+                .participantNom(r.getUtilisateur().getNom())
+                .participantContact(r.getUtilisateur().getTelephone())
+                .fichierPreuve(r.getFichierPreuve())
+                .statutValidation(r.getStatutValidation())
+                .createdAt(r.getCreatedAt())
+                .valideeAt(r.getValideeAt())
+                .recompenseVersee(r.getRecompenseVersee())
+                .details(details)
+                .build();
     }
 
     private Sondage getSondage(UUID id) {
@@ -1002,6 +1053,11 @@ public class SondageService {
                 .budgetDistribue(s.getBudgetDistribue())
                 .budgetRestant(budgetRestant(s))
                 .budgetLibere(Boolean.TRUE.equals(s.getBudgetLibere()))
+                .reponsesTotal(sondageReponseRepository.countBySondageId(s.getId()))
+                .reponsesAValider(sondageReponseRepository.countBySondageIdAndStatutValidation(
+                        s.getId(), StatutValidation.EN_ATTENTE_PREUVE))
+                .reponsesRejetees(sondageReponseRepository.countBySondageIdAndStatutValidation(
+                        s.getId(), StatutValidation.REJETE))
                 .createdAt(s.getCreatedAt())
                 .questions(questions)
                 .hasEligibilite(sondageEligibiliteRepository.existsBySondageId(s.getId()))

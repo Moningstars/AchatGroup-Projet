@@ -17,5 +17,11 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      // Les remises à zéro de pagination dans les effets sont intentionnelles.
+      'react-hooks/set-state-in-effect': 'off',
+      // Les providers exportent aussi leurs hooks publics.
+      'react-refresh/only-export-components': 'off',
+    },
   },
 ])

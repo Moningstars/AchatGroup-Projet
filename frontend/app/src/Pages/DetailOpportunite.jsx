@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom'
 import {
-  ShieldCheck, Users, Loader2, ChevronRight, ChevronDown, CheckCircle2, AlertCircle, Layers, Timer, Minus, Plus, Copy, Share2, ShoppingCart, PackageCheck, ExternalLink, Gift, Store, Coins, Sparkles
+  ShieldCheck, Users, Loader2, ChevronRight, CheckCircle2, AlertCircle, Layers, Timer, Minus, Plus, Copy, Share2, ShoppingCart, PackageCheck, ExternalLink, Gift, Store, Coins, Sparkles
 } from 'lucide-react'
 import { getOpportunite, getOpportunites, getMesParticipationsOpportunites, getSolde, souscrire, imgUrl } from '../services/api'
 import { useAuth } from '../context/AuthContext'
@@ -32,6 +32,14 @@ function InstagramLogo({ className = 'h-5 w-5' }) {
   )
 }
 
+function FacebookLogo({ className = 'h-5 w-5' }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
+      <path d="M13.7 21v-8h2.7l.4-3.1h-3.1v-2c0-.9.3-1.5 1.6-1.5H17V3.6c-.8-.1-1.7-.2-2.5-.2-2.5 0-4.2 1.5-4.2 4.3v2.2H7.5V13h2.8v8h3.4Z" />
+    </svg>
+  )
+}
+
 function TikTokLogo({ className = 'h-5 w-5' }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
@@ -40,13 +48,11 @@ function TikTokLogo({ className = 'h-5 w-5' }) {
   )
 }
 
-function ShareIconButton({ label, onClick, className, children }) {
+function ShareIconButton({ label, caption, onClick, className, children }) {
   return (
-    <button type="button" onClick={onClick} aria-label={label} title={label} className={`group relative flex h-10 w-10 items-center justify-center rounded-xl transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-primary/30 ${className}`}>
+    <button type="button" onClick={onClick} aria-label={label} title={label} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-primary/30 ${className}`}>
       {children}
-      <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-950 px-2.5 py-1.5 text-[10px] font-bold text-white shadow-lg group-hover:block group-focus:block">
-        {label}
-      </span>
+      <span className="sr-only">{caption}</span>
     </button>
   )
 }
@@ -119,7 +125,7 @@ export default function DetailOpportunite() {
   const [maParticipation, setMaParticipation] = useState(null)
   const [copied, setCopied] = useState(false)
   const [shareFeedback, setShareFeedback] = useState('')
-  const [shareOpen, setShareOpen] = useState(false)
+  const [activeInfoTab, setActiveInfoTab] = useState('produit')
   const [wallet, setWallet] = useState(null)
   const [utiliserPoints, setUtiliserPoints] = useState(false)
   const [reponsesComplementaires, setReponsesComplementaires] = useState({})
@@ -249,13 +255,9 @@ export default function DetailOpportunite() {
       return
     }
 
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: opportunite?.titre || 'Opportunité OpportuniHub', text: message, url })
-        return
-      } catch (error) {
-        if (error?.name === 'AbortError') return
-      }
+    if (reseau === 'facebook') {
+      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank', 'noopener,noreferrer')
+      return
     }
 
     const destination = reseau === 'instagram' ? 'https://www.instagram.com/' : 'https://www.tiktok.com/'
@@ -422,53 +424,61 @@ export default function DetailOpportunite() {
             )}
           </div>
 
-          {/* Détails : infos produit + fournisseur — passent après le bloc info sur mobile */}
-          <div className="order-3 lg:order-none lg:col-start-1 lg:col-span-7 lg:row-start-2 space-y-6">
-            <section className="rounded-3xl border-2 border-gray-100 bg-white p-5 sm:p-6">
-              <div className="flex items-center gap-2">
-                <PackageCheck size={16} className="text-primary" />
-                <h2 className="font-heading text-lg font-black text-primary">À propos de ce produit</h2>
+          {/* Informations réunies dans une seule fiche à onglets. */}
+          <div className="order-3 lg:order-none lg:col-start-1 lg:col-span-7 lg:row-start-2">
+            <section className="overflow-hidden rounded-3xl border-2 border-gray-100 bg-white">
+              <div className="grid grid-cols-2 border-b border-gray-100 bg-gray-50/70 p-1.5">
+                <button type="button" onClick={() => setActiveInfoTab('produit')} className={`flex min-w-0 items-center justify-center gap-2 rounded-2xl px-2 py-3 text-xs font-black transition ${activeInfoTab === 'produit' ? 'bg-white text-primary shadow-sm' : 'text-gray-400 hover:text-primary'}`}>
+                  <PackageCheck size={16} className="shrink-0" />
+                  <span className="truncate">À propos du produit</span>
+                </button>
+                <button type="button" onClick={() => setActiveInfoTab('fournisseur')} className={`flex min-w-0 items-center justify-center gap-2 rounded-2xl px-2 py-3 text-xs font-black transition ${activeInfoTab === 'fournisseur' ? 'bg-white text-primary shadow-sm' : 'text-gray-400 hover:text-primary'}`}>
+                  <Store size={16} className="shrink-0" />
+                  <span className="truncate">Fournisseur</span>
+                </button>
               </div>
-              <p className="mt-3 text-sm font-medium leading-7 text-gray-500">
-                {opportunite.description || 'Les détails complets de cette offre seront bientôt renseignés par notre équipe.'}
-              </p>
 
-              {(opportunite.specsPointsForts || opportunite.specsCasUsage || opportunite.specsFinePrint) && (
-                <div className="mt-5 border-t border-gray-100 pt-5 space-y-4">
-                  {opportunite.specsPointsForts && (
-                    <ul className="grid gap-2 sm:grid-cols-2">
-                      {opportunite.specsPointsForts.split('\n').filter(Boolean).map((line, i) => (
-                        <li key={i} className="flex items-start gap-2 rounded-2xl bg-bg-light p-3 text-sm font-semibold text-gray-600">
-                          <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-success" />
-                          {line}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {opportunite.specsCasUsage && <p className="text-sm leading-7 text-gray-500">{opportunite.specsCasUsage}</p>}
-                  {opportunite.specsFinePrint && <p className="rounded-2xl bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-800">{opportunite.specsFinePrint}</p>}
-                </div>
-              )}
-            </section>
-
-            <section className="rounded-3xl border-2 border-gray-100 bg-white p-5 sm:p-6">
-              <div className="flex items-start gap-4">
-                {opportunite.partenaireLogoUrl ? (
-                  <img src={imgUrl(opportunite.partenaireLogoUrl)} alt={opportunite.partenaireNom || 'Partenaire'} className="h-14 w-14 shrink-0 rounded-2xl border border-gray-100 object-contain p-1" />
+              <div className="p-4 sm:p-6">
+                {activeInfoTab === 'produit' ? (
+                  <>
+                    <p className="text-sm font-medium leading-7 text-gray-500">
+                      {opportunite.description || 'Les détails complets de cette offre seront bientôt renseignés par notre équipe.'}
+                    </p>
+                    {(opportunite.specsPointsForts || opportunite.specsCasUsage || opportunite.specsFinePrint) && (
+                      <div className="mt-5 space-y-4 border-t border-gray-100 pt-5">
+                        {opportunite.specsPointsForts && (
+                          <ul className="grid gap-2 sm:grid-cols-2">
+                            {opportunite.specsPointsForts.split('\n').filter(Boolean).map((line, i) => (
+                              <li key={i} className="flex items-start gap-2 rounded-2xl bg-bg-light p-3 text-sm font-semibold text-gray-600">
+                                <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-success" />
+                                <span className="min-w-0 break-words">{line}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {opportunite.specsCasUsage && <p className="break-words text-sm leading-7 text-gray-500">{opportunite.specsCasUsage}</p>}
+                        {opportunite.specsFinePrint && <p className="break-words rounded-2xl bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-800">{opportunite.specsFinePrint}</p>}
+                      </div>
+                    )}
+                  </>
                 ) : (
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/5 text-primary"><Store size={23} /></div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
-                    {opportunite.fournisseurId ? 'Fournisseur vérifié' : "Fournisseur de l'offre"}
-                  </p>
-                  <h2 className="mt-1 font-heading text-lg font-black text-primary">{opportunite.partenaireNom || 'Fournisseur à confirmer'}</h2>
-                  {!opportunite.partenaireNom && <p className="mt-1 text-sm font-semibold text-gray-500">Les informations du fournisseur seront renseignées prochainement.</p>}
-                </div>
-                {opportunite.partenaireReseauxUrl && (
-                  <a href={opportunite.partenaireReseauxUrl} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-2 rounded-xl border-2 border-gray-100 px-3 text-xs font-black text-primary transition hover:border-primary/30" title="Voir le partenaire">
-                    <ExternalLink size={14} /> <span className="hidden sm:inline">Découvrir</span>
-                  </a>
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                    {opportunite.partenaireLogoUrl ? (
+                      <img src={imgUrl(opportunite.partenaireLogoUrl)} alt={opportunite.partenaireNom || 'Partenaire'} className="h-16 w-16 shrink-0 rounded-2xl border border-gray-100 object-contain p-1" />
+                    ) : (
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary/5 text-primary"><Store size={25} /></div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">{opportunite.fournisseurId ? 'Fournisseur vérifié' : "Fournisseur de l'offre"}</p>
+                      <h2 className="mt-1 break-words font-heading text-lg font-black text-primary">{opportunite.partenaireNom || 'Fournisseur à confirmer'}</h2>
+                      {!opportunite.partenaireNom && <p className="mt-1 text-sm font-semibold leading-6 text-gray-500">Les informations du fournisseur seront renseignées prochainement.</p>}
+                    </div>
+                    {opportunite.partenaireReseauxUrl && (
+                      <a href={opportunite.partenaireReseauxUrl} target="_blank" rel="noreferrer" className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-xl border-2 border-gray-100 px-3 text-xs font-black text-primary transition hover:border-primary/30 sm:w-auto" title="Voir le fournisseur">
+                        <ExternalLink size={14} /> Découvrir
+                      </a>
+                    )}
+                  </div>
                 )}
               </div>
             </section>
@@ -608,7 +618,7 @@ export default function DetailOpportunite() {
             )}
 
             {/* Suivi ou aide */}
-            <div className={`${dejaSouscrit ? 'bg-success/10 border-success/20' : 'bg-primary/5 border-primary/10'} rounded-2xl border-2 p-4`}>
+            <div className={`${dejaSouscrit ? 'bg-success/10 border-success/20' : 'bg-primary/5 border-primary/10'} min-w-0 rounded-2xl border-2 p-3 sm:p-4`}>
                 <div className="flex items-start gap-3">
                   {dejaSouscrit ? <CheckCircle2 size={20} className="text-success shrink-0 mt-0.5" /> : <ShieldCheck size={20} className="text-primary shrink-0 mt-0.5" />}
                   <div className="min-w-0 flex-1">
@@ -624,10 +634,10 @@ export default function DetailOpportunite() {
                         Votre dépôt est sécurisé. Il est finalisé seulement si le seuil minimum est atteint, sinon il est remboursé.
                       </p>
                     )}
-                    <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-white/70 px-3 py-2">
-                      <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-primary">
+                    <div className="mt-3 flex flex-col items-start gap-2 rounded-xl bg-white/70 px-3 py-2 min-[430px]:flex-row min-[430px]:items-center min-[430px]:justify-between">
+                      <span className="flex min-w-0 items-center gap-2 text-[10px] font-black uppercase tracking-wider text-primary sm:text-[11px]">
                         <PackageCheck size={14} />
-                        {dejaSouscrit ? (SUIVI_PARTICIPATION[maParticipation.statutLivraison] || 'Opportunité en cours') : (activationAtteinte ? 'Opportunité déjà validée' : 'En attente du seuil minimum')}
+                        <span className="min-w-0 break-words">{dejaSouscrit ? (SUIVI_PARTICIPATION[maParticipation.statutLivraison] || 'Opportunité en cours') : (activationAtteinte ? 'Opportunité déjà validée' : 'En attente du seuil minimum')}</span>
                       </span>
                       <span className={`text-[11px] font-black tabular-nums ${dejaSouscrit ? 'text-success' : 'text-primary'}`}>
                         {dejaSouscrit ? `${maParticipation.progressionLivraison || 0}%` : `${participantsActuels}/${opportunite.seuilMinimum}`}
@@ -645,11 +655,11 @@ export default function DetailOpportunite() {
               </div>
 
             {/* Quantité */}
-            <div className="bg-white rounded-2xl border-2 border-gray-100 p-4 flex items-center justify-between">
+            <div className="flex flex-col gap-3 rounded-2xl border-2 border-gray-100 bg-white p-4 min-[430px]:flex-row min-[430px]:items-center min-[430px]:justify-between">
               <span className="text-[11px] font-black uppercase tracking-widest text-gray-400">
                 {dejaSouscrit ? 'Quantité à ajouter' : 'Quantité'}
               </span>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center justify-between gap-3 min-[430px]:justify-end">
                 <button
                   type="button"
                   onClick={() => setQuantite(q => Math.max(1, q - 1))}
@@ -734,44 +744,40 @@ export default function DetailOpportunite() {
               </div>
             )}
 
-            {/* Partage et parrainage */}
-            <div className={`overflow-hidden rounded-2xl border-2 bg-white transition-all ${shareOpen ? 'border-primary/15 shadow-soft' : 'border-gray-100'}`}>
-              <div className="flex items-center gap-3 p-3">
+            {/* Partage et parrainage — toujours déplié */}
+            <div className="overflow-hidden rounded-2xl border-2 border-primary/10 bg-white shadow-soft">
+              <div className="flex items-start gap-3 p-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/5 text-primary">
                   {dejaSouscrit ? <Gift size={18} /> : <Share2 size={18} />}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-black text-primary">
+                  <p className="text-xs font-black leading-5 text-primary">
                     {dejaSouscrit ? 'Invitez vos proches et gagnez des points' : "Partager l'offre avec vos proches"}
                   </p>
-                  <p className="mt-0.5 truncate text-[10px] font-semibold text-gray-400">
+                  <p className="mt-0.5 text-[10px] font-semibold leading-4 text-gray-400">
                     {dejaSouscrit
                       ? `${fmt(recompenseParrainage)} points après leur achat confirmé`
                       : 'Copiez ou envoyez le lien en quelques secondes'}
                   </p>
                 </div>
-                <button type="button" aria-expanded={shareOpen} onClick={() => setShareOpen(open => !open)} className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-primary px-3 text-[11px] font-black text-white transition hover:brightness-105">
-                  Partager <ChevronDown size={14} className={`transition-transform ${shareOpen ? 'rotate-180' : ''}`} />
-                </button>
               </div>
 
-              {shareOpen && (
-                <div className="animate-fade-up border-t border-gray-100 px-3 pb-3 pt-2.5">
-                  {dejaSouscrit && (
-                    <p className="mb-2 text-[10px] font-semibold leading-4 text-gray-500">
-                      Votre lien personnel vous récompense lorsqu’un proche rejoint cette offre et finalise son achat.
-                    </p>
-                  )}
-                  <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                    <ShareIconButton label={copied ? 'Lien copié !' : 'Copier le lien'} onClick={handleCopyLink} className="bg-gray-50 text-primary hover:bg-gray-100"><Copy size={18} /></ShareIconButton>
-                    <ShareIconButton label="Partager via WhatsApp" onClick={() => handleSocialShare('whatsapp')} className="bg-[#25D366] text-white shadow-sm shadow-emerald-200 hover:bg-[#20bd5a]"><WhatsAppLogo /></ShareIconButton>
-                    <ShareIconButton label="Partager via Instagram" onClick={() => handleSocialShare('instagram')} className="bg-gradient-to-br from-fuchsia-600 via-rose-500 to-amber-400 text-white shadow-sm shadow-fuchsia-200"><InstagramLogo /></ShareIconButton>
-                    <ShareIconButton label="Partager via TikTok" onClick={() => handleSocialShare('tiktok')} className="bg-slate-950 text-white shadow-sm hover:bg-slate-800"><TikTokLogo /></ShareIconButton>
-                    <ShareIconButton label="Partager via une autre application" onClick={handleShare} className="border border-gray-200 bg-white text-primary hover:border-primary/30"><Share2 size={18} /></ShareIconButton>
-                  </div>
-                  {shareFeedback && <p role="status" className="mt-2 text-center text-[10px] font-black text-success">{shareFeedback}</p>}
+              <div className="border-t border-gray-100 px-3 pb-3 pt-2.5">
+                {dejaSouscrit && (
+                  <p className="mb-2 text-[10px] font-semibold leading-4 text-gray-500">
+                    Votre lien personnel vous récompense lorsqu’un proche rejoint cette offre et finalise son achat.
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <ShareIconButton label="Partager via WhatsApp" caption="WhatsApp" onClick={() => handleSocialShare('whatsapp')} className="bg-[#25D366] text-white shadow-sm shadow-emerald-200 hover:bg-[#20bd5a]"><WhatsAppLogo /></ShareIconButton>
+                  <ShareIconButton label="Partager via Facebook" caption="Facebook" onClick={() => handleSocialShare('facebook')} className="bg-[#1877F2] text-white shadow-sm shadow-blue-200 hover:bg-[#1268d3]"><FacebookLogo /></ShareIconButton>
+                  <ShareIconButton label="Partager via TikTok" caption="TikTok" onClick={() => handleSocialShare('tiktok')} className="bg-slate-950 text-white shadow-sm hover:bg-slate-800"><TikTokLogo /></ShareIconButton>
+                  <ShareIconButton label="Partager via Instagram" caption="Instagram" onClick={() => handleSocialShare('instagram')} className="bg-gradient-to-br from-fuchsia-600 via-rose-500 to-amber-400 text-white shadow-sm shadow-fuchsia-200"><InstagramLogo /></ShareIconButton>
+                  <ShareIconButton label={copied ? 'Lien copié !' : 'Copier le lien'} caption={copied ? 'Copié !' : 'Copier'} onClick={handleCopyLink} className="bg-gray-50 text-primary hover:bg-gray-100"><Copy size={18} /></ShareIconButton>
+                  <ShareIconButton label="Partager via une autre application" caption="Partager" onClick={handleShare} className="border border-gray-200 bg-white text-primary hover:border-primary/30"><Share2 size={18} /></ShareIconButton>
                 </div>
-              )}
+                {shareFeedback && <p role="status" className="mt-2 text-center text-[10px] font-black text-success">{shareFeedback}</p>}
+              </div>
             </div>
 
             {/* CTA */}
@@ -784,7 +790,7 @@ export default function DetailOpportunite() {
               <button
                 onClick={handleJoindre}
                 disabled={joining || joinSuccess || !souscriptionOuverte || maxAjout <= 0}
-                className={`w-full py-4 rounded-2xl font-heading font-black text-base shadow-lg flex items-center justify-center gap-3 transition-all active:scale-95 ${joinSuccess ? 'bg-success text-white cursor-default' : !souscriptionOuverte || maxAjout <= 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-accent text-primary hover:brightness-105'}`}
+                className={`flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-4 text-center font-heading text-sm font-black leading-5 shadow-lg transition-all active:scale-95 sm:text-base ${joinSuccess ? 'bg-success text-white cursor-default' : !souscriptionOuverte || maxAjout <= 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-accent text-primary hover:brightness-105'}`}
               >
                 {joining && <Loader2 size={20} className="animate-spin" />}
                 {!joining && !joinSuccess && <ShoppingCart size={20} />}

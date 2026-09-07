@@ -56,11 +56,21 @@ public class WalletService {
      * utilisateur vient de changer, avec le même contrat d'événement que PaygateService.
      */
     private void notifierSoldeDisponible(UUID participantId, String event, BigDecimal montant, Portefeuille portefeuille, String raison) {
-        pusherNotificationService.notifierUtilisateur(participantId, event, Map.of(
+        Map<String, Object> payload = Map.of(
                 "montant", montant,
                 "nouveauSolde", portefeuille.getSoldeDisponible(),
                 "raison", raison
-        ));
+        );
+        Runnable notification = () -> pusherNotificationService.notifierUtilisateur(participantId, event, payload);
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+                && org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override public void afterCommit() { notification.run(); }
+                    });
+        } else {
+            notification.run();
+        }
     }
 
     private void notifierCredit(UUID participantId, BigDecimal montant, Portefeuille portefeuille, String raison) {
@@ -200,7 +210,7 @@ public class WalletService {
         if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Le montant à geler doit être strictement positif");
         }
-        Portefeuille portefeuille = getPortefeuille(participantId);
+        Portefeuille portefeuille = getPortefeuilleForUpdate(participantId);
         if (portefeuille.getSoldeDisponible().compareTo(montant) < 0) {
             throw new IllegalArgumentException("Solde insuffisant pour participer");
         }
@@ -224,7 +234,7 @@ public class WalletService {
             throw new IllegalArgumentException("Le montant à geler doit être strictement positif");
         }
 
-        Portefeuille portefeuille = getPortefeuille(participantId);
+        Portefeuille portefeuille = getPortefeuilleForUpdate(participantId);
         BigDecimal valeurPoint = getWalletPlateforme().getTauxConversionPoints();
         if (valeurPoint == null || valeurPoint.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalStateException("La valeur d'achat des points n'est pas configurée");
@@ -253,7 +263,7 @@ public class WalletService {
         if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Le montant à débiter doit être strictement positif");
         }
-        Portefeuille portefeuille = getPortefeuille(participantId);
+        Portefeuille portefeuille = getPortefeuilleForUpdate(participantId);
         if (portefeuille.getSoldeGele().compareTo(montant) < 0) {
             throw new IllegalStateException("Solde gelé insuffisant pour finaliser le débit");
         }
@@ -266,7 +276,7 @@ public class WalletService {
         if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Le montant à rembourser doit être strictement positif");
         }
-        Portefeuille portefeuille = getPortefeuille(participantId);
+        Portefeuille portefeuille = getPortefeuilleForUpdate(participantId);
         if (portefeuille.getSoldeGele().compareTo(montant) < 0) {
             throw new IllegalStateException("Solde gelé insuffisant pour rembourser");
         }
@@ -285,7 +295,7 @@ public class WalletService {
         if (valeurPoints.compareTo(montantTotal) > 0) valeurPoints = montantTotal;
         BigDecimal montantCash = montantTotal.subtract(valeurPoints);
 
-        Portefeuille portefeuille = getPortefeuille(participantId);
+        Portefeuille portefeuille = getPortefeuilleForUpdate(participantId);
         if (portefeuille.getSoldeGele().compareTo(montantTotal) < 0) {
             throw new IllegalStateException("Solde gelé insuffisant pour rembourser");
         }

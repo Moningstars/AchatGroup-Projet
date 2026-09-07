@@ -25,6 +25,21 @@ const STATUT = {
   CLOTURE: { label: 'Clôturé', cls: 'bg-gray-100 text-gray-400 border-gray-200' },
 }
 const GRID_LIMIT = 10 // 5 col × 2 lignes
+const SURVEY_FALLBACK_IMAGES = ['/hero/slide-2.jpg', '/hero/slide-3.jpg', '/hero/slide-4.jpg']
+
+function surveyImage(survey) {
+  if (survey?.imageUrl) return imgUrl(survey.imageUrl)
+  const key = String(survey?.id || survey?.titre || 'sondage')
+  const index = [...key].reduce((total, char) => total + char.charCodeAt(0), 0) % SURVEY_FALLBACK_IMAGES.length
+  return SURVEY_FALLBACK_IMAGES[index]
+}
+
+function useFallbackImage(event) {
+  const image = event.currentTarget
+  if (image.dataset.fallbackApplied === 'true') return
+  image.dataset.fallbackApplied = 'true'
+  image.src = '/hero/slide-2.jpg'
+}
 
 export default function Sondages() {
   const navigate = useNavigate()
@@ -206,12 +221,15 @@ function SurveyCardFeatured({ survey: s, onClick }) {
       className="w-full text-left bg-primary rounded-3xl text-white relative overflow-hidden shadow-2xl shadow-primary/30 active:scale-[0.98] transition-transform"
     >
       {/* Image de couverture */}
-      {s.imageUrl && (
-        <div className="absolute inset-0 z-0">
-          <img src={imgUrl(s.imageUrl)} alt="" className="w-full h-full object-cover opacity-20" />
-          <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/80 to-primary/50" />
-        </div>
-      )}
+      <div className="absolute inset-0 z-0">
+        <img
+          src={surveyImage(s)}
+          alt=""
+          onError={useFallbackImage}
+          className="h-full w-full object-cover opacity-70 transition-transform duration-500 hover:scale-105"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/95 via-primary/80 to-primary/40" />
+      </div>
 
       <div className="relative z-10 p-7">
         <div className="flex justify-between items-center mb-6">
@@ -263,7 +281,6 @@ function SurveyCardFeatured({ survey: s, onClick }) {
 function SurveyCardCompact({ survey: s, onClick }) {
   const statut = STATUT[s.statut] || STATUT.CLOTURE
   const expiry = formatDate(s.dateExpiration)
-  const isActif = s.statut === 'ACTIF'
 
   return (
     <button
@@ -271,32 +288,20 @@ function SurveyCardCompact({ survey: s, onClick }) {
       className="w-full text-left bg-white border-2 border-gray-100 hover:border-primary/30 hover:shadow-md overflow-hidden group active:scale-[0.98] transition-all"
     >
       {/* Image de couverture */}
-      {s.imageUrl ? (
-        <div className="relative h-24 w-full overflow-hidden">
-          <img src={imgUrl(s.imageUrl)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+      <div className="relative h-24 w-full overflow-hidden bg-primary/10">
+          <img
+            src={surveyImage(s)}
+            alt=""
+            onError={useFallbackImage}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
           <span className={`absolute top-1.5 right-1.5 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-tight border ${statut.cls} bg-white/90`}>
             {statut.label}
           </span>
-        </div>
-      ) : (
-        /* Bande couleur statut si pas d'image */
-        <div className={`h-1 w-full ${isActif ? 'bg-success' : 'bg-gray-200'}`} />
-      )}
+      </div>
 
       <div className="p-3 space-y-2.5">
-        {/* Icône + badge (si pas d'image) */}
-        {!s.imageUrl && (
-          <div className="flex items-start justify-between gap-1">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActif ? 'bg-primary/10' : 'bg-gray-100'}`}>
-              <i className={`ti ti-forms text-base ${isActif ? 'text-primary' : 'text-gray-400'}`} />
-            </div>
-            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-tight border shrink-0 ${statut.cls}`}>
-              {statut.label}
-            </span>
-          </div>
-        )}
-
         {/* Titre */}
         <h3 className="font-heading font-bold text-[11px] text-primary leading-tight line-clamp-2 min-h-[2.4em]">{s.titre}</h3>
 

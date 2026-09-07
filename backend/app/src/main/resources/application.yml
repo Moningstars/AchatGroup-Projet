@@ -13,7 +13,8 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      # Valeur sûre par défaut. La stack Docker locale la surcharge à "update".
+      ddl-auto: ${JPA_DDL_AUTO:validate}
 
 
     open-in-view: false
@@ -40,6 +41,8 @@ server:
   port: 8080
 
 app:
+  seed:
+    enabled: ${APP_SEED_ENABLED:false}
   jwt:
     secret-participant: ${JWT_SECRET_PARTICIPANT}
     secret-admin: ${JWT_SECRET_ADMIN}
@@ -53,7 +56,7 @@ app:
 paygate:
   auth-token: ${PAYGATE_AUTH_TOKEN}
   api-url: https://paygateglobal.com/api/v1/pay
-  dev-mode: true
+  dev-mode: ${PAYGATE_DEV_MODE:false}
 
 ovh:
   sms:
@@ -62,7 +65,7 @@ ovh:
     application-key: ${OVH_SMS_APPLICATION_KEY:}
     application-secret: ${OVH_SMS_APPLICATION_SECRET:}
     consumer-key: ${OVH_SMS_CONSUMER_KEY:}
-    dev-mode: true
+    dev-mode: ${OVH_SMS_DEV_MODE:false}
 
 firebase:
   credentials-path: ${FIREBASE_CREDENTIALS_PATH:./firebase-service-account.json}
@@ -71,7 +74,7 @@ firebase:
 anthropic:
   api-key: ${ANTHROPIC_API_KEY:}
   api-url: https://api.anthropic.com/v1/messages
-  dev-mode: true
+  dev-mode: ${ANTHROPIC_DEV_MODE:false}
 
 gemini:
   api-key: ${GEMINI_API_KEY}
