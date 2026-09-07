@@ -27,6 +27,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final AuditHttpFilter auditHttpFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -42,13 +43,14 @@ public class SecurityConfig {
                                 new AntPathRequestMatcher("/api/opportunites/mes-participations/*/reception", HttpMethod.PATCH.name()),
                                 new AntPathRequestMatcher("/api/sondages/mes-participations", HttpMethod.GET.name())
                         ).hasRole("PARTICIPANT")
+                        .requestMatchers(AntPathRequestMatcher.antMatcher("/uploads/preuves/**")).denyAll()
                         .requestMatchers(
                                 AntPathRequestMatcher.antMatcher("/api/auth/verifier-token"),
                                 AntPathRequestMatcher.antMatcher("/api/auth/dev/**"),
                                 AntPathRequestMatcher.antMatcher("/api/admin/auth/**"),
                                 AntPathRequestMatcher.antMatcher("/api/health"),
                                 AntPathRequestMatcher.antMatcher("/api/stats"),
-                                AntPathRequestMatcher.antMatcher("/api/bannieres"),
+                                AntPathRequestMatcher.antMatcher("/api/bannieres/**"),
                                 AntPathRequestMatcher.antMatcher("/api/events/opportunite/**"),
                                 AntPathRequestMatcher.antMatcher("/api/events/sondage/**"),
                                 AntPathRequestMatcher.antMatcher("/api/events/opportunites"),
@@ -72,6 +74,7 @@ public class SecurityConfig {
                         .anyRequest().hasRole("PARTICIPANT")
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(auditHttpFilter, JwtAuthFilter.class)
                 .build();
     }
 
@@ -92,10 +95,12 @@ public class SecurityConfig {
                 "http://127.0.0.1:5174",
                 "http://127.0.0.1:4173",
                 "http://127.0.0.1:4174",
+                "http://172.31.240.1:5173",
+                "http://172.31.240.1:5174",
+                "http://172.31.240.1:4173",
+                "http://172.31.240.1:4174",
                 "https://opportunihub.maitrise.app",
-                "https://admin-opportunihub.maitrise.app",
-                "https://opportuni.maitrise.app",
-                "https://admin-opportuni.maitrise.app"
+                "https://admin-opportunihub.maitrise.app"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));

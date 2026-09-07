@@ -3,6 +3,7 @@ package com.plateformeopportunites.opportunite.controller;
 import com.plateformeopportunites.opportunite.dto.ConfirmerReceptionRequest;
 import com.plateformeopportunites.opportunite.dto.MaParticipationOpportuniteResponse;
 import com.plateformeopportunites.opportunite.dto.OpportuniteResponse;
+import com.plateformeopportunites.opportunite.dto.SouscrireOpportuniteRequest;
 import com.plateformeopportunites.opportunite.service.OpportuniteService;
 import com.plateformeopportunites.opportunite.service.TentativeSouscriptionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,7 +37,7 @@ public class OpportuniteController {
 
     @GetMapping("/{id}")
     public ResponseEntity<OpportuniteResponse> getById(@PathVariable UUID id) {
-        return ResponseEntity.ok(opportuniteService.getById(id));
+        return ResponseEntity.ok(opportuniteService.getActiveById(id));
     }
 
     @GetMapping("/mes-participations")
@@ -47,17 +48,23 @@ public class OpportuniteController {
     @PostMapping("/{id}/souscrire")
     public ResponseEntity<Void> souscrire(Authentication auth,
                                           @PathVariable UUID id,
+                                          @RequestBody(required = false) SouscrireOpportuniteRequest request,
                                           @RequestParam(defaultValue = "1") @Min(1) Integer quantite,
                                           @RequestParam(required = false) UUID parrainId,
-                                          @RequestParam(defaultValue = "false") boolean utiliserPoints) {
+                                          @RequestParam(defaultValue = "false") boolean utiliserPoints,
+                                          @RequestHeader(value = "Idempotency-Key", required = false) UUID requestId) {
         UUID utilisateurId = UUID.fromString(auth.getName());
+        SouscrireOpportuniteRequest req = request != null ? request : new SouscrireOpportuniteRequest();
+        Integer quantiteEffective = req.getQuantite() != null ? req.getQuantite() : quantite;
+        UUID parrainEffectif = req.getParrainId() != null ? req.getParrainId() : parrainId;
+        boolean pointsEffectifs = req.isUtiliserPoints() || utiliserPoints;
         try {
-            opportuniteService.souscrire(utilisateurId, id, quantite, parrainId, utiliserPoints);
+            opportuniteService.souscrire(utilisateurId, id, quantiteEffective, parrainEffectif, pointsEffectifs, requestId, req.getReponsesComplementaires());
         } catch (RuntimeException erreur) {
             // L'appel transactionnel a déjà été annulé. Le journal d'échec est isolé et
             // ne peut donc jamais être confondu avec une participation payée.
             try {
-                tentativeSouscriptionService.enregistrer(id, utilisateurId, quantite, erreur);
+                tentativeSouscriptionService.enregistrer(id, utilisateurId, quantiteEffective, erreur);
             } catch (RuntimeException erreurJournal) {
                 // Un incident de journalisation ne doit jamais masquer la vraie cause
                 // retournée au participant.

@@ -1,333 +1,213 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, Loader2, ShieldCheck, ShieldOff, Building2, Plus, Search,
-  Users, Clock3, CircleOff, RotateCcw,
+  ArrowLeft, Building2, CircleDollarSign, Clock3, Eye, Loader2, Pencil,
+  Plus, Search, ShieldCheck, ShieldOff, Users, WalletCards, X,
 } from 'lucide-react'
+import { Badge, Card, Table, Th, Td, Tr, Spinner, ActionBtn, Pagination } from '../components/ui'
 import {
-  Badge, Card, Table, Th, Td, Tr, Spinner, FilterPill, ActionBtn, Pagination,
-} from '../components/ui'
-import {
-  getAdminCommanditaires, creerCommanditaire,
-  activerCommanditaire, suspendreCommanditaire,
+  getAdminCommanditaires, getAdminCommanditaire, creerCommanditaire, modifierCommanditaire,
+  activerCommanditaire, suspendreCommanditaire, alimenterCommanditaire, getMouvementsCommanditaire,
 } from '../services/api'
 
 const STATUT_COLOR = { ACTIF: 'emerald', SUSPENDU: 'rose', EN_ATTENTE: 'amber' }
 const STATUT_LABEL = { ACTIF: 'Actif', SUSPENDU: 'Suspendu', EN_ATTENTE: 'En attente' }
-const FILTERS       = ['TOUS', 'ACTIF', 'EN_ATTENTE', 'SUSPENDU']
-const FILTER_LABELS = ['Tous', 'Actifs', 'En attente', 'Suspendus']
+const inputCls = 'h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100'
+const labelCls = 'mb-1.5 block text-[10px] font-black uppercase tracking-[.12em] text-slate-500'
+const fmt = value => Number(value || 0).toLocaleString('fr-FR')
+const formatDate = value => value ? new Date(value).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }) : '—'
+const errorMessage = error => error?.response?.data?.message || Object.values(error?.response?.data?.erreurs || {})[0] || 'Une erreur est survenue.'
 
-const inputCls = 'w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400 transition'
-const labelCls = 'block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1'
-
-function initiales(nom, prenom) {
-  return ((nom?.[0] || '') + (prenom?.[0] || '')).toUpperCase() || '?'
+function initiales(c) {
+  return ((c?.nom?.[0] || '') + (c?.prenom?.[0] || '')).toUpperCase() || '?'
 }
 
-// ── Formulaire dédié : nouveau commanditaire ─────────────────────────────────
-
-function NouveauCommanditaireForm({ onClose, onSaved }) {
-  const [form, setForm] = useState({ nom: '', prenom: '', societe: '', email: '', telephone: '' })
+function IdentityForm({ initial, submitLabel, onSubmit, onCancel }) {
+  const [form, setForm] = useState(initial || { nom: '', prenom: '', societe: '', email: '', telephone: '' })
   const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState('')
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const [error, setError] = useState('')
+  const set = (key, value) => setForm(current => ({ ...current, [key]: value }))
+  const submit = async event => {
+    event.preventDefault()
     setError('')
     setLoading(true)
-    try {
-      await creerCommanditaire(form)
-      onSaved()
-    } catch (err) {
-      if (err.response?.status === 409) setError('Un commanditaire avec cet email existe déjà.')
-      else setError(err.response?.data?.message || 'Erreur lors de la création.')
-    } finally { setLoading(false) }
+    try { await onSubmit(form) } catch (e) { setError(errorMessage(e)) } finally { setLoading(false) }
   }
-
-  return (
-    <div className="mx-auto w-full max-w-3xl pb-8">
-      <div className="w-full rounded-2xl bg-white shadow-sm border border-slate-200">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h3 className="text-base font-bold text-slate-900">Nouveau commanditaire</h3>
-          <button onClick={onClose} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"><ArrowLeft size={14} /> Retour</button>
-        </div>
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className={labelCls}>Nom *</label>
-              <input required value={form.nom} onChange={e => set('nom', e.target.value)} className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Prénom *</label>
-              <input required value={form.prenom} onChange={e => set('prenom', e.target.value)} className={inputCls} />
-            </div>
-          </div>
-          <div>
-            <label className={labelCls}>Société *</label>
-            <input required value={form.societe} onChange={e => set('societe', e.target.value)} className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Email *</label>
-            <input required type="email" value={form.email} onChange={e => set('email', e.target.value)} className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Téléphone *</label>
-            <input required value={form.telephone} onChange={e => set('telephone', e.target.value)} placeholder="+228 90 00 00 00" className={inputCls} />
-          </div>
-          {error && <div className="rounded-lg bg-rose-50 border border-rose-100 p-3 text-sm text-rose-700">{error}</div>}
-          <div className="flex flex-col gap-2.5 pt-1 sm:flex-row">
-            <button type="submit" disabled={loading}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-violet-700 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 transition disabled:opacity-60">
-              {loading && <Loader2 size={14} className="animate-spin" />}
-              Créer le commanditaire
-            </button>
-            <button type="button" onClick={onClose}
-              className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">
-              Annuler
-            </button>
-          </div>
-        </form>
-      </div>
+  return <form onSubmit={submit} className="space-y-4">
+    <div className="grid gap-4 sm:grid-cols-2">
+      <label><span className={labelCls}>Nom *</span><input className={inputCls} required value={form.nom} onChange={e => set('nom', e.target.value)} /></label>
+      <label><span className={labelCls}>Prénom *</span><input className={inputCls} required value={form.prenom} onChange={e => set('prenom', e.target.value)} /></label>
     </div>
-  )
+    <label><span className={labelCls}>Société *</span><input className={inputCls} required value={form.societe} onChange={e => set('societe', e.target.value)} /></label>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <label><span className={labelCls}>Email *</span><input className={inputCls} type="email" required value={form.email} onChange={e => set('email', e.target.value)} /></label>
+      <label><span className={labelCls}>Téléphone international *</span><input className={inputCls} required placeholder="+228 90 00 00 00" value={form.telephone} onChange={e => set('telephone', e.target.value)} /></label>
+    </div>
+    {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p>}
+    <div className="flex flex-wrap gap-2">
+      <button disabled={loading} className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+        {loading && <Loader2 size={15} className="animate-spin" />}{submitLabel}
+      </button>
+      {onCancel && <button type="button" onClick={onCancel} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600">Annuler</button>}
+    </div>
+  </form>
 }
-
-// ── Page principale ───────────────────────────────────────────────────────────
 
 export default function Commanditaires() {
   const navigate = useNavigate()
-  const [commanditaires, setCommanditaires] = useState([])
-  const [loading, setLoading]               = useState(true)
-  const [filterIdx, setFilterIdx]           = useState(0)
-  const [search, setSearch]                 = useState('')
-  const [actionId, setActionId]             = useState(null)
-  const [confirmId, setConfirmId]           = useState(null)
-  const [page, setPage]                     = useState(1)
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [filter, setFilter] = useState('TOUS')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
 
-  const fetchData = () => {
-    setLoading(true)
-    getAdminCommanditaires()
-      .then(setCommanditaires)
-      .catch(() => setCommanditaires([]))
-      .finally(() => setLoading(false))
+  const load = () => {
+    setLoading(true); setError('')
+    getAdminCommanditaires().then(setItems).catch(e => setError(errorMessage(e))).finally(() => setLoading(false))
   }
+  useEffect(load, [])
+  useEffect(() => setPage(1), [filter, search])
 
-  useEffect(() => {
-    let cancelled = false
-    getAdminCommanditaires()
-      .then(data => { if (!cancelled) setCommanditaires(data) })
-      .catch(() => { if (!cancelled) setCommanditaires([]) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [])
-
-  const handleActiver = async (id) => {
-    setActionId(id)
-    try { await activerCommanditaire(id); fetchData() }
-    catch { setActionId(null) }
-    finally { setActionId(null) }
-  }
-
-  const handleSuspendre = async (id) => {
-    setConfirmId(null)
-    setActionId(id)
-    try { await suspendreCommanditaire(id); fetchData() }
-    catch { setActionId(null) }
-    finally { setActionId(null) }
-  }
-
-  const filtre   = FILTERS[filterIdx]
-  const filtered = commanditaires
-    .filter(c => filtre === 'TOUS' || c.statut === filtre)
-    .filter(c => {
-      if (!search) return true
-      const q = search.toLowerCase()
-      return (
-        c.nom?.toLowerCase().includes(q) ||
-        c.prenom?.toLowerCase().includes(q) ||
-        c.societe?.toLowerCase().includes(q) ||
-        c.email?.toLowerCase().includes(q) ||
-        c.telephone?.toLowerCase().includes(q)
-      )
-    })
-
-  const countByStatut = key => commanditaires.filter(c => c.statut === key).length
-  const hasFilters = filterIdx !== 0 || search.trim()
-  useEffect(() => setPage(1), [filterIdx, search])
+  const filtered = useMemo(() => items.filter(c => filter === 'TOUS' || c.statut === filter).filter(c => {
+    const q = search.trim().toLowerCase()
+    return !q || [c.nom, c.prenom, c.societe, c.email, c.telephone].some(value => value?.toLowerCase().includes(q))
+  }), [items, filter, search])
   const pageItems = filtered.slice((page - 1) * 10, page * 10)
-
-  const statCards = [
-    { key: 'TOUS', label: 'Tous', helper: 'Partenaires enregistrés', count: commanditaires.length, icon: Users, tone: 'violet' },
-    { key: 'ACTIF', label: 'Actifs', helper: 'Peuvent sponsoriser', count: countByStatut('ACTIF'), icon: ShieldCheck, tone: 'emerald' },
-    { key: 'EN_ATTENTE', label: 'En attente', helper: 'À examiner', count: countByStatut('EN_ATTENTE'), icon: Clock3, tone: 'amber' },
-    { key: 'SUSPENDU', label: 'Suspendus', helper: 'Accès désactivé', count: countByStatut('SUSPENDU'), icon: CircleOff, tone: 'rose' },
+  const count = key => key === 'TOUS' ? items.length : items.filter(c => c.statut === key).length
+  const cards = [
+    ['TOUS', 'Tous', 'Partenaires enregistrés', Users, 'violet'],
+    ['ACTIF', 'Actifs', 'Autorisés à financer', ShieldCheck, 'emerald'],
+    ['EN_ATTENTE', 'À examiner', 'Validation requise', Clock3, 'amber'],
+    ['SUSPENDU', 'Suspendus', 'Financement bloqué', ShieldOff, 'rose'],
   ]
-
-  const toneClasses = {
-    violet: 'bg-violet-50 text-violet-700 border-violet-200',
-    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    amber: 'bg-amber-50 text-amber-700 border-amber-200',
-    rose: 'bg-rose-50 text-rose-700 border-rose-200',
+  const tones = {
+    violet: 'border-violet-200 bg-violet-50 text-violet-700',
+    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    amber: 'border-amber-200 bg-amber-50 text-amber-700',
+    rose: 'border-rose-200 bg-rose-50 text-rose-700',
   }
 
-  return (
-    <div className="space-y-4">
-
-      {/* ── En-tête et pilotage ── */}
-      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <div className="relative overflow-hidden bg-gradient-to-r from-slate-950 via-slate-900 to-violet-950 px-5 py-5 text-white sm:px-6">
-          <div className="absolute -right-12 -top-16 h-48 w-48 rounded-full border-[28px] border-white/5" />
-          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15">
-                <Building2 size={23} />
-              </span>
-              <div>
-                <h2 className="text-lg font-extrabold">Partenaires de vos sondages</h2>
-                <p className="mt-0.5 max-w-xl text-xs leading-relaxed text-slate-300">Enregistrez et gérez ici les commanditaires qui financent ou portent vos enquêtes.</p>
-              </div>
-            </div>
-            <button onClick={() => navigate('/commanditaires/nouveau')}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-extrabold text-slate-950 shadow-lg transition hover:-translate-y-0.5 hover:bg-violet-50 sm:w-auto">
-              <Plus size={16} /> Ajouter un commanditaire
-            </button>
+  return <div className="space-y-4">
+    <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+      <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-violet-950 px-5 py-5 text-white sm:px-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4"><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10"><Building2 /></span>
+            <div><h2 className="text-lg font-extrabold">Commanditaires des sondages</h2><p className="mt-1 text-xs text-slate-300">Identité, validation, budgets engagés et historique financier.</p></div>
           </div>
+          <button onClick={() => navigate('/commanditaires/nouveau')} className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-extrabold text-slate-950"><Plus size={16} /> Nouveau commanditaire</button>
         </div>
+      </div>
+      <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-4">
+        {cards.map(([key, label, helper, Icon, tone]) => <button key={key} onClick={() => setFilter(key)} aria-pressed={filter === key}
+          className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition ${filter === key ? tones[tone] + ' ring-2 ring-current/10' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}>
+          <Icon size={18} /><span className="min-w-0 flex-1"><span className="flex justify-between gap-2 text-xs font-extrabold"><span>{label}</span><strong className="text-xl text-slate-950">{count(key)}</strong></span><span className="block truncate text-[10px] text-slate-400">{helper}</span></span>
+        </button>)}
+      </div>
+      <div className="border-t border-slate-100 p-4">
+        <label className="relative block max-w-2xl"><Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" /><input className={inputCls + ' pl-10'} value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un partenaire, une société, un email…" /></label>
+        <p className="mt-2 text-[11px] font-semibold text-slate-400">{filtered.length} résultat{filtered.length !== 1 ? 's' : ''}</p>
+      </div>
+    </section>
 
-        <div className="grid gap-2 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-4">
-          {statCards.map(({ key, label, helper, count, icon: Icon, tone }, idx) => {
-            const active = filterIdx === idx
-            return (
-              <button key={key} type="button" onClick={() => setFilterIdx(idx)} aria-pressed={active}
-                className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition ${active ? `${toneClasses[tone]} shadow-sm ring-2 ring-current/10` : 'border-slate-100 bg-slate-50/70 hover:border-slate-200 hover:bg-white'}`}>
-                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${active ? 'bg-white/75' : toneClasses[tone]}`}>
-                  <Icon size={18} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-baseline justify-between gap-2">
-                    <span className="text-xs font-extrabold text-slate-700">{label}</span>
-                    <strong className="text-xl leading-none text-slate-950">{count}</strong>
-                  </span>
-                  <span className="mt-1 block truncate text-[10px] font-medium text-slate-400">{helper}</span>
-                </span>
-              </button>
-            )
-          })}
-        </div>
-
-        <div className="border-t border-slate-100 px-4 py-4 sm:px-5">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <label className="relative block min-w-0 flex-1 lg:max-w-xl">
-              <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input value={search} onChange={event => setSearch(event.target.value)}
-                placeholder="Rechercher un nom, une société, un email…"
-                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none transition focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100" />
-            </label>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {FILTER_LABELS.map((label, idx) => (
-                <FilterPill key={label} label={label} active={filterIdx === idx} onClick={() => setFilterIdx(idx)} />
-              ))}
-              {hasFilters && (
-                <button type="button" onClick={() => { setFilterIdx(0); setSearch('') }}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-slate-500 transition hover:bg-slate-100 hover:text-slate-900">
-                  <RotateCcw size={13} /> Réinitialiser
-                </button>
-              )}
-            </div>
-          </div>
-          <p className="mt-3 text-[11px] font-medium text-slate-400">{filtered.length} résultat{filtered.length !== 1 ? 's' : ''} affiché{filtered.length !== 1 ? 's' : ''}</p>
-        </div>
-      </section>
-
-      {/* ── Tableau ── */}
-      <Card noPad>
-        {loading ? (
-          <Spinner py="py-12" />
-        ) : filtered.length === 0 ? (
-          <div className="flex min-h-64 flex-col items-center justify-center px-5 py-12 text-center">
-            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50 text-violet-500 ring-8 ring-violet-50/50">
-              <Building2 size={26} />
-            </span>
-            <h3 className="mt-5 text-base font-extrabold text-slate-900">{hasFilters ? 'Aucun résultat pour ces critères' : 'Ajoutez votre premier commanditaire'}</h3>
-            <p className="mt-1 max-w-md text-sm leading-relaxed text-slate-500">
-              {hasFilters ? 'Modifiez votre recherche ou réinitialisez les filtres pour afficher les partenaires disponibles.' : 'Les commanditaires sont les entreprises ou personnes qui sponsorisent vos sondages.'}
-            </p>
-            <button type="button" onClick={hasFilters ? () => { setFilterIdx(0); setSearch('') } : () => navigate('/commanditaires/nouveau')}
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-violet-100 transition hover:bg-violet-800">
-              {hasFilters ? <RotateCcw size={15} /> : <Plus size={15} />}
-              {hasFilters ? 'Réinitialiser la recherche' : 'Créer un commanditaire'}
-            </button>
-          </div>
-        ) : (
-          <><Table>
-            <thead>
-              <tr>
-                <Th>Commanditaire</Th>
-                <Th>Société</Th>
-                <Th>Email</Th>
-                <Th>Téléphone</Th>
-                <Th>Statut</Th>
-                <Th>Actions</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageItems.map(c => (
-                <Tr key={c.id}>
-                  <Td>
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 flex-shrink-0 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-[11px] font-bold">
-                        {initiales(c.nom, c.prenom)}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-slate-900 text-[12.5px]">{c.nom} {c.prenom}</p>
-                        <p className="text-[10.5px] font-mono text-slate-400">{c.id?.slice(0, 8)}…</p>
-                      </div>
-                    </div>
-                  </Td>
-                  <Td><span className="text-[12.5px] text-slate-700">{c.societe || '—'}</span></Td>
-                  <Td><span className="text-[12.5px] text-slate-700">{c.email || '—'}</span></Td>
-                  <Td><span className="text-[12px] font-mono text-slate-500">{c.telephone || '—'}</span></Td>
-                  <Td>
-                    <Badge color={STATUT_COLOR[c.statut] || 'gray'}>
-                      {STATUT_LABEL[c.statut] || c.statut}
-                    </Badge>
-                  </Td>
-                  <Td>
-                    {actionId === c.id ? (
-                      <Loader2 size={15} className="animate-spin text-violet-500" />
-                    ) : confirmId === c.id ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-rose-600 font-semibold">Confirmer ?</span>
-                        <ActionBtn variant="red" onClick={() => handleSuspendre(c.id)}>Oui</ActionBtn>
-                        <ActionBtn onClick={() => setConfirmId(null)}>Non</ActionBtn>
-                      </div>
-                    ) : (
-                      <div className="flex gap-1.5">
-                        {(c.statut === 'EN_ATTENTE' || c.statut === 'SUSPENDU') && (
-                          <ActionBtn variant="green" onClick={() => handleActiver(c.id)}>
-                            <ShieldCheck size={12} /> Activer
-                          </ActionBtn>
-                        )}
-                        {c.statut === 'ACTIF' && (
-                          <ActionBtn variant="red" onClick={() => setConfirmId(c.id)}>
-                            <ShieldOff size={12} /> Suspendre
-                          </ActionBtn>
-                        )}
-                      </div>
-                    )}
-                  </Td>
-                </Tr>
-              ))}
-            </tbody>
-          </Table><Pagination page={page} totalItems={filtered.length} onPageChange={setPage} /></>
-        )}
-      </Card>
-    </div>
-  )
+    {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error} <button onClick={load} className="font-black underline">Réessayer</button></p>}
+    <Card noPad>
+      {loading ? <Spinner py="py-16" /> : filtered.length === 0 ? <div className="p-14 text-center"><Building2 className="mx-auto text-slate-300" size={34} /><h3 className="mt-4 font-extrabold">Aucun commanditaire trouvé</h3></div> : <>
+        <Table><thead><tr><Th>Commanditaire</Th><Th>Statut</Th><Th>Financement</Th><Th>Sondages</Th><Th>Contact</Th><Th>Action</Th></tr></thead>
+          <tbody>{pageItems.map(c => <Tr key={c.id}>
+            <Td><button onClick={() => navigate(`/commanditaires/${c.id}`)} className="flex items-center gap-3 text-left"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-100 text-xs font-black text-violet-700">{initiales(c)}</span><span><strong className="block text-[12.5px] text-slate-900">{c.nom} {c.prenom}</strong><span className="text-[11px] text-slate-500">{c.societe}</span></span></button></Td>
+            <Td><Badge color={STATUT_COLOR[c.statut]}>{STATUT_LABEL[c.statut]}</Badge></Td>
+            <Td><strong className="block text-xs text-slate-900">{fmt(c.soldeDisponible)} FCFA</strong><span className="text-[10px] text-slate-400">{fmt(c.soldeReserve)} réservé</span></Td>
+            <Td><strong className="text-xs">{c.nombreSondages || 0}</strong><span className="ml-1 text-[10px] text-slate-400">dont {c.sondagesActifs || 0} actif(s)</span></Td>
+            <Td><span className="block text-[11px] text-slate-700">{c.email}</span><span className="text-[10px] text-slate-400">{c.telephone}</span></Td>
+            <Td><ActionBtn variant="violet" onClick={() => navigate(`/commanditaires/${c.id}`)}><Eye size={13} /> Ouvrir</ActionBtn></Td>
+          </Tr>)}</tbody>
+        </Table><Pagination page={page} totalItems={filtered.length} onPageChange={setPage} /></>}
+    </Card>
+  </div>
 }
 
 export function NouveauCommanditairePage() {
   const navigate = useNavigate()
-  return <NouveauCommanditaireForm onClose={() => navigate('/commanditaires')} onSaved={() => navigate('/commanditaires')} />
+  return <div className="mx-auto max-w-3xl"><Card><div className="mb-5 flex items-center gap-3"><button onClick={() => navigate('/commanditaires')} className="rounded-xl border p-2"><ArrowLeft size={18} /></button><div><p className="text-[10px] font-black uppercase tracking-widest text-violet-700">Nouveau partenaire</p><h2 className="text-xl font-extrabold">Créer un commanditaire</h2></div></div>
+    <IdentityForm submitLabel="Créer le commanditaire" onCancel={() => navigate('/commanditaires')} onSubmit={async form => { const created = await creerCommanditaire(form); navigate(`/commanditaires/${created.id}`) }} />
+  </Card></div>
+}
+
+export function CommanditaireDetailPage() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const [item, setItem] = useState(null)
+  const [movements, setMovements] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [edit, setEdit] = useState(false)
+  const [amount, setAmount] = useState('')
+  const [reference, setReference] = useState('')
+  const [reason, setReason] = useState('')
+  const [action, setAction] = useState(null)
+
+  const load = () => {
+    setLoading(true); setError('')
+    Promise.all([getAdminCommanditaire(id), getMouvementsCommanditaire(id)])
+      .then(([data, entries]) => { setItem(data); setMovements(entries) })
+      .catch(e => setError(errorMessage(e))).finally(() => setLoading(false))
+  }
+  useEffect(load, [id])
+
+  const changeStatus = async () => {
+    if (!reason.trim()) { setError('Indiquez le motif de la décision.'); return }
+    setAction('status'); setError('')
+    try {
+      if (item.statut === 'ACTIF') await suspendreCommanditaire(id, reason)
+      else await activerCommanditaire(id, reason)
+      setReason(''); await Promise.all([getAdminCommanditaire(id).then(setItem), getMouvementsCommanditaire(id).then(setMovements)])
+    } catch (e) { setError(errorMessage(e)) } finally { setAction(null) }
+  }
+  const fund = async event => {
+    event.preventDefault(); setAction('fund'); setError('')
+    try {
+      await alimenterCommanditaire(id, { montant: Number(amount), reference: reference || undefined, description: 'Alimentation depuis l’administration' })
+      setAmount(''); setReference(''); setAction(null); load()
+    } catch (e) { setError(errorMessage(e)); setAction(null) }
+  }
+
+  if (loading) return <Spinner py="py-24" />
+  if (!item) return <div className="rounded-2xl bg-white p-8 text-center text-rose-700">{error || 'Commanditaire introuvable'}</div>
+
+  return <div className="space-y-4">
+    <section className="rounded-3xl bg-gradient-to-r from-slate-950 to-violet-950 p-5 text-white shadow-sm">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4"><button onClick={() => navigate('/commanditaires')} className="rounded-xl bg-white/10 p-2.5"><ArrowLeft size={19} /></button><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-lg font-black text-violet-700">{initiales(item)}</span><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-black">{item.nom} {item.prenom}</h2><Badge color={STATUT_COLOR[item.statut]}>{STATUT_LABEL[item.statut]}</Badge></div><p className="mt-1 text-sm text-slate-300">{item.societe} · {item.email} · {item.telephone}</p></div></div>
+        <button onClick={() => setEdit(!edit)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-900">{edit ? <X size={16} /> : <Pencil size={16} />}{edit ? 'Fermer' : 'Modifier'}</button>
+      </div>
+    </section>
+
+    {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p>}
+    {edit && <Card><h3 className="mb-4 font-extrabold">Coordonnées du partenaire</h3><IdentityForm initial={{ nom: item.nom, prenom: item.prenom, societe: item.societe, email: item.email, telephone: item.telephone }} submitLabel="Enregistrer" onCancel={() => setEdit(false)} onSubmit={async form => { const updated = await modifierCommanditaire(id, form); setItem(updated); setEdit(false) }} /></Card>}
+
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {[
+        ['Disponible', fmt(item.soldeDisponible), WalletCards, 'text-emerald-700 bg-emerald-50'],
+        ['Réservé', fmt(item.soldeReserve), CircleDollarSign, 'text-violet-700 bg-violet-50'],
+        ['Total alimenté', fmt(item.totalAlimente), Plus, 'text-sky-700 bg-sky-50'],
+        ['Total distribué', fmt(item.totalDistribue), Users, 'text-amber-700 bg-amber-50'],
+      ].map(([label, value, Icon, tone]) => <Card key={label}><div className="flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</p><strong className="mt-2 block text-xl">{value} <span className="text-xs">FCFA</span></strong></div><span className={`rounded-xl p-3 ${tone}`}><Icon size={20} /></span></div></Card>)}
+    </div>
+
+    <div className="grid gap-4 lg:grid-cols-[1.05fr_.95fr]">
+      <Card><h3 className="font-extrabold">Alimenter le budget</h3><p className="mt-1 text-xs text-slate-500">Cette somme pourra être réservée lors de l’activation d’un sondage sponsorisé.</p>
+        <form onSubmit={fund} className="mt-4 grid gap-3 sm:grid-cols-2"><label><span className={labelCls}>Montant FCFA</span><input className={inputCls} required min="1" type="number" value={amount} onChange={e => setAmount(e.target.value)} /></label><label><span className={labelCls}>Référence</span><input className={inputCls} value={reference} onChange={e => setReference(e.target.value)} placeholder="Virement, facture…" /></label><button disabled={action === 'fund'} className="sm:col-span-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white">{action === 'fund' ? 'Traitement…' : 'Créditer le commanditaire'}</button></form>
+      </Card>
+      <Card><h3 className="font-extrabold">Décision administrative</h3><p className="mt-1 text-xs text-slate-500">{item.statut === 'ACTIF' ? 'La suspension est refusée tant qu’un sondage financé est actif.' : 'L’activation autorise ce partenaire à financer de nouveaux sondages.'}</p>
+        <label className="mt-4 block"><span className={labelCls}>Motif obligatoire</span><textarea className="min-h-20 w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-violet-400" value={reason} onChange={e => setReason(e.target.value)} placeholder="Justifiez la décision pour le journal d’audit…" /></label>
+        <button onClick={changeStatus} disabled={action === 'status'} className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white ${item.statut === 'ACTIF' ? 'bg-rose-600' : 'bg-emerald-600'}`}>{item.statut === 'ACTIF' ? <ShieldOff size={16} /> : <ShieldCheck size={16} />}{item.statut === 'ACTIF' ? 'Suspendre' : 'Activer'}</button>
+        {item.motifStatut && <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-500"><strong className="text-slate-700">Dernier motif :</strong> {item.motifStatut}</p>}
+      </Card>
+    </div>
+
+    <Card noPad><div className="flex items-center justify-between border-b border-slate-100 p-4"><div><h3 className="font-extrabold">Historique financier</h3><p className="text-xs text-slate-400">50 derniers mouvements traçables</p></div><span className="text-xs font-bold text-slate-500">{item.nombreSondages || 0} sondage(s), {item.sondagesActifs || 0} actif(s)</span></div>
+      {movements.length === 0 ? <div className="p-10 text-center text-sm text-slate-400">Aucun mouvement pour le moment.</div> : <Table><thead><tr><Th>Date</Th><Th>Opération</Th><Th>Montant</Th><Th>Solde disponible</Th><Th>Référence</Th></tr></thead><tbody>{movements.map(m => <Tr key={m.id}><Td>{formatDate(m.createdAt)}</Td><Td><Badge color={{ ALIMENTATION: 'emerald', RESERVATION: 'violet', DISTRIBUTION: 'amber', LIBERATION: 'sky' }[m.type]}>{m.type}</Badge></Td><Td><strong className={m.type === 'ALIMENTATION' || m.type === 'LIBERATION' ? 'text-emerald-700' : 'text-slate-900'}>{fmt(m.montant)} FCFA</strong></Td><Td>{fmt(m.soldeApres)} FCFA</Td><Td>{m.reference || '—'}</Td></Tr>)}</tbody></Table>}
+    </Card>
+  </div>
 }

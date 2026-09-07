@@ -3,6 +3,8 @@ package com.plateformeopportunites.identity.dto;
 import com.plateformeopportunites.common.enums.StatutCommanditaire;
 import lombok.Builder;
 import lombok.Data;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
@@ -15,4 +17,13 @@ public class CommanditaireResponse {
     private String email;
     private String telephone;
     private StatutCommanditaire statut;
+    private BigDecimal soldeDisponible;
+    private BigDecimal soldeReserve;
+    private BigDecimal totalAlimente;
+    private BigDecimal totalDistribue;
+    private String motifStatut;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private long nombreSondages;
+    private long sondagesActifs;
 }

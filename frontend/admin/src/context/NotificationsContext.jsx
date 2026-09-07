@@ -97,7 +97,7 @@ export function NotificationsProvider({ children }) {
 
     Object.entries(handlers).forEach(([event, handler]) => on(event, handler))
     return () => { Object.entries(handlers).forEach(([event, handler]) => off(event, handler)) }
-  }, [isAuthenticated])
+  }, [isAuthenticated, off, on])
 
   const dismissToast = (id) => setToasts(prev => prev.filter(t => t.id !== id))
   const dismissNotification = (id) => setNotifications(prev => prev.filter(n => n.id !== id))

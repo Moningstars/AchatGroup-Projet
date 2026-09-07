@@ -8,7 +8,11 @@ import { firebaseAuth, firebaseConfigured } from '../services/firebase'
 import { AsYouType, isValidPhoneNumber } from 'libphonenumber-js'
 
 const DEV_OTP_CODE = '123456'
-const USE_LOCAL_AUTH = import.meta.env.DEV && !firebaseConfigured
+const DEV_AUTH_SETTING = import.meta.env.VITE_DEV_AUTH_ENABLED
+// En développement Vite, la connexion locale est disponible par défaut.
+// Une valeur explicite `false` permet néanmoins de tester Firebase localement,
+// tandis que les builds de production restent sur Firebase sauf activation volontaire.
+const USE_LOCAL_AUTH = DEV_AUTH_SETTING === 'true' || (import.meta.env.DEV && DEV_AUTH_SETTING !== 'false')
 
 const ERREURS_FIREBASE = {
   'auth/invalid-phone-number': 'Numéro de téléphone invalide',

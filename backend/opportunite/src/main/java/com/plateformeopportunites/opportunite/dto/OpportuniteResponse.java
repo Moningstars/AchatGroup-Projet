@@ -1,5 +1,6 @@
 package com.plateformeopportunites.opportunite.dto;
 
+import com.plateformeopportunites.common.enums.ModePlafond;
 import com.plateformeopportunites.common.enums.StatutOpportunite;
 import lombok.Builder;
 import lombok.Data;
@@ -21,6 +22,7 @@ public class OpportuniteResponse {
     private BigDecimal prixActuel;
     private Integer seuilMinimum;
     private Integer seuilMaximal;
+    private ModePlafond modePlafond;
     private Integer participantsActuels;
     private Integer placesRestantes;
     private Boolean souscriptionOuverte;
@@ -48,6 +50,7 @@ public class OpportuniteResponse {
     private Integer delaiConfirmationReceptionJours;
     private String messageNotificationLivraison;
     private String messagePartage;
+    private List<ChampFormulaireComplementaire> formulaireComplementaire;
     private List<PalierPrixResponse> paliers;
     private List<ImageResponse> images;
 

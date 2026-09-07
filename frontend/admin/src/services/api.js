@@ -77,6 +77,9 @@ export const mettreAJourLivraisonParticipants = (id, data) =>
 export const getAdminSondages = () =>
   api.get('/admin/sondages').then(r => r.data)
 
+export const getAdminSondage = (id) =>
+  api.get(`/admin/sondages/${id}`).then(r => r.data)
+
 export const activerSondage = (id) =>
   api.patch(`/admin/sondages/${id}/activer`).then(r => r.data)
 
@@ -104,11 +107,22 @@ export const getReponsesAValider = (id) =>
 export const validerReponse = (reponseId, approuve) =>
   api.patch(`/admin/sondages/reponses/${reponseId}/valider`, null, { params: { approuve } }).then(r => r.data)
 
+export const getPreuveReponse = (reponseId) =>
+  api.get(`/admin/sondages/reponses/${reponseId}/preuve`, { responseType: 'blob' }).then(r => r.data)
+
 export const getSondageResultats = (id) =>
   api.get(`/admin/sondages/${id}/resultats`).then(r => r.data)
 
 export const getRepondantsSondage = (id) =>
   api.get(`/admin/sondages/${id}/repondants`).then(r => r.data)
+
+export const uploadSondageImage = (id, file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return api.post(`/admin/sondages/${id}/image`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then(r => r.data)
+}
 
 // Utilisateurs (admin)
 export const getAdminUtilisateurs = () =>
@@ -133,13 +147,25 @@ export const getAdminCommanditaires = () =>
 export const creerCommanditaire = (data) =>
   api.post('/admin/commanditaires', data).then(r => r.data)
 
-export const activerCommanditaire = (id) =>
-  api.patch(`/admin/commanditaires/${id}/activer`).then(r => r.data)
+export const getAdminCommanditaire = (id) =>
+  api.get(`/admin/commanditaires/${id}`).then(r => r.data)
 
-export const suspendreCommanditaire = (id) =>
-  api.patch(`/admin/commanditaires/${id}/suspendre`).then(r => r.data)
+export const modifierCommanditaire = (id, data) =>
+  api.put(`/admin/commanditaires/${id}`, data).then(r => r.data)
 
-// Fournisseurs de produits (admin)
+export const activerCommanditaire = (id, motif) =>
+  api.patch(`/admin/commanditaires/${id}/activer`, { motif }).then(r => r.data)
+
+export const suspendreCommanditaire = (id, motif) =>
+  api.patch(`/admin/commanditaires/${id}/suspendre`, { motif }).then(r => r.data)
+
+export const alimenterCommanditaire = (id, data) =>
+  api.post(`/admin/commanditaires/${id}/alimentations`, data).then(r => r.data)
+
+export const getMouvementsCommanditaire = (id) =>
+  api.get(`/admin/commanditaires/${id}/mouvements`).then(r => r.data)
+
+// Fournisseurs d'opportunités (admin)
 export const getAdminFournisseurs = () =>
   api.get('/admin/fournisseurs').then(r => r.data)
 
@@ -155,6 +181,13 @@ export const suspendreFournisseur = (id) =>
 // Stats admin
 export const getAdminStats = () =>
   api.get('/admin/stats').then(r => r.data)
+
+// Journal d'activité (admin)
+export const getAuditLogs = (params = {}) =>
+  api.get('/admin/audit-logs', { params }).then(r => r.data)
+
+export const getAuditStats = () =>
+  api.get('/admin/audit-logs/stats').then(r => r.data)
 
 // Wallet plateforme (admin)
 export const getAdminWallet = () =>
@@ -192,6 +225,9 @@ export const toggleBanniere = (id) =>
 
 export const supprimerBanniere = (id) =>
   api.delete(`/admin/bannieres/${id}`)
+
+export const reordonnerBannieres = (ids) =>
+  api.put('/admin/bannieres/ordre', ids).then(r => r.data)
 
 // Ajustement manuel du solde d'un participant
 export const ajusterSoldeUtilisateur = (id, montant, description) =>

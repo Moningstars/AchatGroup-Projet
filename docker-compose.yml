@@ -45,6 +45,11 @@ services:
       # Le contournement OTP 123456 reste limité à cette stack locale.
       DEV_AUTH_ENABLED: ${DEV_AUTH_ENABLED:-true}
       FIREBASE_DEV_MODE: ${FIREBASE_DEV_MODE:-true}
+      PAYGATE_DEV_MODE: ${PAYGATE_DEV_MODE:-true}
+      OVH_SMS_DEV_MODE: ${OVH_SMS_DEV_MODE:-true}
+      ANTHROPIC_DEV_MODE: ${ANTHROPIC_DEV_MODE:-true}
+      APP_SEED_ENABLED: ${APP_SEED_ENABLED:-true}
+      JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
     ports:
       - "8080:8080"
     volumes:

@@ -1,0 +1,31 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:plateforme_test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+  task:
+    scheduling:
+      enabled: false
+
+app:
+  jwt:
+    secret-participant: test-participant-secret-key-that-is-long-enough
+    secret-admin: test-administrator-secret-key-that-is-long-enough
+    expiration: 86400000
+
+gemini:
+  api-key: test
+
+paygate:
+  auth-token: test
+
+pusher:
+  app-id: test-app
+  key: test-key
+  secret: test-secret
+  cluster: eu

@@ -3,7 +3,9 @@ package com.plateformeopportunites.opportunite.service;
 import com.plateformeopportunites.identity.entity.Utilisateur;
 import com.plateformeopportunites.opportunite.dto.TentativeSouscriptionResponse;
 import com.plateformeopportunites.opportunite.entity.Opportunite;
+import com.plateformeopportunites.opportunite.entity.PalierPrix;
 import com.plateformeopportunites.opportunite.entity.TentativeSouscription;
+import com.plateformeopportunites.opportunite.repository.PalierPrixRepository;
 import com.plateformeopportunites.opportunite.repository.TentativeSouscriptionRepository;
 import com.plateformeopportunites.opportunite.repository.OpportuniteRepository;
 import com.plateformeopportunites.identity.repository.UtilisateurRepository;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -20,6 +23,7 @@ public class TentativeSouscriptionService {
     private final TentativeSouscriptionRepository repository;
     private final OpportuniteRepository opportuniteRepository;
     private final UtilisateurRepository utilisateurRepository;
+    private final PalierPrixRepository palierPrixRepository;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void enregistrer(java.util.UUID opportuniteId, java.util.UUID utilisateurId, Integer quantite, Throwable erreur) {
@@ -27,10 +31,12 @@ public class TentativeSouscriptionService {
         Utilisateur utilisateur = utilisateurRepository.findById(utilisateurId).orElse(null);
         if (opportunite == null || utilisateur == null) return;
         String message = erreur.getMessage() == null ? "Erreur non détaillée" : erreur.getMessage();
+        int quantiteDemandee = quantite == null ? 0 : Math.max(0, quantite);
         repository.save(TentativeSouscription.builder()
                 .opportunite(opportunite)
                 .utilisateur(utilisateur)
-                .quantite(quantite == null ? 0 : quantite)
+                .quantite(quantiteDemandee)
+                .montantTransaction(calculerMontantTente(opportunite, quantiteDemandee))
                 .motif(classer(message))
                 .detail(message.length() > 500 ? message.substring(0, 500) : message)
                 .build());
@@ -46,6 +52,9 @@ public class TentativeSouscriptionService {
                 .utilisateurNom(t.getUtilisateur().getNom())
                 .utilisateurTelephone(t.getUtilisateur().getTelephone())
                 .quantite(t.getQuantite())
+                .montantTransaction(t.getMontantTransaction() != null
+                        ? t.getMontantTransaction()
+                        : calculerMontantTente(t.getOpportunite(), t.getQuantite()))
                 .motif(t.getMotif())
                 .detail(t.getDetail())
                 .createdAt(t.getCreatedAt())
@@ -58,5 +67,21 @@ public class TentativeSouscriptionService {
         if (normalized.contains("expir") || normalized.contains("active") || normalized.contains("plafond") || normalized.contains("place")) return "OFFRE_INDISPONIBLE";
         if (normalized.contains("quantité") || normalized.contains("déjà")) return "VALIDATION";
         return "ERREUR_TECHNIQUE";
+    }
+
+    private BigDecimal calculerMontantTente(Opportunite opportunite, Integer quantite) {
+        if (quantite == null || quantite <= 0) return BigDecimal.ZERO;
+        List<PalierPrix> paliers = palierPrixRepository.findByOpportuniteIdOrderBySeuilMin(opportunite.getId());
+        BigDecimal prix = paliers.stream()
+                .filter(p -> opportunite.getParticipantsActuels() >= p.getSeuilMin()
+                        && opportunite.getParticipantsActuels() <= p.getSeuilMax())
+                .map(PalierPrix::getPrix)
+                .findFirst()
+                .orElseGet(() -> {
+                    if (paliers.isEmpty()) return opportunite.getPrixNormal();
+                    if (opportunite.getParticipantsActuels() < paliers.get(0).getSeuilMin()) return paliers.get(0).getPrix();
+                    return paliers.get(paliers.size() - 1).getPrix();
+                });
+        return prix.multiply(BigDecimal.valueOf(quantite));
     }
 }

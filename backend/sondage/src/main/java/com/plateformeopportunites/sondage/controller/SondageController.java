@@ -79,8 +79,16 @@ public class SondageController {
     public ResponseEntity<Void> soumettrePreuve(Authentication auth,
                                                 @PathVariable UUID id,
                                                 @RequestParam("file") MultipartFile file) throws IOException {
+        UUID participantId = UUID.fromString(auth.getName());
+        sondageService.verifierSoumissionPreuve(participantId, id);
         String url = preuveStorageService.stocker(file, id);
-        sondageService.soumettrePreuve(UUID.fromString(auth.getName()), id, url);
+        try {
+            String anciennePreuve = sondageService.soumettrePreuve(participantId, id, url);
+            preuveStorageService.supprimer(anciennePreuve);
+        } catch (RuntimeException exception) {
+            preuveStorageService.supprimer(url);
+            throw exception;
+        }
         return ResponseEntity.ok().build();
     }
 }

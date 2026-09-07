@@ -7,7 +7,7 @@ const NotificationsContext = createContext(null)
 function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
 
 // Raisons de wallet.credited/wallet.debited qui n'ont pas déjà leur propre notification
-// spécifique (RECOMPENSE et RETRAIT_REJETE sont déjà couverts via le canal SSE).
+// spécifique (RECOMPENSE a son propre événement Pusher "RECOMPENSE").
 const WALLET_CREDIT_LABELS = {
   RECHARGE: 'Recharge effectuée avec succès !',
   REMBOURSEMENT: 'Remboursement reçu sur votre portefeuille.',
@@ -143,7 +143,7 @@ export function NotificationsProvider({ children }) {
 
     Object.entries(handlers).forEach(([event, handler]) => on(event, handler))
     return () => { Object.entries(handlers).forEach(([event, handler]) => off(event, handler)) }
-  }, [isAuthenticated])
+  }, [isAuthenticated, off, on])
 
   const dismissToast = (id) => setToasts(prev => prev.filter(t => t.id !== id))
   const dismissNotification = (id) => setNotifications(prev => prev.filter(n => n.id !== id))

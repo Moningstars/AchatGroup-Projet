@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   Loader2, Plus, Trash2, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
   Edit2, CheckCircle2, XCircle, Clock, Users,
@@ -9,11 +9,73 @@ import {
 import { Badge, Pagination, ProgressBar } from '../components/ui'
 import { useSSE } from '../hooks/useSSE'
 import {
-  getAdminSondages, activerSondage, distribuerSondage, creerSondage,
+  getAdminSondage, getAdminSondages, activerSondage, distribuerSondage, creerSondage,
   creerEligibilite, modifierSondage, supprimerSondage, cloturerSondage,
   getReponsesAValider, validerReponse, getAdminCommanditaires,
-  getSondageResultats, getRepondantsSondage,
+  getSondageResultats, getRepondantsSondage, uploadSondageImage, getPreuveReponse, BASE_URL,
 } from '../services/api'
+
+const API_ORIGIN = BASE_URL.replace(/\/api\/?$/, '')
+const mediaUrl = value => value ? (value.startsWith('http') ? value : `${API_ORIGIN}${value}`) : null
+const preuveEstPdf = value => /\.pdf(?:$|[?#])/i.test(value || '')
+const REFERENCE_TEMPS = Date.now()
+
+function JustificatifPreuve({ reponse }) {
+  const fichier = reponse.fichierPreuve
+  const externe = fichier?.startsWith('http')
+  const [preuve, setPreuve] = useState(() => externe ? { url: fichier, type: preuveEstPdf(fichier) ? 'application/pdf' : 'image/externe' } : null)
+  const [erreur, setErreur] = useState('')
+
+  useEffect(() => {
+    if (!fichier || externe) return undefined
+    let actif = true
+    let objectUrl
+    getPreuveReponse(reponse.id)
+      .then(blob => {
+        objectUrl = URL.createObjectURL(blob)
+        if (actif) setPreuve({ url: objectUrl, type: blob.type })
+        else URL.revokeObjectURL(objectUrl)
+      })
+      .catch(() => {
+        if (actif) setErreur('Le justificatif ne peut pas être chargé.')
+      })
+    return () => {
+      actif = false
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [externe, fichier, reponse.id])
+
+  if (!fichier) {
+    return (
+      <div className="rounded-xl border border-dashed border-amber-200 bg-amber-50 p-4 text-xs leading-relaxed text-amber-700">
+        <AlertTriangle size={18} className="mb-2" />
+        Aucun justificatif transmis. Contrôlez attentivement les réponses avant de décider.
+      </div>
+    )
+  }
+  if (erreur) return <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-700">{erreur}</div>
+  if (!preuve) return <div className="flex h-36 items-center justify-center rounded-xl border border-slate-200 bg-slate-50"><Loader2 size={22} className="animate-spin text-violet-600" /></div>
+
+  const pdf = preuve.type === 'application/pdf' || preuveEstPdf(fichier)
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+      {pdf ? (
+        <div className="flex h-36 flex-col items-center justify-center bg-slate-100 px-4 text-center">
+          <ClipboardList size={30} className="mb-2 text-violet-500" />
+          <p className="text-xs font-bold text-slate-700">Document justificatif PDF</p>
+          <p className="mt-1 text-[10px] text-slate-400">Utilisez le bouton ci-dessous pour le consulter.</p>
+        </div>
+      ) : (
+        <button type="button" onClick={() => window.open(preuve.url, '_blank', 'noopener,noreferrer')} className="block w-full bg-slate-100 p-2">
+          <img src={preuve.url} alt={`Justificatif transmis par ${reponse.participantNom || 'le participant'}`} className="h-36 w-full rounded-lg object-contain" />
+        </button>
+      )}
+      <button type="button" onClick={() => window.open(preuve.url, '_blank', 'noopener,noreferrer')} className="flex w-full items-center justify-center gap-1.5 border-t border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-violet-700 hover:bg-violet-50">
+        <Eye size={13} /> Ouvrir en grand
+      </button>
+    </div>
+  )
+}
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -182,7 +244,7 @@ const ELIG_Q_VIDE = {
 
 function NouveauSondageForm({ onClose, onSaved, modal = false }) {
   const [form, setForm] = useState({
-    titre: '', description: '',
+    titre: '', description: '', imageUrl: '',
     quotaVise: '', recompense: '', typeRecompense: 'ARGENT',
     seuilEligibilite: '80', niveauVerification: 'AUCUN',
     modeDistribution: 'AUTO', dateExpiration: '',
@@ -192,6 +254,7 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
   const [questions, setQuestions] = useState([{ ...QUESTION_VIDE }])
   const [eligTitre, setEligTitre] = useState('')
   const [eligQuestions, setEligQuestions] = useState([{ ...ELIG_Q_VIDE }])
+  const [imageFile, setImageFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [step, setStep] = useState(1)
@@ -265,6 +328,7 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
       const sondage = await creerSondage({
         commanditaireId: form.commanditaireId || undefined,
         titre: form.titre,
+        imageUrl: imageFile ? undefined : (form.imageUrl || undefined),
         description: form.description || undefined,
         quotaVise: Number(form.quotaVise),
         recompense: Number(form.recompense),
@@ -283,6 +347,10 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
             : [],
         })),
       })
+
+      if (imageFile) {
+        await uploadSondageImage(sondage.id, imageFile)
+      }
 
       await creerEligibilite(sondage.id, {
         titre: eligTitre || `Test d'éligibilité — ${form.titre}`,
@@ -351,7 +419,7 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
                     </option>
                   ))}
                 </select>
-                <p className="mt-1 text-[10px] text-slate-400">Sponsor de l’enquête — ce choix n’est jamais utilisé comme fournisseur de produit.</p>
+                <p className="mt-1 text-[10px] text-slate-400">Sponsor de l’enquête — ce choix n’est jamais utilisé comme fournisseur d’opportunité.</p>
               </div>
               <div className="sm:col-span-2">
                 <label className="mb-1 block text-sm font-medium text-slate-700">Titre *</label>
@@ -360,6 +428,40 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
               <div className="sm:col-span-2">
                 <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
                 <textarea value={form.description} onChange={e => setField('description', e.target.value)} rows={2} className={inputCls + ' resize-none'} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-sm font-medium text-slate-700">Image de couverture</label>
+                {form.imageUrl && (
+                  <img src={form.imageUrl} alt="Aperçu" className="mb-2 h-28 w-full rounded-xl object-cover border border-slate-200" />
+                )}
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    placeholder="https://..."
+                    value={form.imageUrl}
+                    onChange={e => {
+                      setField('imageUrl', e.target.value)
+                      setImageFile(null)
+                    }}
+                    className={inputCls}
+                  />
+                  <div className="relative overflow-hidden rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 cursor-pointer flex-shrink-0 transition-colors">
+                    <span className="flex items-center gap-1"><Plus size={16} /> Fichier</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="absolute inset-0 cursor-pointer opacity-0"
+                      onChange={e => {
+                        const file = e.target.files[0]
+                        if (file) {
+                          setImageFile(file)
+                          setField('imageUrl', URL.createObjectURL(file))
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+                <p className="mt-1 text-xs text-slate-400">Collez un lien direct ou uploadez un fichier image.</p>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">Quota visé *</label>
@@ -594,13 +696,16 @@ function ConfigurerEligibiliteForm({ sondage, onClose, onSaved }) {
 // ─── Formulaire dédié : modification ─────────────────────────────────────────
 
 function ModifierSondageForm({ sondage, onClose, onSaved }) {
+  const budgetVerrouille = sondage.statut !== 'BROUILLON'
   const [form, setForm] = useState({
     titre: sondage.titre || '',
     description: sondage.description || '',
+    imageUrl: sondage.imageUrl || '',
     quotaVise: String(sondage.quotaVise || ''),
     recompense: String(sondage.recompense || ''),
     dateExpiration: sondage.dateExpiration ? sondage.dateExpiration.slice(0, 16) : '',
   })
+  const [imageFile, setImageFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -613,11 +718,15 @@ function ModifierSondageForm({ sondage, onClose, onSaved }) {
     try {
       await modifierSondage(sondage.id, {
         titre: form.titre || undefined,
+        imageUrl: imageFile ? undefined : (form.imageUrl || undefined),
         description: form.description || undefined,
-        quotaVise: form.quotaVise ? Number(form.quotaVise) : undefined,
-        recompense: form.recompense ? Number(form.recompense) : undefined,
+        quotaVise: !budgetVerrouille && form.quotaVise ? Number(form.quotaVise) : undefined,
+        recompense: !budgetVerrouille && form.recompense ? Number(form.recompense) : undefined,
         dateExpiration: form.dateExpiration ? new Date(form.dateExpiration).toISOString() : undefined,
       })
+      if (imageFile) {
+        await uploadSondageImage(sondage.id, imageFile)
+      }
       onSaved()
     } catch (err) {
       setError(err.response?.data?.message || 'Erreur lors de la modification')
@@ -634,6 +743,7 @@ function ModifierSondageForm({ sondage, onClose, onSaved }) {
           <button onClick={onClose} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"><ArrowLeft size={15} /> Retour</button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {budgetVerrouille && <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-relaxed text-sky-800"><strong>Sondage déjà activé.</strong> Le titre, la description, l’image et l’expiration restent modifiables. Le quota et la récompense sont verrouillés car le budget a déjà été réservé.</div>}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Titre</label>
             <input value={form.titre} onChange={e => setField('titre', e.target.value)} className={inputCls} />
@@ -643,14 +753,48 @@ function ModifierSondageForm({ sondage, onClose, onSaved }) {
             <textarea value={form.description} onChange={e => setField('description', e.target.value)} rows={3}
               className={inputCls + ' resize-none'} />
           </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Image de couverture</label>
+            {form.imageUrl && (
+              <img src={form.imageUrl} alt="Aperçu" className="mb-2 h-24 w-full rounded-xl object-cover border border-slate-200" />
+            )}
+            <div className="flex gap-2">
+              <input
+                type="url"
+                placeholder="https://..."
+                value={form.imageUrl}
+                onChange={e => {
+                  setField('imageUrl', e.target.value)
+                  setImageFile(null)
+                }}
+                className={inputCls}
+              />
+              <div className="relative overflow-hidden rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 cursor-pointer flex-shrink-0 transition-colors">
+                <span className="flex items-center gap-1"><Plus size={16} /> Fichier</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  onChange={e => {
+                    const file = e.target.files[0]
+                    if (file) {
+                      setImageFile(file)
+                      setField('imageUrl', URL.createObjectURL(file))
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">Collez un lien direct ou uploadez un fichier image.</p>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Quota visé</label>
-              <input type="number" min="1" value={form.quotaVise} onChange={e => setField('quotaVise', e.target.value)} className={inputCls} />
+              <input type="number" min="1" disabled={budgetVerrouille} value={form.quotaVise} onChange={e => setField('quotaVise', e.target.value)} className={inputCls + ' disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400'} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Récompense (FCFA)</label>
-              <input type="number" min="0" value={form.recompense} onChange={e => setField('recompense', e.target.value)} className={inputCls} />
+              <input type="number" min="0" disabled={budgetVerrouille} value={form.recompense} onChange={e => setField('recompense', e.target.value)} className={inputCls + ' disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400'} />
             </div>
           </div>
           <div>
@@ -682,6 +826,12 @@ function ReponsesSondageContent({ sondageId, onClose, onChanged }) {
   const [loading, setLoading] = useState(true)
   const [actionId, setActionId] = useState(null)
   const [error, setError] = useState('')
+  const [expandedId, setExpandedId] = useState(null)
+  const [recherche, setRecherche] = useState('')
+  const [filtrePreuve, setFiltrePreuve] = useState('TOUTES')
+  const [triReponses, setTriReponses] = useState('RECENTES')
+  const [pageReponses, setPageReponses] = useState(1)
+  const pageSizeReponses = 5
 
   const load = () => {
     setLoading(true)
@@ -701,6 +851,9 @@ function ReponsesSondageContent({ sondageId, onClose, onChanged }) {
   }, [sondageId])
 
   const handle = async (reponseId, approuve) => {
+    const reponse = reponses.find(item => item.id === reponseId)
+    const action = approuve ? 'valider et rémunérer' : 'rejeter'
+    if (!window.confirm(`Confirmer : ${action} la réponse de ${reponse?.participantNom || 'ce participant'} ? Cette décision est définitive.`)) return
     setActionId(reponseId)
     try {
       await validerReponse(reponseId, approuve)
@@ -712,6 +865,40 @@ function ReponsesSondageContent({ sondageId, onClose, onChanged }) {
       setActionId(null)
     }
   }
+
+  const rechercheNormalisee = recherche.trim().toLocaleLowerCase('fr')
+  const reponsesFiltrees = [...reponses]
+    .filter(reponse => {
+      const aUnePreuve = Boolean(reponse.fichierPreuve)
+      if (filtrePreuve === 'AVEC' && !aUnePreuve) return false
+      if (filtrePreuve === 'SANS' && aUnePreuve) return false
+      if (!rechercheNormalisee) return true
+
+      const contenu = [
+        reponse.participantNom,
+        reponse.participantContact,
+        ...(reponse.details || []).flatMap(detail => [detail.question, detail.reponse]),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLocaleLowerCase('fr')
+      return contenu.includes(rechercheNormalisee)
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0).getTime()
+      const dateB = new Date(b.createdAt || 0).getTime()
+      return triReponses === 'ANCIENNES' ? dateA - dateB : dateB - dateA
+    })
+
+  const totalPagesReponses = Math.max(1, Math.ceil(reponsesFiltrees.length / pageSizeReponses))
+  const pageReponsesActive = Math.min(pageReponses, totalPagesReponses)
+  const debutPageReponses = (pageReponsesActive - 1) * pageSizeReponses
+  const reponsesPage = reponsesFiltrees.slice(debutPageReponses, debutPageReponses + pageSizeReponses)
+
+  useEffect(() => {
+    setPageReponses(1)
+    setExpandedId(null)
+  }, [recherche, filtrePreuve, triReponses])
 
   return (
     <div className="mx-auto w-full max-w-5xl pb-8">
@@ -734,15 +921,56 @@ function ReponsesSondageContent({ sondageId, onClose, onChanged }) {
               <p className="text-slate-500 font-medium">Aucune réponse en attente de validation</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {reponses.map(r => (
-                <div key={r.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 truncate">{r.participantNom || '—'}</p>
-                    <p className="text-xs text-slate-400 truncate">{r.participantContact || '—'}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">Soumis le {formatDatetime(r.createdAt)}</p>
-                  </div>
-                  <div className="flex w-full flex-shrink-0 gap-2 sm:w-auto">
+            <div className="space-y-4">
+              <section aria-label="Filtres des réponses" className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <div className="grid gap-2 md:grid-cols-[minmax(240px,1fr)_170px_170px]">
+                  <label className="relative">
+                    <span className="sr-only">Rechercher dans les réponses</span>
+                    <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={recherche}
+                      onChange={event => setRecherche(event.target.value)}
+                      placeholder="Participant, téléphone ou réponse…"
+                      className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                    />
+                  </label>
+                  <select value={filtrePreuve} onChange={event => setFiltrePreuve(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-violet-400">
+                    <option value="TOUTES">Toutes les preuves</option>
+                    <option value="AVEC">Avec justificatif</option>
+                    <option value="SANS">Sans justificatif</option>
+                  </select>
+                  <select value={triReponses} onChange={event => setTriReponses(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-violet-400">
+                    <option value="RECENTES">Plus récentes</option>
+                    <option value="ANCIENNES">Plus anciennes</option>
+                  </select>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold text-slate-500">{reponsesFiltrees.length} dossier{reponsesFiltrees.length > 1 ? 's' : ''} à examiner</p>
+                  {(recherche || filtrePreuve !== 'TOUTES' || triReponses !== 'RECENTES') && (
+                    <button type="button" onClick={() => { setRecherche(''); setFiltrePreuve('TOUTES'); setTriReponses('RECENTES') }} className="text-[11px] font-bold text-violet-700 hover:underline">Réinitialiser les filtres</button>
+                  )}
+                </div>
+              </section>
+
+              {reponsesFiltrees.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 py-10 text-center">
+                  <Search size={28} className="mx-auto mb-2 text-slate-300" />
+                  <p className="text-sm font-semibold text-slate-600">Aucune réponse ne correspond aux filtres</p>
+                  <button type="button" onClick={() => { setRecherche(''); setFiltrePreuve('TOUTES'); setTriReponses('RECENTES') }} className="mt-2 text-xs font-bold text-violet-700 hover:underline">Afficher tous les dossiers</button>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-3">
+              {reponsesPage.map(r => (
+                <article key={r.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                  <div className="flex flex-col gap-3 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <Link to={r.participantId ? `/utilisateurs/${r.participantId}` : '#'} className="text-sm font-bold text-slate-800 hover:text-violet-700 hover:underline">{r.participantNom || '—'} →</Link>
+                      <p className="text-xs text-slate-400 truncate">{r.participantContact || '—'} · {formatDatetime(r.createdAt)}</p>
+                      <p className={`mt-1 text-[10px] font-bold ${r.fichierPreuve ? 'text-emerald-600' : 'text-amber-600'}`}>{r.fichierPreuve ? 'Preuve jointe' : 'Aucune preuve jointe'}</p>
+                    </div>
+                    <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+                      <button onClick={() => setExpandedId(current => current === r.id ? null : r.id)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"><Eye size={13} className="mr-1 inline" />{expandedId === r.id ? 'Réduire' : 'Examiner'}</button>
                     <button
                       onClick={() => handle(r.id, true)}
                       disabled={actionId === r.id}
@@ -760,8 +988,25 @@ function ReponsesSondageContent({ sondageId, onClose, onChanged }) {
                       Rejeter
                     </button>
                   </div>
-                </div>
+                  </div>
+                  {expandedId === r.id && <div className="grid gap-4 border-t border-slate-100 p-4 md:grid-cols-[minmax(0,1fr)_260px]">
+                    <div><p className="mb-2 text-[10px] font-black uppercase tracking-wider text-slate-400">Réponses fournies</p><div className="space-y-2">{(r.details || []).map((detail, index) => <div key={`${detail.questionId}-${index}`} className="rounded-xl border border-slate-100 p-3"><p className="text-xs font-bold text-slate-700"><span className="mr-1 text-slate-400">{String(detail.ordre).padStart(2, '0')}.</span>{detail.question}</p><p className="mt-1 text-sm text-slate-600">{detail.reponse || 'Aucune réponse'}</p></div>)}</div></div>
+                    <aside>
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Justificatif</p>
+                        {r.fichierPreuve && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold uppercase text-emerald-700">{preuveEstPdf(r.fichierPreuve) ? 'PDF' : 'Image'}</span>}
+                      </div>
+                      <JustificatifPreuve key={r.id} reponse={r} />
+                    </aside>
+                  </div>}
+                </article>
               ))}
+                  </div>
+                  <div className="overflow-hidden rounded-xl border border-slate-200">
+                    <Pagination page={pageReponsesActive} totalItems={reponsesFiltrees.length} pageSize={pageSizeReponses} onPageChange={page => { setPageReponses(page); setExpandedId(null) }} />
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -778,6 +1023,11 @@ function ResultatsSondageContent({ sondageId, onClose }) {
   const [error, setError] = useState('')
   const [repondants, setRepondants] = useState([])
   const [loadingRepondants, setLoadingRepondants] = useState(true)
+  const [periode, setPeriode] = useState('TOUT')
+  const [rechercheRepondant, setRechercheRepondant] = useState('')
+  const [statutRepondant, setStatutRepondant] = useState('TOUS')
+  const [pageRepondants, setPageRepondants] = useState(1)
+  const pageSizeRepondants = 10
 
   useEffect(() => {
     getSondageResultats(sondageId)
@@ -793,6 +1043,48 @@ function ResultatsSondageContent({ sondageId, onClose }) {
       .finally(() => setLoadingRepondants(false))
   }, [sondageId])
 
+  const limitePeriode = periode === '7J' ? 7 : periode === '30J' ? 30 : null
+  const repondantsPeriode = repondants.filter(item => !limitePeriode || (REFERENCE_TEMPS - new Date(item.createdAt).getTime()) <= limitePeriode * 86400000)
+  const rechercheNormalisee = rechercheRepondant.trim().toLocaleLowerCase('fr')
+  const repondantsFiltres = repondantsPeriode.filter(item => {
+    const correspondStatut = statutRepondant === 'TOUS' || item.statutValidation === statutRepondant
+    const correspondRecherche = !rechercheNormalisee
+      || [item.participantNom, item.participantContact].some(value => String(value || '').toLocaleLowerCase('fr').includes(rechercheNormalisee))
+    return correspondStatut && correspondRecherche
+  })
+  const totalPagesRepondants = Math.max(1, Math.ceil(repondantsFiltres.length / pageSizeRepondants))
+  const pageRepondantsActive = Math.min(pageRepondants, totalPagesRepondants)
+  const repondantsPage = repondantsFiltres.slice(
+    (pageRepondantsActive - 1) * pageSizeRepondants,
+    pageRepondantsActive * pageSizeRepondants,
+  )
+  const repartitionValidation = ['VALIDE', 'EN_ATTENTE_PREUVE', 'REJETE'].map(statut => ({
+    statut,
+    label: STATUT_VALIDATION_LABEL[statut],
+    count: repondantsPeriode.filter(item => item.statutValidation === statut).length,
+  }))
+
+  useEffect(() => {
+    setPageRepondants(1)
+  }, [periode, rechercheRepondant, statutRepondant])
+
+  const exporterCsv = () => {
+    if (!resultats) return
+    const echapper = value => `"${String(value ?? '').replaceAll('"', '""')}"`
+    const lignes = [['Question', 'Type', 'Réponse', 'Nombre', 'Pourcentage']]
+    resultats.resultatsParQuestion.forEach(question => {
+      if (question.repartition) question.repartition.forEach(option => lignes.push([question.texte, TYPE_Q[question.typeQuestion] || question.typeQuestion, option.libelle, option.count, option.pourcentage]))
+      if (question.verbatims) question.verbatims.forEach(verbatim => lignes.push([question.texte, TYPE_Q[question.typeQuestion] || question.typeQuestion, verbatim, 1, '']))
+    })
+    const csv = '\uFEFF' + lignes.map(ligne => ligne.map(echapper).join(';')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const lien = document.createElement('a')
+    lien.href = url
+    lien.download = `resultats-${resultats.titre.toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.csv`
+    lien.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="mx-auto w-full max-w-5xl pb-8">
       <div className="w-full rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -806,7 +1098,10 @@ function ResultatsSondageContent({ sondageId, onClose }) {
               </p>
             )}
           </div>
-          <button onClick={onClose} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"><ArrowLeft size={15} /> Retour</button>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={exporterCsv} disabled={!resultats} className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-100 disabled:opacity-40"><BarChart3 size={14} className="mr-1 inline" />Exporter CSV</button>
+            <button onClick={onClose} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"><ArrowLeft size={15} /> Retour</button>
+          </div>
         </div>
 
         <div className="p-6 space-y-6">
@@ -839,6 +1134,14 @@ function ResultatsSondageContent({ sondageId, onClose }) {
                   <p className="text-lg font-extrabold text-slate-800">{fmt(resultats.budgetDistribue)}</p>
                   <p className="text-[11px] text-slate-500 font-medium">FCFA distribués</p>
                 </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div><p className="text-sm font-black text-slate-900">Qualité et activité des réponses</p><p className="text-[11px] text-slate-400">Répartition des décisions pour la période sélectionnée</p></div>
+                  <select value={periode} onChange={event => setPeriode(event.target.value)} className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700"><option value="TOUT">Toute la période</option><option value="7J">7 derniers jours</option><option value="30J">30 derniers jours</option></select>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">{repartitionValidation.map(item => { const pct = repondantsPeriode.length ? Math.round(item.count * 100 / repondantsPeriode.length) : 0; return <div key={item.statut} className="rounded-xl bg-white p-3"><div className="flex items-center justify-between text-xs"><span className="font-bold text-slate-600">{item.label}</span><strong className="text-slate-900">{item.count}</strong></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${item.statut === 'VALIDE' ? 'bg-emerald-500' : item.statut === 'REJETE' ? 'bg-rose-500' : 'bg-amber-400'}`} style={{ width: `${pct}%` }} /></div><p className="mt-1 text-right text-[10px] text-slate-400">{pct}%</p></div> })}</div>
               </div>
 
               {/* Par question */}
@@ -891,37 +1194,63 @@ function ResultatsSondageContent({ sondageId, onClose }) {
           )}
 
           {/* Répondants */}
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-              Répondants ({repondants.length})
-            </p>
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="border-b border-slate-100 bg-slate-50/70 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h4 className="text-sm font-black text-slate-900">Répondants</h4>
+                  <p className="text-[11px] text-slate-500">{repondantsFiltres.length} résultat{repondantsFiltres.length > 1 ? 's' : ''}{repondantsFiltres.length !== repondants.length ? ` sur ${repondants.length}` : ''}</p>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[minmax(220px,1fr)_180px] lg:w-[520px]">
+                  <label className="relative">
+                    <span className="sr-only">Rechercher un répondant</span>
+                    <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input value={rechercheRepondant} onChange={event => setRechercheRepondant(event.target.value)} placeholder="Nom ou téléphone…" className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
+                  </label>
+                  <select value={statutRepondant} onChange={event => setStatutRepondant(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-violet-400">
+                    <option value="TOUS">Tous les statuts</option>
+                    <option value="VALIDE">Validées</option>
+                    <option value="EN_ATTENTE_PREUVE">À vérifier</option>
+                    <option value="REJETE">Non retenues</option>
+                  </select>
+                </div>
+              </div>
+            </div>
             {loadingRepondants ? (
               <div className="flex justify-center py-6">
                 <Loader2 size={20} className="animate-spin text-violet-500" />
               </div>
-            ) : repondants.length === 0 ? (
-              <p className="text-sm text-slate-400">Aucun répondant pour l'instant.</p>
+            ) : repondantsFiltres.length === 0 ? (
+              <div className="px-4 py-10 text-center">
+                <Users size={28} className="mx-auto mb-2 text-slate-300" />
+                <p className="text-sm font-semibold text-slate-600">Aucun répondant trouvé</p>
+                <button type="button" onClick={() => { setRechercheRepondant(''); setStatutRepondant('TOUS') }} className="mt-2 text-xs font-bold text-violet-700 hover:underline">Réinitialiser la recherche</button>
+              </div>
             ) : (
-              <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 max-h-72 overflow-y-auto">
-                {repondants.map(r => (
-                  <div key={r.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+              <>
+                <div className="divide-y divide-slate-100">
+                {repondantsPage.map(r => (
+                  <div key={r.id} className="flex flex-col gap-2 px-4 py-3 transition hover:bg-slate-50/80 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 truncate">{r.participantNom || '—'}</p>
+                      <Link to={r.participantId ? `/utilisateurs/${r.participantId}` : '#'} className="inline-flex items-center gap-1 text-sm font-bold text-slate-800 hover:text-violet-700 hover:underline">{r.participantNom || '—'} <span aria-hidden="true" className="text-violet-500">→</span></Link>
                       <p className="text-xs text-slate-400 truncate">{r.participantContact || '—'} · {formatDatetime(r.createdAt)}</p>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 sm:flex-shrink-0 sm:justify-end">
                       {r.recompenseVersee && (
                         <span className="text-[10px] font-semibold text-emerald-600">Récompense versée</span>
                       )}
                       <Badge color={STATUT_VALIDATION_COLOR[r.statutValidation] || 'gray'}>
                         {STATUT_VALIDATION_LABEL[r.statutValidation] || r.statutValidation}
                       </Badge>
+                      {r.statutValidation === 'EN_ATTENTE_PREUVE' && <Link to={`/sondages/${sondageId}/reponses`} className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-[10px] font-bold text-amber-700 hover:bg-amber-100">Vérifier</Link>}
                     </div>
                   </div>
                 ))}
-              </div>
+                </div>
+                <Pagination page={pageRepondantsActive} totalItems={repondantsFiltres.length} pageSize={pageSizeRepondants} onPageChange={setPageRepondants} />
+              </>
             )}
-          </div>
+          </section>
         </div>
       </div>
     </div>
@@ -930,7 +1259,7 @@ function ResultatsSondageContent({ sondageId, onClose }) {
 
 // ─── SondageCard ─────────────────────────────────────────────────────────────
 
-function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, onModifier, onSupprimer, onVoirReponses, onConfigurerElig, onVoirResultats }) {
+function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, onModifier, onSupprimer, onVoirDetail, onVoirReponses, onConfigurerElig, onVoirResultats }) {
   const [expanded, setExpanded] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -961,8 +1290,8 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
   return (
     <article className="relative rounded-2xl border border-slate-200 bg-white shadow-soft transition duration-200 hover:shadow-lift">
       {/* ── Header ── */}
-      <div className="p-4 sm:p-5">
-        <div className="flex flex-wrap items-start gap-3 mb-3">
+      <div className="p-4">
+        <div className="flex flex-wrap items-start gap-3 mb-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
@@ -978,17 +1307,19 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
               </p>
             )}
             {survey.description && (
-              <p className="mt-1 text-sm text-slate-500 line-clamp-2">{survey.description}</p>
+              <p className="mt-1 text-xs text-slate-500 line-clamp-1">{survey.description}</p>
             )}
           </div>
 
           {/* Action buttons */}
-          <div className="relative flex-shrink-0" ref={actionsRef}>
+          <div className="relative flex flex-shrink-0 gap-2" ref={actionsRef}>
+            {(survey.reponsesAValider || 0) > 0 ? <button onClick={() => onVoirReponses(survey.id)} className="h-10 rounded-xl bg-amber-50 px-3 text-xs font-bold text-amber-700 hover:bg-amber-100">{survey.reponsesAValider} à vérifier</button> : <button onClick={() => onVoirDetail(survey.id)} className="h-10 rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-700 hover:bg-slate-50">Voir la fiche</button>}
             <button onClick={() => setActionsOpen(v => !v)} aria-expanded={actionsOpen} aria-haspopup="menu"
               className="flex h-10 items-center gap-1.5 rounded-xl bg-slate-950 px-3.5 text-xs font-bold text-white shadow-sm transition hover:bg-violet-700">
-              Gérer {actionsOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+              Actions {actionsOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
             </button>
-            {actionsOpen && <div role="menu" className="absolute right-0 top-12 z-20 w-64 space-y-1.5 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-lift [&>button]:min-h-9 [&>button]:w-full [&>button]:justify-start [&>button]:rounded-xl">
+            {actionsOpen && <div role="menu" aria-label={`Actions pour ${survey.titre}`} className="absolute right-0 top-12 z-20 w-64 space-y-1.5 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-lift [&>button]:min-h-9 [&>button]:w-full [&>button]:justify-start [&>button]:rounded-xl">
+            <p className="px-2 pb-1 text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-400">Actions disponibles</p>
             {/* ⚠️ Pas de test d'éligibilité */}
             {!survey.hasEligibilite && !['CLOTURE', 'ANNULE'].includes(survey.statut) && (
               <button onClick={() => onConfigurerElig(survey)}
@@ -1009,9 +1340,10 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
                   className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition">
                   <Edit2 size={12} /> Modifier
                 </button>
+                <div className="my-1 border-t border-slate-100" />
                 {!confirmDelete ? (
                   <button onClick={() => setConfirmDelete(true)}
-                    className="flex items-center gap-1.5 rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-100 transition">
+                    className="flex items-center gap-1.5 rounded-lg border border-rose-100 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-100 transition">
                     <Trash2 size={12} /> Supprimer
                   </button>
                 ) : (
@@ -1032,12 +1364,6 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
 
             {survey.statut === 'ACTIF' && (
               <>
-                <button onClick={() => onCloturer(survey.id)}
-                  disabled={isActing('-cloturer')}
-                  className="flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-50 transition">
-                  {isActing('-cloturer') ? <Loader2 size={12} className="animate-spin" /> : null}
-                  Clôturer
-                </button>
                 <button onClick={() => onVoirReponses(survey.id)}
                   className="flex items-center gap-1.5 rounded-lg bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition">
                   <Eye size={12} /> Réponses
@@ -1045,6 +1371,14 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
                 <button onClick={() => onModifier(survey)}
                   className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition">
                   <Edit2 size={12} /> Modifier
+                </button>
+                <div className="my-1 border-t border-slate-100" />
+                <button onClick={() => onCloturer(survey.id)}
+                  disabled={isActing('-cloturer')}
+                  className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 transition"
+                  title="Arrête définitivement la collecte de nouvelles réponses">
+                  {isActing('-cloturer') ? <Loader2 size={12} className="animate-spin" /> : <AlertTriangle size={12} />}
+                  Clôturer la collecte
                 </button>
               </>
             )}
@@ -1085,7 +1419,7 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
         </div>
 
         {/* ── Stats row ── */}
-        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+        <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-4">
           <span className="flex min-w-0 items-center gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
             <Users size={12} className="text-slate-400" />
             {survey.repondantsActuels} / {survey.quotaVise} répondants
@@ -1102,7 +1436,6 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
             <Clock size={12} className="text-slate-400" />
             Expire {formatDate(survey.dateExpiration)}
           </span>
-          <span className="hidden items-center rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-400 xl:flex">Créé {formatDate(survey.createdAt)}</span>
         </div>
 
         {/* ── Progress bar ── */}
@@ -1158,8 +1491,9 @@ function useSondageRoute() {
 
   useEffect(() => {
     let cancelled = false
-    getAdminSondages()
-      .then(items => { if (!cancelled) setSondage(items.find(item => item.id === id) || null) })
+    getAdminSondage(id)
+      .then(item => { if (!cancelled) setSondage(item) })
+      .catch(() => { if (!cancelled) setSondage(null) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [id])
@@ -1169,6 +1503,80 @@ function useSondageRoute() {
 
 function SondageRouteLoading() {
   return <div className="flex justify-center py-24"><Loader2 size={28} className="animate-spin text-violet-600" /></div>
+}
+
+export function DetailSondagePage() {
+  const navigate = useNavigate()
+  const { sondage, loading } = useSondageRoute()
+  const [repondants, setRepondants] = useState([])
+
+  useEffect(() => {
+    if (!sondage?.id) return
+    getRepondantsSondage(sondage.id).then(setRepondants).catch(() => setRepondants([]))
+  }, [sondage?.id])
+
+  if (loading) return <SondageRouteLoading />
+  if (!sondage) return <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">Sondage introuvable.</p>
+
+  const cfg = STATUT_CONFIG[sondage.statut] || STATUT_CONFIG.BROUILLON
+  const progression = sondage.quotaVise ? Math.min(100, Math.round((sondage.repondantsActuels / sondage.quotaVise) * 100)) : 0
+  const valides = repondants.filter(item => item.statutValidation === 'VALIDE').length
+  const rejetes = repondants.filter(item => item.statutValidation === 'REJETE').length
+
+  return (
+    <div className="space-y-4 pb-8">
+      <button onClick={() => navigate('/sondages')} className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-violet-700"><ArrowLeft size={15} /> Retour aux sondages</button>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="grid lg:grid-cols-[260px_1fr]">
+          <div className="h-48 bg-slate-100 lg:h-full lg:min-h-56">
+            {sondage.imageUrl ? <img src={mediaUrl(sondage.imageUrl)} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center"><ClipboardList size={42} className="text-slate-300" /></div>}
+          </div>
+          <div className="p-5 sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="mb-2 flex flex-wrap gap-2"><Badge color={cfg.color}>{cfg.label}</Badge><Badge color="gray">{MODE_LABEL[sondage.modeDistribution]}</Badge><Badge color="gray">{RECOMPENSE_LABEL[sondage.typeRecompense]}</Badge></div>
+                <h2 className="text-2xl font-black leading-tight text-slate-950">{sondage.titre}</h2>
+                {sondage.description && <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-500">{sondage.description}</p>}
+                <p className="mt-3 text-xs font-semibold text-indigo-600">{sondage.commanditaireNom ? `${sondage.commanditaireNom}${sondage.commanditaireSociete ? ` · ${sondage.commanditaireSociete}` : ''}` : 'Sondage interne'}</p>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <button onClick={() => navigate(`/sondages/${sondage.id}/modifier`)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"><Edit2 size={13} className="mr-1 inline" />Modifier</button>
+                <button onClick={() => navigate(`/sondages/${sondage.id}/resultats`)} className="rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold text-white hover:bg-violet-700"><BarChart3 size={13} className="mr-1 inline" />Résultats</button>
+              </div>
+            </div>
+            <div className="mt-5"><ProgressBar value={progression} color={progression >= 100 ? 'emerald' : 'violet'} className="h-2" /><p className="mt-1 text-right text-[11px] font-semibold text-slate-400">{progression}% du quota</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        {[
+          ['Répondants', `${sondage.repondantsActuels}/${sondage.quotaVise}`, 'text-slate-950'],
+          ['À valider', sondage.reponsesAValider || 0, (sondage.reponsesAValider || 0) > 0 ? 'text-amber-600' : 'text-slate-950'],
+          ['Validées', valides, 'text-emerald-600'],
+          ['Rejetées', rejetes, 'text-rose-600'],
+          ['Budget restant', `${fmt(sondage.budgetRestant || 0)} FCFA`, 'text-violet-700'],
+          ['Expiration', formatDate(sondage.dateExpiration), 'text-slate-950'],
+        ].map(([label, value, color]) => <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className={`mt-2 text-base font-black ${color}`}>{value}</p></div>)}
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1fr_320px]">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="mb-4 flex items-center justify-between"><h3 className="font-black text-slate-900">Questions du sondage</h3><Badge color="gray">{sondage.questions?.length || 0} questions</Badge></div>
+          <div className="space-y-2">{(sondage.questions || []).map(q => <div key={q.id} className="rounded-xl bg-slate-50 p-3"><div className="flex items-start justify-between gap-3"><p className="text-sm font-bold text-slate-800"><span className="mr-2 text-slate-400">{String(q.ordre).padStart(2, '0')}.</span>{q.texte}</p><span className="shrink-0 text-[10px] font-bold text-slate-400">{TYPE_Q[q.typeQuestion]}</span></div>{q.options?.length > 0 && <p className="mt-2 text-xs text-slate-500">{q.options.map(o => o.libelle).join(' · ')}</p>}</div>)}</div>
+        </div>
+        <aside className="space-y-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4"><h3 className="text-sm font-black text-slate-900">Pilotage</h3><div className="mt-3 grid gap-2">
+            {(sondage.reponsesAValider || 0) > 0 && <button onClick={() => navigate(`/sondages/${sondage.id}/reponses`)} className="rounded-xl bg-amber-50 px-3 py-2.5 text-left text-xs font-bold text-amber-700">Vérifier {sondage.reponsesAValider} réponse(s)</button>}
+            {!sondage.hasEligibilite && <button onClick={() => navigate(`/sondages/${sondage.id}/eligibilite`)} className="rounded-xl bg-violet-50 px-3 py-2.5 text-left text-xs font-bold text-violet-700">Configurer l’éligibilité</button>}
+            <button onClick={() => navigate(`/sondages/${sondage.id}/resultats`)} className="rounded-xl bg-slate-100 px-3 py-2.5 text-left text-xs font-bold text-slate-700">Analyser les résultats</button>
+          </div></div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4"><h3 className="text-sm font-black text-slate-900">Cadre financier</h3><div className="mt-3 space-y-2 text-xs text-slate-500"><p className="flex justify-between"><span>Récompense</span><strong className="text-slate-900">{fmt(sondage.recompense)} {sondage.typeRecompense === 'POINTS' ? 'points' : 'FCFA'}</strong></p><p className="flex justify-between"><span>Budget réservé</span><strong className="text-slate-900">{fmt(sondage.budgetReserve || 0)} FCFA</strong></p><p className="flex justify-between"><span>Distribué</span><strong className="text-slate-900">{fmt(sondage.budgetDistribue || 0)} FCFA</strong></p></div></div>
+        </aside>
+      </section>
+    </div>
+  )
 }
 
 export function NouveauSondagePage() {
@@ -1262,9 +1670,21 @@ export default function Sondages() {
     }
   }
 
-  const handleActiver    = (id) => act(id, '-activer',    () => activerSondage(id))
-  const handleDistribuer = (id) => act(id, '-distribuer', () => distribuerSondage(id))
-  const handleCloturer   = (id) => act(id, '-cloturer',   () => cloturerSondage(id))
+  const handleActiver = (id) => {
+    const sondage = sondages.find(item => item.id === id)
+    if (!window.confirm(`Activer « ${sondage?.titre || 'ce sondage'} » et réserver son budget ?`)) return
+    act(id, '-activer', () => activerSondage(id))
+  }
+  const handleDistribuer = (id) => {
+    const sondage = sondages.find(item => item.id === id)
+    if (!window.confirm(`Finaliser définitivement « ${sondage?.titre || 'ce sondage'} », distribuer les récompenses dues et libérer le reliquat ?`)) return
+    act(id, '-distribuer', () => distribuerSondage(id))
+  }
+  const handleCloturer = (id) => {
+    const sondage = sondages.find(item => item.id === id)
+    if (!window.confirm(`Fermer « ${sondage?.titre || 'ce sondage'} » aux nouvelles réponses ? Les validations en attente devront encore être traitées.`)) return
+    act(id, '-cloturer', () => cloturerSondage(id))
+  }
   const handleSupprimer  = (id) => act(id, '-supprimer',  () => supprimerSondage(id))
 
   const sondagesFiltres = sondages
@@ -1289,6 +1709,11 @@ export default function Sondages() {
   const countByStatut = (key) => sondages.filter(s => s.statut === key).length
   useEffect(() => setPage(1), [filtre, search, modeFilter, rewardFilter, sort])
   const sondagesPage = sondagesFiltres.slice((page - 1) * 10, page * 10)
+  const reponsesAValiderTotal = sondages.reduce((total, item) => total + Number(item.reponsesAValider || 0), 0)
+  const budgetReserveTotal = sondages.reduce((total, item) => total + Number(item.budgetReserve || 0), 0)
+  const budgetRestantTotal = sondages.reduce((total, item) => total + Number(item.budgetRestant || 0), 0)
+  const expirationProche = sondages.filter(item => item.statut === 'ACTIF' && new Date(item.dateExpiration).getTime() > REFERENCE_TEMPS && new Date(item.dateExpiration).getTime() - REFERENCE_TEMPS <= 7 * 86400000).length
+  const progressionMoyenne = sondages.length ? Math.round(sondages.reduce((total, item) => total + (item.quotaVise ? Math.min(100, Number(item.repondantsActuels || 0) * 100 / item.quotaVise) : 0), 0) / sondages.length) : 0
 
   return (
     <div className="space-y-5">
@@ -1306,6 +1731,16 @@ export default function Sondages() {
           <Plus size={15} /> Nouveau sondage
         </button>
       </div>
+
+      <section aria-label="Indicateurs décisionnels" className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        {[
+          ['À vérifier', reponsesAValiderTotal, reponsesAValiderTotal > 0 ? 'text-amber-600' : 'text-slate-900'],
+          ['Budget réservé', `${fmt(budgetReserveTotal)} FCFA`, 'text-violet-700'],
+          ['Budget restant', `${fmt(budgetRestantTotal)} FCFA`, 'text-emerald-700'],
+          ['Expiration < 7 jours', expirationProche, expirationProche > 0 ? 'text-rose-600' : 'text-slate-900'],
+          ['Progression moyenne', `${progressionMoyenne}%`, 'text-sky-700'],
+        ].map(([label, value, color]) => <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className={`mt-2 text-lg font-black ${color}`}>{value}</p></div>)}
+      </section>
 
       {/* ── Erreur action ── */}
       {actionError && (
@@ -1377,6 +1812,7 @@ export default function Sondages() {
               onCloturer={handleCloturer}
               onModifier={survey => navigate(`/sondages/${survey.id}/modifier`)}
               onSupprimer={handleSupprimer}
+              onVoirDetail={id => navigate(`/sondages/${id}`)}
               onVoirReponses={id => navigate(`/sondages/${id}/reponses`)}
               onConfigurerElig={survey => navigate(`/sondages/${survey.id}/eligibilite`)}
               onVoirResultats={id => navigate(`/sondages/${id}/resultats`)}

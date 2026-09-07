@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/bannieres")
@@ -18,5 +19,15 @@ public class BanniereController {
     @GetMapping
     public List<BanniereResponse> getActives(@RequestParam PageCible page) {
         return banniereService.getActives(page);
+    }
+
+    @PostMapping("/{id}/impression")
+    public void enregistrerImpression(@PathVariable UUID id) {
+        banniereService.enregistrerImpression(id);
+    }
+
+    @PostMapping("/{id}/clic")
+    public void enregistrerClic(@PathVariable UUID id) {
+        banniereService.enregistrerClic(id);
     }
 }

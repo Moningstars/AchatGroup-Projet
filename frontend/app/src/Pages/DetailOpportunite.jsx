@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom'
 import {
-  ShieldCheck, Users, Loader2, ChevronRight, ChevronDown, CheckCircle2, AlertCircle, Layers, Timer, Minus, Plus, Copy, Share2, ShoppingCart, PackageCheck, ExternalLink, Gift, Store, Coins
+  ShieldCheck, Users, Loader2, ChevronRight, ChevronDown, CheckCircle2, AlertCircle, Layers, Timer, Minus, Plus, Copy, Share2, ShoppingCart, PackageCheck, ExternalLink, Gift, Store, Coins, Sparkles
 } from 'lucide-react'
 import { getOpportunite, getOpportunites, getMesParticipationsOpportunites, getSolde, souscrire, imgUrl } from '../services/api'
 import { useAuth } from '../context/AuthContext'
@@ -52,7 +52,7 @@ function ShareIconButton({ label, onClick, className, children }) {
 }
 
 const SUIVI_PARTICIPATION = {
-  EN_ATTENTE_QUOTA: 'Campagne en cours',
+  EN_ATTENTE_QUOTA: 'Opportunité en cours',
   A_PREPARER: 'Paiement validé',
   PREPARATION: 'Lot transmis au partenaire',
   PRET_LIVRAISON: 'Partenaire confirmé',
@@ -122,6 +122,7 @@ export default function DetailOpportunite() {
   const [shareOpen, setShareOpen] = useState(false)
   const [wallet, setWallet] = useState(null)
   const [utiliserPoints, setUtiliserPoints] = useState(false)
+  const [reponsesComplementaires, setReponsesComplementaires] = useState({})
 
   useSSE(id ? `opportunite/${id}` : null, {
     COMPTEUR: ({ participantsActuels, prixActuel }) => {
@@ -172,22 +173,38 @@ export default function DetailOpportunite() {
     }
   }
 
+  const champsComplementaires = opportunite?.formulaireComplementaire || []
+  const setReponseComplementaire = (cle, valeur) => {
+    setReponsesComplementaires(current => ({ ...current, [cle]: valeur }))
+  }
+
+  const validerReponsesComplementaires = () => {
+    const manquant = champsComplementaires.find(champ => champ.obligatoire && !String(reponsesComplementaires[champ.cle] || '').trim())
+    return manquant ? `Complétez le champ : ${manquant.libelle}` : ''
+  }
+
   const handleJoindre = async () => {
     if (!isAuthenticated) {
       navigate('/connexion', { state: { from: `${window.location.pathname}${window.location.search}` } })
+      return
+    }
+    const erreurComplementaire = validerReponsesComplementaires()
+    if (erreurComplementaire) {
+      setJoinError(erreurComplementaire)
       return
     }
     setJoinError(''); setJoining(true)
     try {
       const ref = searchParams.get('ref')
       const parrainId = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(ref || '') ? ref : undefined
-      await souscrire(id, quantiteEffective, { parrainId, utiliserPoints })
+      await souscrire(id, quantiteEffective, { parrainId, utiliserPoints, reponsesComplementaires })
       setJoinSuccess(true)
       const updated = await getOpportunite(id)
       setOpportunite(updated)
       await refreshParticipation()
       setQuantite(1)
       setUtiliserPoints(false)
+      setReponsesComplementaires({})
       getSolde().then(setWallet).catch(() => {})
       // Réactive le bouton après un court instant pour permettre d'ajouter encore de la quantité.
       setTimeout(() => setJoinSuccess(false), 2500)
@@ -289,25 +306,49 @@ export default function DetailOpportunite() {
     </div>
   )
 
-  const {
-    pct: progress,
-    valide: progressionValidee,
-    phase: phaseProgression,
-    placesRestantes: placesRestantesCalculees,
-    objectifFinal,
-  } = calculerProgression(opportunite)
-  const discount = opportunite.prixNormal && Number(opportunite.prixNormal) > Number(opportunite.prixActuel)
-    ? Math.round((1 - Number(opportunite.prixActuel) / Number(opportunite.prixNormal)) * 100) : null
   const paliersTries = [...(opportunite.paliers || [])].sort((a, b) => a.seuilMin - b.seuilMin)
-  const placesRestantes = phaseProgression === 'plafond' ? placesRestantesCalculees : Infinity
-  const isComplet = phaseProgression === 'plafond' && placesRestantes <= 0
+  const palierActif = paliersTries.find((palier, i) => {
+    const dernier = i === paliersTries.length - 1
+    return (opportunite.participantsActuels >= palier.seuilMin || (i === 0 && opportunite.participantsActuels < palier.seuilMin)) &&
+      (dernier || !palier.seuilMax || opportunite.participantsActuels <= palier.seuilMax)
+  })
+  const prixAffiche = palierActif ? palierActif.prix : opportunite.prixActuel
+
+  const { valide: progressionValidee, phase: phaseProgression, placesRestantes: unitésRestantesCalculees } = calculerProgression({ ...opportunite, paliers: paliersTries })
+  const discount = opportunite.prixNormal && Number(opportunite.prixNormal) > Number(prixAffiche)
+    ? Math.round((1 - Number(prixAffiche) / Number(opportunite.prixNormal)) * 100) : null
+  const unitésRestantes = phaseProgression === 'plafond' ? unitésRestantesCalculees : Infinity
+  const isComplet = phaseProgression === 'plafond' && unitésRestantes <= 0
   const isExpired = opportunite.dateExpiration && new Date(opportunite.dateExpiration) <= new Date()
   const souscriptionOuverte = opportunite.souscriptionOuverte ?? (opportunite.statut === 'ACTIVE' && !isExpired && !isComplet)
   const activationAtteinte = opportunite.activationAtteinte ?? opportunite.participantsActuels >= opportunite.seuilMinimum
   const dejaSouscrit = Boolean(maParticipation)
-  const maxAjout = Number.isFinite(placesRestantes) ? placesRestantes : 99
-  const quantiteEffective = Math.min(quantite, Math.max(maxAjout || 1, 1))
-  const totalCommande = Number(opportunite.prixActuel) * quantiteEffective
+  const maxAjout = Number.isFinite(unitésRestantes) ? unitésRestantes : 99
+  const maxQuantiteSelectionnable = Math.max(1, maxAjout || 1)
+  const quantiteEffective = Math.min(quantite, maxQuantiteSelectionnable)
+  const participantsActuels = Math.max(0, Number(opportunite.participantsActuels || 0))
+  const palierActifIndex = Math.max(0, paliersTries.findIndex(p => p === palierActif))
+  const prochainPalier = paliersTries[palierActifIndex + 1]
+  const palierDebut = Number(palierActif?.seuilMin || 1)
+  const palierFin = Number(palierActif?.seuilMax || opportunite.seuilMaximal || palierDebut)
+  const palierEstOuvert = !palierActif?.seuilMax && !opportunite.seuilMaximal
+  const uniteDansPalier = palierEstOuvert
+    ? Math.max(0, participantsActuels - palierDebut + 1)
+    : palierActifIndex === 0
+      ? Math.min(participantsActuels, palierFin)
+      : Math.max(0, Math.min(participantsActuels, palierFin) - palierDebut + 1)
+  const capacitePalier = palierEstOuvert ? null : Math.max(1, palierFin - palierDebut + 1)
+  const progressPalier = capacitePalier ? Math.min(100, Math.round((uniteDansPalier / capacitePalier) * 100)) : 100
+  const messageProgression = !activationAtteinte
+    ? `Plus que ${Math.max(0, Number(opportunite.seuilMinimum || 0) - participantsActuels)} unité${Math.max(0, Number(opportunite.seuilMinimum || 0) - participantsActuels) > 1 ? 's' : ''} pour activer l’opportunité`
+    : prochainPalier
+      ? `Plus que ${Math.max(0, Number(prochainPalier.seuilMin || 0) - participantsActuels)} unité${Math.max(0, Number(prochainPalier.seuilMin || 0) - participantsActuels) > 1 ? 's' : ''} pour passer au prix de ${fmt(prochainPalier.prix)} FCFA`
+      : 'Dernier palier atteint : chaque nouvelle unité garde le meilleur prix disponible.'
+  const handleQuantiteChange = (value) => {
+    const next = Math.floor(Number(value) || 1)
+    setQuantite(Math.min(maxQuantiteSelectionnable, Math.max(1, next)))
+  }
+  const totalCommande = Number(prixAffiche) * quantiteEffective
   const soldePoints = Number(wallet?.soldePoints || 0)
   const valeurPoint = Number(wallet?.valeurPointFcfa || 1)
   const recompenseParrainage = Number(wallet?.recompenseParrainagePoints || 100)
@@ -328,8 +369,8 @@ export default function DetailOpportunite() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 lg:items-start">
 
-          {/* Gallery */}
-          <div className="lg:col-span-7 space-y-6">
+          {/* Media : photos + miniatures — toujours en premier, y compris sur mobile */}
+          <div className="order-1 lg:order-none lg:col-start-1 lg:col-span-7 lg:row-start-1 space-y-6">
 
             {/* Image principale — hauteur fixe, clic = lightbox */}
             <div
@@ -379,8 +420,10 @@ export default function DetailOpportunite() {
                 ))}
               </div>
             )}
+          </div>
 
-            {/* Contenu produit : reste sous la galerie pour occuper naturellement la colonne gauche. */}
+          {/* Détails : infos produit + fournisseur — passent après le bloc info sur mobile */}
+          <div className="order-3 lg:order-none lg:col-start-1 lg:col-span-7 lg:row-start-2 space-y-6">
             <section className="rounded-3xl border-2 border-gray-100 bg-white p-5 sm:p-6">
               <div className="flex items-center gap-2">
                 <PackageCheck size={16} className="text-primary" />
@@ -474,8 +517,8 @@ export default function DetailOpportunite() {
             </div>
           )}
 
-          {/* Info */}
-          <div className="lg:col-span-5 flex flex-col gap-5 lg:sticky lg:top-24">
+          {/* Info : titre, prix, progression, quantité, CTA — passe avant les détails produit/fournisseur sur mobile */}
+          <div className="order-2 lg:order-none lg:col-start-8 lg:col-span-5 lg:row-start-1 lg:row-span-2 flex flex-col gap-5 lg:sticky lg:top-24">
 
             {/* Status + catégorie */}
             <div className="flex items-center gap-2 flex-wrap">
@@ -496,9 +539,9 @@ export default function DetailOpportunite() {
             {/* Prix */}
             <div className="flex flex-wrap items-baseline gap-3">
               <span className="text-3xl md:text-4xl font-heading font-extrabold text-accent tracking-tighter tabular-nums">
-                {fmt(opportunite.prixActuel)} <span className="text-base font-bold">FCFA</span>
+                {fmt(prixAffiche)} <span className="text-base font-bold">FCFA</span>
               </span>
-              {opportunite.prixNormal && Number(opportunite.prixNormal) > Number(opportunite.prixActuel) && (
+              {opportunite.prixNormal && Number(opportunite.prixNormal) > Number(prixAffiche) && (
                 <span className="text-base text-gray-300 line-through">{fmt(opportunite.prixNormal)} FCFA</span>
               )}
               {discount > 0 && (
@@ -511,30 +554,20 @@ export default function DetailOpportunite() {
               <div className="flex justify-between items-center text-[11px] font-black uppercase tracking-widest">
                 <span className="text-gray-400 flex items-center gap-1.5">
                   <Users size={12} />
-                  {phaseProgression === 'plafond'
-                    ? `${opportunite.participantsActuels} / ${objectifFinal || opportunite.seuilMaximal} places`
-                    : progressionValidee && objectifFinal === Number(opportunite.seuilMinimum)
-                      ? `${opportunite.participantsActuels} unités · offre validée`
-                      : `${opportunite.participantsActuels} / ${objectifFinal || opportunite.seuilMinimum} unités réservées`}
+                  {palierEstOuvert
+                    ? `${participantsActuels} unités · palier ${palierDebut} et plus`
+                    : `${uniteDansPalier} / ${capacitePalier} unités dans ce palier`}
                 </span>
-                <span className={activationAtteinte ? 'text-success' : 'text-accent'}>{progress}%</span>
+                <span className={activationAtteinte ? 'text-success' : 'text-accent'}>{progressPalier}%</span>
               </div>
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-success rounded-full transition-all duration-700" style={{ width: `${progress}%` }} />
+                <div className="h-full bg-success rounded-full transition-all duration-700" style={{ width: `${progressPalier}%` }} />
               </div>
-              {!progressionValidee && (
-                <p className="text-[10px] text-gray-400 font-bold">
-                  Plus que {opportunite.seuilMinimum - opportunite.participantsActuels} unité{opportunite.seuilMinimum - opportunite.participantsActuels > 1 ? 's' : ''} pour activer l'offre
-                </p>
-              )}
-              {activationAtteinte && (
-                <p className="text-[10px] text-success font-bold">
-                  Quota atteint : la campagne est activée et peut être traitée.
-                </p>
-              )}
+              <p className={`text-[10px] font-bold ${activationAtteinte ? 'text-success' : 'text-gray-400'}`}>{messageProgression}</p>
+              {activationAtteinte && progressionValidee && <p className="text-[10px] text-gray-400 font-semibold">Seuil minimum atteint : l’opportunité est validée si elle se clôture maintenant.</p>}
               {phaseProgression === 'plafond' && (
                 <p className={`text-[10px] font-bold ${isComplet ? 'text-urgency' : 'text-accent'}`}>
-                  {isComplet ? 'Stock épuisé' : `Plus que ${placesRestantes} place${placesRestantes > 1 ? 's' : ''} disponible${placesRestantes > 1 ? 's' : ''}`}
+                  {isComplet ? 'Stock épuisé' : `Plus que ${unitésRestantes} unité${unitésRestantes > 1 ? 's' : ''} disponible${unitésRestantes > 1 ? 's' : ''}`}
                 </p>
               )}
             </div>
@@ -551,7 +584,7 @@ export default function DetailOpportunite() {
                     .map((palier, i) => {
                       const dernier = i === paliersTries.length - 1
                       const atteint = opportunite.participantsActuels >= palier.seuilMin
-                      const actif = opportunite.participantsActuels >= palier.seuilMin &&
+                      const actif = (opportunite.participantsActuels >= palier.seuilMin || (i === 0 && opportunite.participantsActuels < palier.seuilMin)) &&
                         (dernier || !palier.seuilMax || opportunite.participantsActuels <= palier.seuilMax)
                       return (
                         <div key={i} className={`flex items-center justify-between px-4 py-3 transition-colors ${actif ? 'bg-success/5' : ''}`}>
@@ -574,32 +607,42 @@ export default function DetailOpportunite() {
               </div>
             )}
 
-            {/* Participation existante */}
-            {dejaSouscrit && (
-              <div className="bg-success/10 rounded-2xl border-2 border-success/20 p-4">
+            {/* Suivi ou aide */}
+            <div className={`${dejaSouscrit ? 'bg-success/10 border-success/20' : 'bg-primary/5 border-primary/10'} rounded-2xl border-2 p-4`}>
                 <div className="flex items-start gap-3">
-                  <CheckCircle2 size={20} className="text-success shrink-0 mt-0.5" />
+                  {dejaSouscrit ? <CheckCircle2 size={20} className="text-success shrink-0 mt-0.5" /> : <ShieldCheck size={20} className="text-primary shrink-0 mt-0.5" />}
                   <div className="min-w-0 flex-1">
-                    <p className="font-heading font-black text-success text-sm">Vous avez déjà rejoint cette campagne</p>
-                    <p className="text-xs text-success/80 font-bold mt-1">
-                      Quantité actuelle : {maParticipation.quantite || 1} · Fonds gelés : {fmt(maParticipation.montantGele)} FCFA
+                    <p className={`font-heading font-black text-sm ${dejaSouscrit ? 'text-success' : 'text-primary'}`}>
+                      {dejaSouscrit ? 'Vous avez déjà rejoint cette opportunité' : 'Réservez maintenant, sans achat définitif immédiat'}
                     </p>
+                    {dejaSouscrit ? (
+                      <p className="text-xs text-success/80 font-bold mt-1">
+                        Quantité actuelle : {maParticipation.quantite || 1} · Fonds gelés : {fmt(maParticipation.montantGele)} FCFA
+                      </p>
+                    ) : (
+                      <p className="text-xs text-primary/70 font-bold mt-1">
+                        Votre dépôt est sécurisé. Il est finalisé seulement si le seuil minimum est atteint, sinon il est remboursé.
+                      </p>
+                    )}
                     <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-white/70 px-3 py-2">
                       <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-primary">
                         <PackageCheck size={14} />
-                        {SUIVI_PARTICIPATION[maParticipation.statutLivraison] || 'Campagne en cours'}
+                        {dejaSouscrit ? (SUIVI_PARTICIPATION[maParticipation.statutLivraison] || 'Opportunité en cours') : (activationAtteinte ? 'Opportunité déjà validée' : 'En attente du seuil minimum')}
                       </span>
-                      <span className="text-[11px] font-black text-success tabular-nums">{maParticipation.progressionLivraison || 0}%</span>
+                      <span className={`text-[11px] font-black tabular-nums ${dejaSouscrit ? 'text-success' : 'text-primary'}`}>
+                        {dejaSouscrit ? `${maParticipation.progressionLivraison || 0}%` : `${participantsActuels}/${opportunite.seuilMinimum}`}
+                      </span>
                     </div>
                     {souscriptionOuverte && (
-                      <p className="mt-2 text-xs text-success/80">
-                        Besoin de plus d’unités ? Choisissez une quantité ci-dessous : elle sera ajoutée à votre commande existante.
+                      <p className={`mt-2 text-xs ${dejaSouscrit ? 'text-success/80' : 'text-primary/70'}`}>
+                        {dejaSouscrit
+                          ? 'Besoin de plus d’unités ? Choisissez une quantité ci-dessous : elle sera ajoutée à votre commande existante.'
+                          : 'Choisissez la quantité voulue ci-dessous pour rejoindre cette opportunité.'}
                       </p>
                     )}
                   </div>
                 </div>
               </div>
-            )}
 
             {/* Quantité */}
             <div className="bg-white rounded-2xl border-2 border-gray-100 p-4 flex items-center justify-between">
@@ -615,7 +658,17 @@ export default function DetailOpportunite() {
                 >
                   <Minus size={16} />
                 </button>
-                <span className="text-lg font-heading font-extrabold text-primary tabular-nums w-6 text-center">{quantite}</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={maxQuantiteSelectionnable}
+                  inputMode="numeric"
+                  value={quantite}
+                  onChange={e => handleQuantiteChange(e.target.value)}
+                  disabled={joining || joinSuccess}
+                  aria-label={dejaSouscrit ? 'Quantité à ajouter' : 'Quantité à réserver'}
+                  className="h-9 w-14 rounded-xl border-2 border-gray-100 bg-bg-light text-center font-heading text-lg font-extrabold tabular-nums text-primary outline-none transition focus:border-primary/30 disabled:opacity-50"
+                />
                 <button
                   type="button"
                   onClick={() => setQuantite(q => Math.min(maxAjout, q + 1))}
@@ -638,6 +691,47 @@ export default function DetailOpportunite() {
                   </span>
                 </span>
               </label>
+            )}
+
+            {champsComplementaires.length > 0 && souscriptionOuverte && (
+              <div className="rounded-2xl border-2 border-gray-100 bg-white p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/5 text-primary">
+                    <PackageCheck size={18} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-primary">Informations nécessaires après validation</p>
+                    <p className="mt-0.5 text-[10px] font-semibold leading-4 text-gray-400">Ces éléments aideront l’équipe à préparer votre livraison si le seuil est atteint.</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  {champsComplementaires.map(champ => {
+                    const commonClass = 'w-full rounded-xl border-2 border-gray-100 bg-gray-50 px-3 py-2.5 text-sm font-semibold text-primary outline-none transition focus:border-primary/30 focus:bg-white'
+                    const value = reponsesComplementaires[champ.cle] || ''
+                    return (
+                      <label key={champ.cle} className="block">
+                        <span className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">{champ.libelle}{champ.obligatoire ? ' *' : ''}</span>
+                        {champ.type === 'TEXTAREA' ? (
+                          <textarea rows={3} value={value} onChange={e => setReponseComplementaire(champ.cle, e.target.value)} className={`${commonClass} resize-none`} />
+                        ) : champ.type === 'SELECT' || champ.type === 'RADIO' ? (
+                          <select value={value} onChange={e => setReponseComplementaire(champ.cle, e.target.value)} className={commonClass}>
+                            <option value="">Sélectionner</option>
+                            {(champ.options || []).map(option => <option key={option} value={option}>{option}</option>)}
+                          </select>
+                        ) : champ.type === 'CHECKBOX' ? (
+                          <span className="flex items-center gap-3 rounded-xl border-2 border-gray-100 bg-gray-50 px-3 py-2.5">
+                            <input type="checkbox" checked={value === 'Oui'} onChange={e => setReponseComplementaire(champ.cle, e.target.checked ? 'Oui' : '')} className="h-5 w-5 accent-primary" />
+                            <span className="text-sm font-bold text-primary">Oui</span>
+                          </span>
+                        ) : (
+                          <input type={champ.type === 'NUMBER' ? 'number' : champ.type === 'DATE' ? 'date' : champ.type === 'PHONE' ? 'tel' : 'text'} value={value} onChange={e => setReponseComplementaire(champ.cle, e.target.value)} className={commonClass} />
+                        )}
+                        {champ.aide && <span className="mt-1 block text-[10px] font-semibold leading-4 text-gray-400">{champ.aide}</span>}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
             )}
 
             {/* Partage et parrainage */}
@@ -684,7 +778,7 @@ export default function DetailOpportunite() {
             <div className="pt-2 space-y-3 mt-auto">
               {!souscriptionOuverte && (
                 <div className="text-urgency text-xs font-bold bg-urgency/5 p-3 rounded-xl border border-urgency/10">
-                  {opportunite.raisonIndisponibilite || (isExpired ? 'Cette campagne est expirée.' : 'Cette campagne ne peut plus recevoir de commandes.')}
+                  {opportunite.raisonIndisponibilite || (isExpired ? 'Cette opportunité est expirée.' : 'Cette opportunité ne peut plus recevoir de réservations.')}
                 </div>
               )}
               <button
@@ -696,15 +790,42 @@ export default function DetailOpportunite() {
                 {!joining && !joinSuccess && <ShoppingCart size={20} />}
                 {joinSuccess ? <><CheckCircle2 size={18} /> Inscrit avec succès</>
                   : isComplet ? 'Offre complète'
-                  : dejaSouscrit ? `Ajouter ${quantiteEffective} — ${fmt(totalCommande)} FCFA`
-                  : `Passer la commande — ${fmt(totalCommande)} FCFA`}
+                  : dejaSouscrit ? `Ajouter ${quantiteEffective} — dépôt de ${fmt(totalCommande)} FCFA`
+                  : `Réserver avec un dépôt — ${fmt(totalCommande)} FCFA`}
               </button>
-              <div className="flex items-center justify-center gap-1.5 text-[10px] text-gray-400 font-bold">
-                <ShieldCheck size={12} className="text-success" /> Fonds sécurisés jusqu'à la fin de la vente
+              <div className="flex items-start justify-center gap-1.5 px-2 text-center text-[10px] font-bold leading-4 text-gray-500">
+                <ShieldCheck size={12} className="mt-0.5 shrink-0 text-success" />
+                <span>Dépôt débité au prix final si le seuil minimum est atteint, sinon remboursé intégralement.</span>
               </div>
               {joinError && <p className="text-urgency text-xs font-bold text-center bg-urgency/5 p-3 rounded-xl border border-urgency/10">{joinError}</p>}
             </div>
           </div>
+
+          {/* Fiche produit enrichie — sous la galerie en desktop, tout en bas en mobile */}
+          {(opportunite.specsPointsForts || opportunite.specsCasUsage || opportunite.specsFinePrint) && (
+            <div className="lg:col-span-7 bg-white rounded-2xl border-2 border-gray-100 p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles size={14} className="text-primary" />
+                <span className="text-[10px] font-black text-primary uppercase tracking-widest">Points clés</span>
+              </div>
+              {opportunite.specsPointsForts && (
+                <ul className="space-y-1.5">
+                  {opportunite.specsPointsForts.split('\n').filter(Boolean).map((line, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                      <CheckCircle2 size={14} className="text-success shrink-0 mt-0.5" />
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {opportunite.specsCasUsage && (
+                <p className="text-sm text-gray-500 leading-relaxed">{opportunite.specsCasUsage}</p>
+              )}
+              {opportunite.specsFinePrint && (
+                <p className="text-[11px] text-gray-400 italic border-t border-gray-50 pt-2.5">{opportunite.specsFinePrint}</p>
+              )}
+            </div>
+          )}
 
         </div>
 

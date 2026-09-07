@@ -36,7 +36,8 @@ public class AdminBanniereController {
             @RequestPart(value = "lien", required = false) String lien,
             @RequestPart(value = "ordre", required = false) String ordre,
             @RequestPart(value = "dateDebut", required = false) String dateDebut,
-            @RequestPart(value = "dateFin", required = false) String dateFin
+            @RequestPart(value = "dateFin", required = false) String dateFin,
+            @RequestPart(value = "publier", required = false) String publier
     ) throws IOException {
         BanniereResponse resp = banniereService.creer(
                 image, titre, description, tag, icone,
@@ -44,7 +45,8 @@ public class AdminBanniereController {
                 lien,
                 ordre != null ? Integer.parseInt(ordre) : null,
                 dateDebut != null && !dateDebut.isBlank() ? LocalDateTime.parse(dateDebut) : null,
-                dateFin  != null && !dateFin.isBlank()  ? LocalDateTime.parse(dateFin)  : null
+                dateFin  != null && !dateFin.isBlank()  ? LocalDateTime.parse(dateFin)  : null,
+                publier == null || Boolean.parseBoolean(publier)
         );
         return ResponseEntity.ok(resp);
     }
@@ -61,7 +63,8 @@ public class AdminBanniereController {
             @RequestPart(value = "lien", required = false) String lien,
             @RequestPart(value = "ordre", required = false) String ordre,
             @RequestPart(value = "dateDebut", required = false) String dateDebut,
-            @RequestPart(value = "dateFin", required = false) String dateFin
+            @RequestPart(value = "dateFin", required = false) String dateFin,
+            @RequestPart(value = "publier", required = false) String publier
     ) throws IOException {
         BanniereResponse resp = banniereService.modifier(
                 id, image, titre, description, tag, icone,
@@ -69,7 +72,8 @@ public class AdminBanniereController {
                 lien,
                 ordre != null && !ordre.isBlank() ? Integer.parseInt(ordre) : null,
                 dateDebut != null && !dateDebut.isBlank() ? LocalDateTime.parse(dateDebut) : null,
-                dateFin  != null && !dateFin.isBlank()  ? LocalDateTime.parse(dateFin)  : null
+                dateFin  != null && !dateFin.isBlank()  ? LocalDateTime.parse(dateFin)  : null,
+                publier != null ? Boolean.parseBoolean(publier) : null
         );
         return ResponseEntity.ok(resp);
     }
@@ -77,6 +81,11 @@ public class AdminBanniereController {
     @PatchMapping("/{id}/toggle")
     public ResponseEntity<BanniereResponse> toggle(@PathVariable UUID id) {
         return ResponseEntity.ok(banniereService.toggleActif(id));
+    }
+
+    @PutMapping("/ordre")
+    public List<BanniereResponse> reordonner(@RequestBody List<UUID> ids) {
+        return banniereService.reordonner(ids);
     }
 
     @DeleteMapping("/{id}")

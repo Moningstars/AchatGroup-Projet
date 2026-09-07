@@ -25,7 +25,7 @@ const STATUT_OP_OPPORTUNITE = {
 }
 
 const LIVRAISON = {
-  EN_ATTENTE_QUOTA: ['Campagne en cours', 0], A_PREPARER: ['Paiement validé', 20],
+  EN_ATTENTE_QUOTA: ['Opportunité en cours', 0], A_PREPARER: ['Paiement validé', 20],
   PREPARATION: ['Lot transmis au partenaire', 40], PRET_LIVRAISON: ['Partenaire confirmé', 55],
   EN_LIVRAISON: ['Date promise communiquée', 75], LIVRE_A_CONFIRMER: ['Votre confirmation est attendue', 90],
   LIVRE_CONFIRME: ['Terminée', 100], ECHEC_LIVRAISON: ['Anomalie', 70], LITIGE: ['Litige', 70], ANNULE: ['Annulée', 0],

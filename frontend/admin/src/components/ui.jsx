@@ -118,9 +118,9 @@ export function Td({ children, className = '' }) {
   )
 }
 
-export function Tr({ children, className = '' }) {
+export function Tr({ children, className = '', ...props }) {
   return (
-    <tr className={`transition-colors hover:bg-violet-50/30 ${className}`}>
+    <tr {...props} className={`transition-colors hover:bg-violet-50/30 ${className}`}>
       {children}
     </tr>
   )

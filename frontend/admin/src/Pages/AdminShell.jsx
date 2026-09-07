@@ -32,6 +32,7 @@ const PAGE_META = {
   '/bannieres': { label: 'Bannières', sub: 'Publicités affichées dans l\'app' },
   '/kyc': { label: 'KYC', sub: "Vérification d'identité" },
   '/parametres': { label: 'Paramètres', sub: 'Configuration du compte' },
+  '/journal-activite': { label: "Journal d’activité", sub: 'Traçabilité et sécurité' },
 }
 
 function getPageMeta(pathname) {
@@ -40,6 +41,9 @@ function getPageMeta(pathname) {
   }
   if (pathname === '/opportunites/traitement') {
     return { label: 'Opportunités à traiter', sub: 'Préparation, livraison et clôture des dossiers' }
+  }
+  if (pathname === '/opportunites/tentatives') {
+    return { label: 'Tentatives non abouties', sub: 'Analyse des souscriptions échouées' }
   }
   if (pathname.startsWith('/opportunites/')) {
     return pathname.endsWith('/modifier')
@@ -50,7 +54,7 @@ function getPageMeta(pathname) {
     return { label: 'Nouveau sondage', sub: 'Création complète de l’enquête' }
   }
   if (pathname === '/fournisseurs/nouveau') {
-    return { label: 'Nouveau fournisseur', sub: 'Référencement d’un fournisseur produit' }
+    return { label: 'Nouveau fournisseur', sub: 'Référencement d’un fournisseur d’opportunité' }
   }
   if (pathname === '/commanditaires/nouveau') {
     return { label: 'Nouveau commanditaire', sub: 'Référencement d’un sponsor de sondage' }

@@ -55,7 +55,7 @@ Deux frontends **React + Vite** consomment l'API REST :
 - `frontend/app` — application participant
 - `frontend/admin` — back-office administrateur
 
-> `frontend/Opportunités de sondage et réduction/` est un export Figma de référence (maquette), non branché sur le code réel.
+> Le frontend participant maintenu se trouve uniquement dans `frontend/app`.
 
 ## Stack technique
 

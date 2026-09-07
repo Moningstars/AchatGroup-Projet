@@ -1,5 +1,6 @@
 package com.plateformeopportunites.finance.service;
 
+import com.plateformeopportunites.common.enums.NiveauVerification;
 import com.plateformeopportunites.common.enums.StatutTransaction;
 import com.plateformeopportunites.common.enums.TypeTransaction;
 import com.plateformeopportunites.common.event.RetraitDemandeEvent;
@@ -9,27 +10,33 @@ import com.plateformeopportunites.finance.dto.RetraitRequest;
 import com.plateformeopportunites.finance.entity.Portefeuille;
 import com.plateformeopportunites.finance.repository.PortefeuilleRepository;
 import com.plateformeopportunites.finance.repository.TransactionRepository;
+import com.plateformeopportunites.finance.repository.WalletPlateformeRepository;
+import com.plateformeopportunites.identity.entity.Utilisateur;
 import com.plateformeopportunites.identity.repository.UtilisateurRepository;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
-
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.argThat;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class WalletServiceTest {
 
     @Mock private PortefeuilleRepository portefeuilleRepository;
     @Mock private TransactionRepository transactionRepository;
+    @Mock private WalletPlateformeRepository walletPlateformeRepository;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private UtilisateurRepository utilisateurRepository;
     @Mock private PusherNotificationService pusherNotificationService;
@@ -47,6 +54,10 @@ class WalletServiceTest {
                 .build();
     }
 
+    private Utilisateur utilisateurVerifie() {
+        return Utilisateur.builder().id(PID).niveauVerification(NiveauVerification.VERIFIE).build();
+    }
+
     // ── recharger ────────────────────────────────────────────────────────────
 
     @Test
@@ -54,6 +65,7 @@ class WalletServiceTest {
         Portefeuille p = wallet("5000");
         when(portefeuilleRepository.findByUtilisateurId(PID)).thenReturn(Optional.of(p));
         when(portefeuilleRepository.save(any())).thenReturn(p);
+        when(walletPlateformeRepository.findAll()).thenReturn(List.of());
 
         RechargeRequest req = new RechargeRequest();
         req.setMontant(new BigDecimal("2000"));
@@ -73,7 +85,8 @@ class WalletServiceTest {
     @Test
     void demanderRetrait_soldeInsuffisant_leveException() {
         Portefeuille p = wallet("500");
-        when(portefeuilleRepository.findByUtilisateurId(PID)).thenReturn(Optional.of(p));
+        when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateurVerifie()));
+        when(portefeuilleRepository.findByUtilisateurIdForUpdate(PID)).thenReturn(Optional.of(p));
 
         RetraitRequest req = new RetraitRequest();
         req.setMontant(new BigDecimal("1000"));
@@ -86,7 +99,8 @@ class WalletServiceTest {
     @Test
     void demanderRetrait_geleLeFondsEtPublieEvenement() {
         Portefeuille p = wallet("5000");
-        when(portefeuilleRepository.findByUtilisateurId(PID)).thenReturn(Optional.of(p));
+        when(utilisateurRepository.findById(PID)).thenReturn(Optional.of(utilisateurVerifie()));
+        when(portefeuilleRepository.findByUtilisateurIdForUpdate(PID)).thenReturn(Optional.of(p));
         when(portefeuilleRepository.save(any())).thenReturn(p);
 
         RetraitRequest req = new RetraitRequest();
@@ -107,7 +121,7 @@ class WalletServiceTest {
     @Test
     void gelerFonds_soldeInsuffisant_leveException() {
         Portefeuille p = wallet("100");
-        when(portefeuilleRepository.findByUtilisateurId(PID)).thenReturn(Optional.of(p));
+        when(portefeuilleRepository.findByUtilisateurIdForUpdate(PID)).thenReturn(Optional.of(p));
 
         assertThrows(IllegalArgumentException.class, () ->
                 walletService.gelerFonds(PID, new BigDecimal("500"), null));
@@ -117,7 +131,7 @@ class WalletServiceTest {
     @Test
     void gelerFonds_transfereDisponibleVersGele() {
         Portefeuille p = wallet("5000");
-        when(portefeuilleRepository.findByUtilisateurId(PID)).thenReturn(Optional.of(p));
+        when(portefeuilleRepository.findByUtilisateurIdForUpdate(PID)).thenReturn(Optional.of(p));
         when(portefeuilleRepository.save(any())).thenReturn(p);
 
         walletService.gelerFonds(PID, new BigDecimal("2000"), null);
@@ -132,7 +146,7 @@ class WalletServiceTest {
     void rembourser_transfereGeleVersDisponible() {
         Portefeuille p = wallet("1000");
         p.setSoldeGele(new BigDecimal("500"));
-        when(portefeuilleRepository.findByUtilisateurId(PID)).thenReturn(Optional.of(p));
+        when(portefeuilleRepository.findByUtilisateurIdForUpdate(PID)).thenReturn(Optional.of(p));
         when(portefeuilleRepository.save(any())).thenReturn(p);
 
         walletService.rembourser(PID, new BigDecimal("500"));

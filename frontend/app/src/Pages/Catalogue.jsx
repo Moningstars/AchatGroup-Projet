@@ -123,6 +123,7 @@ export default function Catalogue() {
   useEffect(() => {
     getBannieres('CATALOGUE')
       .then(data => setSlides(data.map(b => ({
+        id: b.id,
         img: imgUrl(b.imageUrl),
         tag: b.tag,
         icon: b.icone,
@@ -252,7 +253,7 @@ export default function Catalogue() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 lg:px-0 pt-6 space-y-6 pb-8">
+      <div className="mx-auto w-full max-w-7xl px-4 pt-6 space-y-6 pb-8 sm:px-5 lg:px-6 xl:px-8">
 
         {/* ── Carousel promo ── */}
         {slides.length > 0 && <PageCarousel slides={slides} />}
@@ -330,7 +331,7 @@ export default function Catalogue() {
           </div>
         ) : (
           <div className="space-y-8">
-            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {visibleItems.map(op => <ProductCard key={op.id} opportunity={op} />)}
             </div>
 

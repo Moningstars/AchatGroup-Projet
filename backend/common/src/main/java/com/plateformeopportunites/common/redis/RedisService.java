@@ -41,6 +41,10 @@ public class RedisService {
         redis.opsForValue().setIfAbsent(cleCompteur(opportuniteId), String.valueOf(valeurDb));
     }
 
+    public void definirParticipants(UUID opportuniteId, int valeurDb) {
+        redis.opsForValue().set(cleCompteur(opportuniteId), String.valueOf(valeurDb));
+    }
+
     public void supprimerCompteur(UUID opportuniteId) {
         redis.delete(cleCompteur(opportuniteId));
     }

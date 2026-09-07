@@ -6,25 +6,24 @@ import PageCarousel from '../components/PageCarousel'
 import { useSSE } from '../hooks/useSSE'
 
 function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
+const REFERENCE_TEMPS = Date.now()
 
 
 function formatDate(dt) {
   if (!dt) return null
   const d = new Date(dt)
-  const diff = Math.ceil((d - Date.now()) / (1000 * 60 * 60 * 24))
+  const diff = Math.ceil((d - REFERENCE_TEMPS) / (1000 * 60 * 60 * 24))
   if (diff <= 0) return 'Expiré'
   if (diff === 1) return 'Expire demain'
   if (diff <= 7) return `Expire dans ${diff}j`
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
 }
-
 const STATUT = {
   ACTIF: { label: 'Ouvert', cls: 'bg-success/15 text-success border-success/20' },
   EN_ATTENTE: { label: 'En attente', cls: 'bg-accent/15 text-accent border-accent/20' },
   EN_ATTENTE_DISTRIBUTION: { label: 'En validation', cls: 'bg-blue-500/10 text-blue-600 border-blue-200' },
   CLOTURE: { label: 'Clôturé', cls: 'bg-gray-100 text-gray-400 border-gray-200' },
 }
-
 const GRID_LIMIT = 10 // 5 col × 2 lignes
 
 export default function Sondages() {
@@ -39,6 +38,7 @@ export default function Sondages() {
   useEffect(() => {
     getBannieres('SONDAGES')
       .then(data => setSlides(data.map(b => ({
+        id: b.id,
         img: imgUrl(b.imageUrl),
         tag: b.tag,
         icon: b.icone,
@@ -196,7 +196,6 @@ export default function Sondages() {
     </div>
   )
 }
-
 function SurveyCardFeatured({ survey: s, onClick }) {
   const statut = STATUT[s.statut] || STATUT.CLOTURE
   const expiry = formatDate(s.dateExpiration)
@@ -204,9 +203,17 @@ function SurveyCardFeatured({ survey: s, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="w-full text-left bg-primary rounded-3xl p-7 text-white relative overflow-hidden shadow-2xl shadow-primary/30 active:scale-[0.98] transition-transform"
+      className="w-full text-left bg-primary rounded-3xl text-white relative overflow-hidden shadow-2xl shadow-primary/30 active:scale-[0.98] transition-transform"
     >
-      <div className="relative z-10">
+      {/* Image de couverture */}
+      {s.imageUrl && (
+        <div className="absolute inset-0 z-0">
+          <img src={imgUrl(s.imageUrl)} alt="" className="w-full h-full object-cover opacity-20" />
+          <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/80 to-primary/50" />
+        </div>
+      )}
+
+      <div className="relative z-10 p-7">
         <div className="flex justify-between items-center mb-6">
           <div className="bg-success/20 text-success text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest border border-success/30">
             {statut.label}
@@ -253,7 +260,6 @@ function SurveyCardFeatured({ survey: s, onClick }) {
     </button>
   )
 }
-
 function SurveyCardCompact({ survey: s, onClick }) {
   const statut = STATUT[s.statut] || STATUT.CLOTURE
   const expiry = formatDate(s.dateExpiration)
@@ -264,19 +270,32 @@ function SurveyCardCompact({ survey: s, onClick }) {
       onClick={onClick}
       className="w-full text-left bg-white border-2 border-gray-100 hover:border-primary/30 hover:shadow-md overflow-hidden group active:scale-[0.98] transition-all"
     >
-      {/* Bande couleur statut */}
-      <div className={`h-1 w-full ${isActif ? 'bg-success' : 'bg-gray-200'}`} />
-
-      <div className="p-3 space-y-2.5">
-        {/* Icône + badge */}
-        <div className="flex items-start justify-between gap-1">
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActif ? 'bg-primary/10' : 'bg-gray-100'}`}>
-            <i className={`ti ti-forms text-base ${isActif ? 'text-primary' : 'text-gray-400'}`} />
-          </div>
-          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-tight border shrink-0 ${statut.cls}`}>
+      {/* Image de couverture */}
+      {s.imageUrl ? (
+        <div className="relative h-24 w-full overflow-hidden">
+          <img src={imgUrl(s.imageUrl)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+          <span className={`absolute top-1.5 right-1.5 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-tight border ${statut.cls} bg-white/90`}>
             {statut.label}
           </span>
         </div>
+      ) : (
+        /* Bande couleur statut si pas d'image */
+        <div className={`h-1 w-full ${isActif ? 'bg-success' : 'bg-gray-200'}`} />
+      )}
+
+      <div className="p-3 space-y-2.5">
+        {/* Icône + badge (si pas d'image) */}
+        {!s.imageUrl && (
+          <div className="flex items-start justify-between gap-1">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActif ? 'bg-primary/10' : 'bg-gray-100'}`}>
+              <i className={`ti ti-forms text-base ${isActif ? 'text-primary' : 'text-gray-400'}`} />
+            </div>
+            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-tight border shrink-0 ${statut.cls}`}>
+              {statut.label}
+            </span>
+          </div>
+        )}
 
         {/* Titre */}
         <h3 className="font-heading font-bold text-[11px] text-primary leading-tight line-clamp-2 min-h-[2.4em]">{s.titre}</h3>
@@ -294,57 +313,6 @@ function SurveyCardCompact({ survey: s, onClick }) {
           </p>
         )}
       </div>
-    </button>
-  )
-}
-
-function SurveyCard({ survey: s, onClick }) {
-  const statut = STATUT[s.statut] || STATUT.CLOTURE
-  const expiry = formatDate(s.dateExpiration)
-  const pct = s.quotaVise ? Math.min(100, Math.round((s.repondantsActuels / s.quotaVise) * 100)) : null
-
-  return (
-    <button
-      onClick={onClick}
-      className="w-full text-left bg-white rounded-2xl p-5 border-2 border-gray-100 hover:border-primary/20 shadow-sm active:scale-[0.98] transition-all"
-    >
-      <div className="flex justify-between items-start mb-4">
-        <div className="w-11 h-11 bg-primary/5 rounded-xl flex items-center justify-center">
-          <i className="ti ti-forms text-xl text-primary" />
-        </div>
-        <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg border uppercase tracking-tight ${statut.cls}`}>
-          {statut.label}
-        </span>
-      </div>
-
-      <h3 className="font-heading font-bold text-sm text-primary leading-tight mb-2 line-clamp-2">{s.titre}</h3>
-      {s.description && (
-        <p className="text-xs text-gray-400 font-medium line-clamp-2 mb-4">{s.description}</p>
-      )}
-
-      <div className="flex items-baseline gap-1.5 mb-4">
-        <span className="text-2xl font-heading font-extrabold text-accent">{fmt(s.recompense)}</span>
-        <span className="text-xs font-bold text-gray-400">FCFA{s.typeRecompense === 'POINTS' ? ' → pts' : ''}</span>
-      </div>
-
-      {pct !== null && (
-        <div className="mb-3">
-          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full rounded-full bg-success transition-all" style={{ width: `${pct}%` }} />
-          </div>
-          <div className="flex justify-between text-[10px] text-gray-400 font-bold mt-1">
-            <span>{s.repondantsActuels}/{s.quotaVise} répondants</span>
-            <span>{pct}%</span>
-          </div>
-        </div>
-      )}
-
-      {expiry && (
-        <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-bold">
-          <i className="ti ti-clock text-xs" />
-          {expiry}
-        </div>
-      )}
     </button>
   )
 }

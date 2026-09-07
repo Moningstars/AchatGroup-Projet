@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
 import Pusher from 'pusher-js'
 import { useAuth } from './AuthContext'
 import { BACKEND_ORIGIN } from '../services/api'
@@ -55,25 +55,27 @@ export function PusherProvider({ children }) {
     }
   }, [isAuthenticated, user?.id])
 
-  const on = (event, handler) => {
+  const on = useCallback((event, handler) => {
     if (!handlersRef.current[event]) handlersRef.current[event] = []
     handlersRef.current[event].push(handler)
     if (channelRef.current) {
       channelRef.current.bind(event, handler)
     }
-  }
+  }, [])
 
-  const off = (event, handler) => {
+  const off = useCallback((event, handler) => {
     if (handlersRef.current[event]) {
       handlersRef.current[event] = handlersRef.current[event].filter(h => h !== handler)
     }
     if (channelRef.current) {
       channelRef.current.unbind(event, handler)
     }
-  }
+  }, [])
+
+  const value = useMemo(() => ({ on, off }), [on, off])
 
   return (
-    <PusherContext.Provider value={{ on, off }}>
+    <PusherContext.Provider value={value}>
       {children}
     </PusherContext.Provider>
   )

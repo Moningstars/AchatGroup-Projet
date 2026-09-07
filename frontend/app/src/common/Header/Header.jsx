@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
-import { User, Wallet, ShieldCheck, ShieldX, ShieldAlert, Clock, LogOut, ChevronDown, Bell, CheckCircle2, XCircle, Trash2, X } from 'lucide-react'
+import { User, Wallet, ShieldCheck, ShieldX, ShieldAlert, Clock, LogOut, Bell, CheckCircle2, XCircle, Trash2, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { usePusher } from '../../context/PusherContext'
 import { useNotifications } from '../../context/NotificationsContext'
@@ -74,7 +74,7 @@ const Header = () => {
     on('wallet.credited', majSolde)
     on('wallet.debited', majSolde)
     return () => { off('wallet.credited', majSolde); off('wallet.debited', majSolde) }
-  }, [isAuthenticated])
+  }, [isAuthenticated, off, on])
 
   // Fermer les dropdowns au clic extérieur
   useEffect(() => {

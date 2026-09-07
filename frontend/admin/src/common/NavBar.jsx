@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LogOut, Menu, X, ChevronRight } from 'lucide-react'
+import { LogOut, Menu, X, ChevronRight, ScrollText } from 'lucide-react'
 import { menuSections } from '../Pages/adminData'
 import { IconDashboard, IconBox, IconSurvey, IconUsers, IconWallet, IconSponsor, IconSettings, IconKyc, IconBanniere } from './icons'
 import { useAuth } from '../context/AuthContext'
@@ -17,6 +17,7 @@ const iconMap = {
     "Bannières": IconBanniere,
     "KYC": IconKyc,
     "Paramètres": IconSettings,
+    "Journal d'activité": ScrollText,
 }
 
 function SidebarItem({ label, to, onNavigate, nested = false, badge = 0 }) {

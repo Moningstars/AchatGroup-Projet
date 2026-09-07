@@ -21,7 +21,9 @@ import com.plateformeopportunites.sondage.service.SondageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component
+@ConditionalOnProperty(name = "app.seed.enabled", havingValue = "true")
+@Order(0)
 @RequiredArgsConstructor
 @Slf4j
 public class DataInitializer implements CommandLineRunner {
@@ -82,10 +86,17 @@ public class DataInitializer implements CommandLineRunner {
         // On les supprime puis on les recrée avec les valeurs à jour.
         String[] drop = {
             "ALTER TABLE sondages DROP CONSTRAINT IF EXISTS sondages_niveau_verification_check",
+            "ALTER TABLE sondages DROP CONSTRAINT IF EXISTS fk_sondage_commanditaire",
             "ALTER TABLE utilisateurs DROP CONSTRAINT IF EXISTS utilisateurs_niveau_verification_check",
             "ALTER TABLE transactions_plateforme DROP CONSTRAINT IF EXISTS transactions_plateforme_type_check",
             "ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_type_check",
             "ALTER TABLE participations DROP CONSTRAINT IF EXISTS participations_statut_livraison_check",
+            "ALTER TABLE opportunites ADD COLUMN IF NOT EXISTS version BIGINT DEFAULT 0",
+            "UPDATE opportunites SET version = 0 WHERE version IS NULL",
+            "ALTER TABLE opportunites ALTER COLUMN version SET DEFAULT 0",
+            "ALTER TABLE participations ADD COLUMN IF NOT EXISTS version BIGINT DEFAULT 0",
+            "UPDATE participations SET version = 0 WHERE version IS NULL",
+            "ALTER TABLE participations ALTER COLUMN version SET DEFAULT 0",
             "ALTER TABLE participations ADD COLUMN IF NOT EXISTS creneau_traitement TIMESTAMP",
             "ALTER TABLE participations ADD COLUMN IF NOT EXISTS date_preparation TIMESTAMP",
             "ALTER TABLE participations ADD COLUMN IF NOT EXISTS date_expedition TIMESTAMP",
@@ -100,6 +111,7 @@ public class DataInitializer implements CommandLineRunner {
             "ALTER TABLE participations ADD COLUMN IF NOT EXISTS note_traitement VARCHAR(500)",
             "ALTER TABLE participations ADD COLUMN IF NOT EXISTS note_livraison VARCHAR(500)",
             "ALTER TABLE participations ADD COLUMN IF NOT EXISTS commentaire_participant_livraison VARCHAR(500)",
+            "ALTER TABLE participations ADD COLUMN IF NOT EXISTS reponses_complementaires TEXT",
             "ALTER TABLE opportunites ADD COLUMN IF NOT EXISTS partenaire_nom VARCHAR(255)",
             "ALTER TABLE opportunites ADD COLUMN IF NOT EXISTS partenaire_logo_url VARCHAR(255)",
             "ALTER TABLE opportunites ADD COLUMN IF NOT EXISTS partenaire_contact VARCHAR(255)",
@@ -109,6 +121,7 @@ public class DataInitializer implements CommandLineRunner {
             "ALTER TABLE opportunites ADD COLUMN IF NOT EXISTS date_confirmation_partenaire TIMESTAMP",
             "ALTER TABLE opportunites ADD COLUMN IF NOT EXISTS delai_confirmation_reception_jours INTEGER DEFAULT 3",
             "ALTER TABLE opportunites ADD COLUMN IF NOT EXISTS message_notification_livraison VARCHAR(500)",
+            "ALTER TABLE opportunites ADD COLUMN IF NOT EXISTS formulaire_complementaire TEXT",
             "UPDATE opportunites SET montant_du_partenaire = 0 WHERE montant_du_partenaire IS NULL",
             "UPDATE opportunites SET montant_paye_partenaire = 0 WHERE montant_paye_partenaire IS NULL",
             "UPDATE opportunites SET delai_confirmation_reception_jours = 3 WHERE delai_confirmation_reception_jours IS NULL",
@@ -116,6 +129,7 @@ public class DataInitializer implements CommandLineRunner {
             "UPDATE sondages SET budget_libere = FALSE WHERE budget_libere IS NULL",
         };
         String[] recreate = {
+            "ALTER TABLE sondages ADD CONSTRAINT fk_sondage_commanditaire FOREIGN KEY (commanditaire_id) REFERENCES commanditaires(id)",
             "ALTER TABLE transactions_plateforme ADD CONSTRAINT transactions_plateforme_type_check " +
                 "CHECK (type IN ('ALIMENTATION','DISTRIBUTION_AUTO','DISTRIBUTION_MANUELLE','RESERVATION_BUDGET','LIBERATION_BUDGET'))",
             "ALTER TABLE transactions ADD CONSTRAINT transactions_type_check " +

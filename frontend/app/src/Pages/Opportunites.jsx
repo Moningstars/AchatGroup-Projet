@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { Loader2, Search } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { getOpportunites, getSondages, getBannieres, imgUrl } from '../services/api'
+import { getOpportunites, getSondages, getBannieres, imgUrl, enregistrerImpressionBanniere, enregistrerClicBanniere } from '../services/api'
 import ProductCard from '../components/ProductCard'
 import { useSSE } from '../hooks/useSSE'
 
@@ -11,10 +11,11 @@ const CATS = [
 ]
 
 function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
+const REFERENCE_TEMPS = Date.now()
 function formatDate(dt) {
   if (!dt) return null
   const d = new Date(dt)
-  const diff = Math.ceil((d - Date.now()) / (1000 * 60 * 60 * 24))
+  const diff = Math.ceil((d - REFERENCE_TEMPS) / (1000 * 60 * 60 * 24))
   if (diff <= 0) return null
   if (diff <= 7) return `${diff}j restants`
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
@@ -67,6 +68,7 @@ export default function Opportunites() {
   const [opportunites, setOpportunites] = useState([])
   const [sondages, setSondages] = useState([])
   const [heroSlides, setHeroSlides] = useState(HERO_SLIDES)
+  const impressionsBannieres = useRef(new Set())
   const [loading, setLoading] = useState(true)
   const [searching, setSearching] = useState(false)
   const [search, setSearch] = useState('')
@@ -97,6 +99,7 @@ export default function Opportunites() {
       .then(data => {
         if (data.length > 0) {
           setHeroSlides(data.map(b => ({
+            id: b.id,
             tag: b.tag || '',
             icon: b.icone || 'ti-star',
             title: [b.titre, ''],
@@ -110,6 +113,25 @@ export default function Opportunites() {
       })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    const id = heroSlides[slide]?.id
+    if (!id || impressionsBannieres.current.has(id)) return
+    impressionsBannieres.current.add(id)
+    enregistrerImpressionBanniere(id)
+  }, [heroSlides, slide])
+
+  const ouvrirCta = () => {
+    const opportuniteSlide = heroSlides[slide]
+    if (opportuniteSlide.id) enregistrerClicBanniere(opportuniteSlide.id)
+    if (opportuniteSlide.cta.anchor) {
+      document.getElementById('catalogue')?.scrollIntoView({ behavior: 'smooth' })
+    } else if (/^https?:\/\//i.test(opportuniteSlide.cta.path)) {
+      window.location.assign(opportuniteSlide.cta.path)
+    } else {
+      navigate(opportuniteSlide.cta.path)
+    }
+  }
 
   useEffect(() => {
     heroSlides.forEach(s => { const img = new Image(); img.src = s.bg })
@@ -267,9 +289,7 @@ export default function Opportunites() {
 
                 <div className="flex flex-col items-end gap-4">
                   <button
-                    onClick={() => heroSlides[slide].cta.anchor
-                      ? document.getElementById('catalogue')?.scrollIntoView({ behavior: 'smooth' })
-                      : navigate(heroSlides[slide].cta.path)}
+                    onClick={ouvrirCta}
                     className="bg-accent text-primary px-5 sm:px-8 py-3 sm:py-4 rounded-2xl font-heading font-black text-xs sm:text-sm uppercase tracking-widest shadow-2xl shadow-black/30 hover:brightness-105 active:scale-95 transition-all flex items-center gap-2"
                   >
                     {heroSlides[slide].cta.label}
@@ -290,12 +310,12 @@ export default function Opportunites() {
             </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 lg:px-0 pt-8 space-y-10">
+      <main className="mx-auto w-full max-w-7xl px-4 pt-8 space-y-10 sm:px-5 lg:px-6 xl:px-8">
 
         {/* ── Expire bientôt ── */}
         {expirantBientot.length > 0 && (
-          <section className="space-y-5">
-            <div className="flex items-center justify-between">
+          <section className="overflow-hidden rounded-[1.75rem] bg-bg-light/70 py-1 space-y-5">
+            <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 bg-urgency/10 rounded-xl flex items-center justify-center">
                   <i className="ti ti-clock-hour-4 text-urgency text-lg" />
@@ -316,11 +336,11 @@ export default function Opportunites() {
             </div>
 
             {/* Liste scrollable horizontalement */}
-            <div className="relative">
-              <div className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory scrollbar-thin">
+            <div className="relative -mx-1 px-1">
+              <div className="flex max-w-full gap-3 overflow-x-auto overscroll-x-contain pb-3 snap-x snap-mandatory scrollbar-thin sm:gap-4">
                 {expirantBientot.map(op => {
                   const diff = op.dateExpiration
-                    ? Math.ceil((new Date(op.dateExpiration) - Date.now()) / (1000 * 60 * 60 * 24))
+                    ? Math.ceil((new Date(op.dateExpiration) - REFERENCE_TEMPS) / (1000 * 60 * 60 * 24))
                     : null
                   const urgent = diff !== null && diff <= 2
                   const progress = op.seuilMinimum > 0
@@ -335,7 +355,7 @@ export default function Opportunites() {
                     <Link
                       key={op.id}
                       to={`/opportunity/${op.id}`}
-                      className="snap-start shrink-0 w-56 text-left bg-white overflow-hidden border-2 border-gray-100 hover:border-primary/30 hover:shadow-md transition-all active:scale-[0.98] group"
+                      className="snap-start shrink-0 w-[min(72vw,14rem)] text-left bg-white overflow-hidden rounded-2xl border-2 border-gray-100 hover:border-primary/30 hover:shadow-md transition-all active:scale-[0.98] group sm:w-56"
                     >
                       {/* Image */}
                       <div className="relative h-32 overflow-hidden">
@@ -387,7 +407,7 @@ export default function Opportunites() {
               </div>
 
               {/* Fondu droite */}
-              <div className="absolute top-0 right-0 bottom-3 w-16 bg-gradient-to-l from-bg-light to-transparent pointer-events-none" />
+              <div className="pointer-events-none absolute bottom-3 right-0 top-0 w-10 bg-gradient-to-l from-bg-light via-bg-light/80 to-transparent sm:w-16" />
             </div>
           </section>
         )}
@@ -429,7 +449,7 @@ export default function Opportunites() {
         </section>
 
         {/* ── Product Grid ── */}
-        <section id="catalogue" className="space-y-6">
+        <section id="catalogue" className="mx-auto w-[92%] space-y-6 xl:w-[90%]">
           {filtered.length === 0 ? (
             <div className="py-24 text-center bg-white border-4 border-dashed border-gray-50 flex flex-col items-center gap-4">
               <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center">
@@ -445,7 +465,7 @@ export default function Opportunites() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {filtered.slice(0, 10).map(op => <ProductCard key={op.id} opportunity={op} />)}
               </div>
 

@@ -44,6 +44,15 @@ public class Banniere {
     @Column(nullable = false)
     private Boolean actif;
 
+    @Column
+    private Boolean brouillon;
+
+    @Column
+    private Long impressions;
+
+    @Column
+    private Long clics;
+
     private LocalDateTime dateDebut;
 
     private LocalDateTime dateFin;
@@ -55,6 +64,9 @@ public class Banniere {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         if (this.actif == null) this.actif = true;
+        if (this.brouillon == null) this.brouillon = false;
+        if (this.impressions == null) this.impressions = 0L;
+        if (this.clics == null) this.clics = 0L;
         if (this.ordre == null) this.ordre = 0;
     }
 }

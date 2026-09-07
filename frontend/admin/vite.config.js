@@ -5,11 +5,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0',
-    allowedHosts: ['admin-opportuni.maitrise.app', 'opportuni.maitrise.app'],
+    port: 5174,
+    strictPort: true,
+    allowedHosts: ['admin-opportunihub.maitrise.app'],
   },
   preview: {
     host: '0.0.0.0',
     port: 4174,
-    allowedHosts: ['admin-opportuni.maitrise.app', 'opportuni.maitrise.app'],
+    allowedHosts: ['admin-opportunihub.maitrise.app'],
   },
 })

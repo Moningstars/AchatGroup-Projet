@@ -7,11 +7,14 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Data
 public class ModifierSondageRequest {
+    private UUID commanditaireId;
     @Size(min = 1, max = 255)
     private String titre;
+    private String imageUrl;
     private String description;
     @Min(1)
     private Integer quotaVise;

@@ -16,6 +16,7 @@ public class SondageResponse {
     private String commanditaireNom;
     private String commanditaireSociete;
     private String titre;
+    private String imageUrl;
     private String description;
     private Integer quotaVise;
     private Integer repondantsActuels;
@@ -30,6 +31,9 @@ public class SondageResponse {
     private BigDecimal budgetDistribue;
     private BigDecimal budgetRestant;
     private Boolean budgetLibere;
+    private Long reponsesTotal;
+    private Long reponsesAValider;
+    private Long reponsesRejetees;
     private LocalDateTime createdAt;
     private List<QuestionResponse> questions;
     private boolean hasEligibilite;

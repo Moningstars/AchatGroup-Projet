@@ -39,7 +39,7 @@ function NouveauFournisseur({ onClose, onSaved }) {
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
           <div>
             <h2 className="font-bold text-slate-900">Nouveau fournisseur</h2>
-            <p className="mt-0.5 text-xs text-slate-400">Entreprise ou professionnel qui fournit les produits des opportunités.</p>
+            <p className="mt-0.5 text-xs text-slate-400">Entreprise ou professionnel qui fournit les opportunités.</p>
           </div>
           <button type="button" onClick={onClose} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"><ArrowLeft size={14} /> Retour</button>
         </div>
@@ -111,7 +111,7 @@ export default function Fournisseurs() {
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-[13px] font-bold text-slate-900">Fournisseurs de produits</p>
+            <p className="text-[13px] font-bold text-slate-900">Fournisseurs d’opportunités</p>
             <p className="mt-0.5 text-[11px] text-slate-400">Réservés aux opportunités d’achat groupé — distincts des commanditaires de sondages.</p>
           </div>
           <button onClick={() => navigate('/fournisseurs/nouveau')} className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-bold text-white sm:w-auto"><Plus size={15} /> Nouveau fournisseur</button>

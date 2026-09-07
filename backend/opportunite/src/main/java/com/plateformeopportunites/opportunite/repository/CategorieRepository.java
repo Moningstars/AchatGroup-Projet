@@ -8,4 +8,5 @@ import java.util.UUID;
 
 public interface CategorieRepository extends JpaRepository<Categorie, UUID> {
     Optional<Categorie> findByNom(String nom);
+    Optional<Categorie> findByNomIgnoreCase(String nom);
 }

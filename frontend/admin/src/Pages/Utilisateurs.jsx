@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Loader2, ShieldCheck, ShieldOff, Users, Eye, User, Phone, Calendar, CheckCircle2, ShieldAlert, Globe, MapPin, CreditCard, Briefcase, Mail, Home, Trash2, AlertTriangle } from 'lucide-react'
 import {
   Badge, Card, Table, Th, Td, Tr, Spinner, EmptyState,
@@ -227,6 +227,8 @@ function UserDetailContent({ userId, baseUser, onClose, onDeleted }) {
 
 export default function Utilisateurs() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const focusedUserId = searchParams.get('focus')
   const [utilisateurs, setUtilisateurs] = useState([])
   const [loading, setLoading]           = useState(true)
   const [filterIdx, setFilterIdx]       = useState(0)
@@ -251,6 +253,23 @@ export default function Utilisateurs() {
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    if (!focusedUserId || loading || utilisateurs.length === 0) return
+    const focusedIndex = utilisateurs.findIndex(u => String(u.id) === String(focusedUserId))
+    if (focusedIndex < 0) return
+    setFilterIdx(0)
+    setSearch('')
+    setPage(Math.floor(focusedIndex / 10) + 1)
+  }, [focusedUserId, loading, utilisateurs])
+
+  useEffect(() => {
+    if (!focusedUserId || loading) return undefined
+    const timer = window.setTimeout(() => {
+      document.querySelector('[data-focused-user="true"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 150)
+    return () => window.clearTimeout(timer)
+  }, [focusedUserId, loading, page])
 
   const handleActiver = async (id) => {
     setActionId(id)
@@ -336,14 +355,19 @@ export default function Utilisateurs() {
                 </tr>
               </thead>
               <tbody>
-                {utilisateursPage.map(u => (
-                  <Tr key={u.id}>
+                {utilisateursPage.map(u => {
+                  const isFocused = String(u.id) === String(focusedUserId)
+                  return (
+                  <Tr key={u.id} data-focused-user={isFocused ? 'true' : undefined} className={isFocused ? 'bg-violet-50 ring-2 ring-inset ring-violet-400 hover:bg-violet-50' : ''}>
                     <Td>
                       <div className="flex items-center gap-2.5">
-                        <div className={`w-7 h-7 flex-shrink-0 rounded-lg flex items-center justify-center text-[10px] font-bold ${avatarColor(u.nom)}`}>
+                        <div className={`w-7 h-7 flex-shrink-0 rounded-lg flex items-center justify-center text-[10px] font-bold ${isFocused ? 'bg-violet-600 text-white' : avatarColor(u.nom)}`}>
                           {initiales(u.nom)}
                         </div>
-                        <span className="font-semibold text-slate-900 text-[12.5px]">{u.nom || '—'}</span>
+                        <div>
+                          <span className="font-semibold text-slate-900 text-[12.5px]">{u.nom || '—'}</span>
+                          {isFocused && <span className="ml-2 rounded-full bg-violet-600 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-white">Sélectionné</span>}
+                        </div>
                       </div>
                     </Td>
                     <Td><span className="font-mono text-[11.5px] text-slate-500">{u.telephone || '—'}</span></Td>
@@ -386,7 +410,8 @@ export default function Utilisateurs() {
                       )}
                     </Td>
                   </Tr>
-                ))}
+                  )
+                })}
               </tbody>
             </Table>
             <Pagination page={page} totalItems={filtered.length} onPageChange={setPage} />

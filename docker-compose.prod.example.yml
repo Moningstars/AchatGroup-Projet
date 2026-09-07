@@ -31,6 +31,11 @@ services:
       SPRING_DATASOURCE_USERNAME: opportunihub
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+      JPA_DDL_AUTO: validate
+      APP_SEED_ENABLED: "false"
+      PAYGATE_DEV_MODE: "false"
+      OVH_SMS_DEV_MODE: "false"
+      ANTHROPIC_DEV_MODE: "false"
     volumes:
       - ./backend/app/target/app-1.0.0-SNAPSHOT.jar:/app/app-1.0.0-SNAPSHOT.jar:ro
       - ./backend/secrets.properties:/app/secrets.properties:ro
@@ -50,7 +55,7 @@ services:
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./frontend/admin/dist:/srv/admin:ro
-      - ./frontend/Opportunités de sondage et réduction/dist:/srv/app:ro
+      - ./frontend/app/dist:/srv/app:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

@@ -4,11 +4,12 @@ import {
   Plus, Edit2, Trash2, Eye, EyeOff, Image, Loader2, Calendar, Search,
   SlidersHorizontal, RotateCcw, ChevronDown, Check, ArrowLeft, UsersRound,
   ShoppingBag, Gift, Megaphone, BadgePercent, Trophy, WalletCards,
-  ClipboardList, Package, Heart, Star, Zap,
+  ClipboardList, Package, Heart, Star, Zap, GripVertical, Monitor, Smartphone,
+  MousePointerClick, BarChart3, LayoutGrid, List,
 } from 'lucide-react'
 import {
   getAdminBannieres, creerBanniere, modifierBanniere,
-  toggleBanniere, supprimerBanniere,
+  toggleBanniere, supprimerBanniere, reordonnerBannieres,
 } from '../services/api'
 import { Pagination } from '../components/ui'
 
@@ -30,6 +31,14 @@ const PAGE_COLORS = {
 
 const PAGE_LABELS = { ACCUEIL: 'Accueil', CATALOGUE: 'Catalogue', SONDAGES: 'Sondages', TOUTES: 'Toutes' }
 
+const STATUTS = {
+  BROUILLON: { label: 'Brouillon', badge: 'bg-slate-700 text-white', dot: 'bg-slate-300', table: 'border-slate-200 bg-slate-50 text-slate-700', accent: 'bg-slate-400' },
+  PROGRAMMEE: { label: 'Programmée', badge: 'bg-sky-600 text-white', dot: 'bg-sky-200', table: 'border-sky-200 bg-sky-50 text-sky-700', accent: 'bg-sky-500' },
+  EN_LIGNE: { label: 'En ligne', badge: 'bg-emerald-500 text-white', dot: 'bg-white', table: 'border-emerald-200 bg-emerald-50 text-emerald-700', accent: 'bg-emerald-500' },
+  EXPIREE: { label: 'Expirée', badge: 'bg-amber-500 text-white', dot: 'bg-amber-100', table: 'border-amber-200 bg-amber-50 text-amber-700', accent: 'bg-amber-500' },
+  MASQUEE: { label: 'Masquée', badge: 'bg-rose-600 text-white', dot: 'bg-rose-200', table: 'border-rose-200 bg-rose-50 text-rose-700', accent: 'bg-rose-500' },
+}
+
 const BANNER_ICONS = [
   { value: '', label: 'Sans icône', icon: Image },
   { value: 'ti-users-group', label: 'Communauté', icon: UsersRound },
@@ -40,7 +49,7 @@ const BANNER_ICONS = [
   { value: 'ti-trophy', label: 'Récompense', icon: Trophy },
   { value: 'ti-wallet', label: 'Portefeuille', icon: WalletCards },
   { value: 'ti-clipboard-text', label: 'Sondage', icon: ClipboardList },
-  { value: 'ti-package', label: 'Produit', icon: Package },
+  { value: 'ti-package', label: 'Opportunité', icon: Package },
   { value: 'ti-heart', label: 'Favori', icon: Heart },
   { value: 'ti-star', label: 'Vedette', icon: Star },
   { value: 'ti-bolt', label: 'Offre flash', icon: Zap },
@@ -53,6 +62,14 @@ function imgSrc(url) {
   if (!url) return null
   if (url.startsWith('http')) return url
   return BASE_URL + url
+}
+
+function periodeDiffusion(banniere) {
+  if (!banniere.dateDebut && !banniere.dateFin) return 'Sans limite'
+  const format = value => new Date(value).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+  if (banniere.dateDebut && banniere.dateFin) return `${format(banniere.dateDebut)} → ${format(banniere.dateFin)}`
+  if (banniere.dateDebut) return `Dès le ${format(banniere.dateDebut)}`
+  return `Jusqu'au ${format(banniere.dateFin)}`
 }
 
 function FilterDropdown({ label, value, onChange, options, icon: Icon }) {
@@ -171,7 +188,6 @@ function BanniereForm({ banniere, onClose, onSaved }) {
     icone: banniere?.icone ?? '',
     pageCible: banniere?.pageCible ?? 'ACCUEIL',
     lien: banniere?.lien ?? '',
-    ordre: banniere?.ordre ?? 0,
     dateDebut: banniere?.dateDebut ? banniere.dateDebut.slice(0, 16) : '',
     dateFin: banniere?.dateFin ? banniere.dateFin.slice(0, 16) : '',
   })
@@ -179,12 +195,22 @@ function BanniereForm({ banniere, onClose, onSaved }) {
   const [preview, setPreview] = useState(banniere?.imageUrl ? imgSrc(banniere.imageUrl) : null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [previewMode, setPreviewMode] = useState('desktop')
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const handleFile = (e) => {
     const file = e.target.files[0]
     if (!file) return
+    if (!['image/jpeg', 'image/png', 'image/gif'].includes(file.type)) {
+      e.target.value = ''
+      return setError('Format refusé. Utilisez une image JPEG, PNG ou GIF.')
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      e.target.value = ''
+      return setError("L'image ne doit pas dépasser 8 Mo.")
+    }
+    setError('')
     setImageFile(file)
     setPreview(URL.createObjectURL(file))
   }
@@ -194,18 +220,25 @@ function BanniereForm({ banniere, onClose, onSaved }) {
     setError('')
     if (!form.titre.trim()) return setError('Le titre est requis.')
     if (!isEdit && !imageFile) return setError('Une image est requise.')
+    if (form.dateDebut && form.dateFin && new Date(form.dateFin) < new Date(form.dateDebut)) {
+      return setError('La date de fin doit être postérieure à la date de début.')
+    }
+    if (form.lien && !form.lien.startsWith('/') && !/^https?:\/\//i.test(form.lien)) {
+      return setError('Le lien doit commencer par / ou par http(s)://.')
+    }
+    const publier = e.nativeEvent.submitter?.value !== 'brouillon'
 
     const fd = new FormData()
     if (imageFile) fd.append('image', imageFile)
     fd.append('titre', form.titre)
-    if (form.description) fd.append('description', form.description)
-    if (form.tag)         fd.append('tag', form.tag)
-    if (form.icone)       fd.append('icone', form.icone)
+    fd.append('description', form.description)
+    fd.append('tag', form.tag)
+    fd.append('icone', form.icone)
     fd.append('pageCible', form.pageCible)
-    if (form.lien)        fd.append('lien', form.lien)
-    fd.append('ordre', String(form.ordre))
+    fd.append('lien', form.lien)
     if (form.dateDebut)   fd.append('dateDebut', form.dateDebut + ':00')
     if (form.dateFin)     fd.append('dateFin',   form.dateFin   + ':00')
+    if (!isEdit) fd.append('publier', String(publier))
 
     setLoading(true)
     try {
@@ -267,11 +300,11 @@ function BanniereForm({ banniere, onClose, onSaved }) {
                 <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-400">
                   <Image size={28} />
                   <span className="text-sm">Cliquez pour choisir une image</span>
-                  <span className="text-xs">JPG, PNG, WebP — recommandé 1200×400px</span>
+                  <span className="text-xs">JPG, PNG ou GIF · 8 Mo max · recommandé 1200×400px</span>
                 </div>
               )}
             </button>
-            <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/gif" onChange={handleFile} className="hidden" />
           </div>
 
           {/* Titre + Tag */}
@@ -306,16 +339,13 @@ function BanniereForm({ banniere, onClose, onSaved }) {
             </div>
           </div>
 
-          {/* Lien + Ordre */}
-          <div className="grid gap-3 sm:grid-cols-2">
+          {/* Lien */}
+          <div>
             <div>
               <label className={labelCls}>Lien au clic (optionnel)</label>
               <input value={form.lien} onChange={e => set('lien', e.target.value)} className={inputCls} placeholder="/opportunites ou /sondages/uuid" />
             </div>
-            <div>
-              <label className={labelCls}>Ordre d'affichage</label>
-              <input type="number" min={0} value={form.ordre} onChange={e => set('ordre', parseInt(e.target.value) || 0)} className={inputCls} />
-            </div>
+            <p className="mt-1 text-[11px] text-slate-400">Le classement se règle par glisser-déposer depuis la liste des campagnes.</p>
           </div>
 
           {/* Planification */}
@@ -337,6 +367,31 @@ function BanniereForm({ banniere, onClose, onSaved }) {
             <p className="mt-2 text-[11px] text-slate-400">Sans dates, la bannière s'affiche tant qu'elle est active.</p>
           </div>
 
+          <section aria-label="Prévisualisation de la bannière" className="rounded-2xl border border-slate-200 bg-slate-100 p-3 sm:p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-wider text-slate-700">Aperçu avant publication</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">Rendu indicatif avec le texte et l’image saisis.</p>
+              </div>
+              <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1">
+                <button type="button" onClick={() => setPreviewMode('desktop')} aria-label="Aperçu ordinateur" className={`rounded-lg p-2 ${previewMode === 'desktop' ? 'bg-violet-100 text-violet-700' : 'text-slate-400'}`}><Monitor size={16} /></button>
+                <button type="button" onClick={() => setPreviewMode('mobile')} aria-label="Aperçu mobile" className={`rounded-lg p-2 ${previewMode === 'mobile' ? 'bg-violet-100 text-violet-700' : 'text-slate-400'}`}><Smartphone size={16} /></button>
+              </div>
+            </div>
+            <div className={`mx-auto overflow-hidden rounded-2xl bg-slate-900 shadow-lg transition-all ${previewMode === 'mobile' ? 'max-w-[320px]' : 'w-full'}`}>
+              <div className={`relative overflow-hidden ${previewMode === 'mobile' ? 'h-72' : 'h-56'}`}>
+                {preview ? <img src={preview} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <div className="absolute inset-0 bg-gradient-to-br from-violet-900 to-slate-950" />}
+                <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/65 to-slate-950/20" />
+                <div className="absolute inset-0 flex flex-col justify-center p-6 sm:p-8">
+                  {form.tag && <span className="mb-3 w-fit rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-white/80">{form.tag}</span>}
+                  <h4 className="max-w-lg text-xl font-black text-white sm:text-2xl">{form.titre || 'Titre de votre campagne'}</h4>
+                  <p className="mt-2 max-w-md text-xs leading-relaxed text-white/70">{form.description || 'La description apparaîtra ici pour présenter clairement votre message.'}</p>
+                  {form.lien && <span className="mt-4 inline-flex w-fit items-center gap-2 rounded-xl bg-white px-4 py-2 text-xs font-black text-violet-800">En savoir plus <span>→</span></span>}
+                </div>
+              </div>
+            </div>
+          </section>
+
           {error && <div className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
           </div>
 
@@ -344,9 +399,12 @@ function BanniereForm({ banniere, onClose, onSaved }) {
             <button type="button" onClick={onClose} disabled={loading} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50">
               Annuler
             </button>
-            <button type="submit" disabled={loading} className="flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-violet-700 disabled:opacity-60">
+            {!isEdit && <button type="submit" value="brouillon" disabled={loading} className="flex items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-5 py-2.5 text-sm font-bold text-violet-700 transition hover:bg-violet-100 disabled:opacity-60">
+              Enregistrer en brouillon
+            </button>}
+            <button type="submit" value="publier" disabled={loading} className="flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-violet-700 disabled:opacity-60">
               {loading && <Loader2 size={14} className="animate-spin" />}
-              {isEdit ? 'Enregistrer' : 'Créer la bannière'}
+              {isEdit ? 'Enregistrer' : 'Publier la bannière'}
             </button>
           </footer>
         </form>
@@ -404,8 +462,9 @@ export function BanniereEditorPage() {
 
 // ── Carte bannière ────────────────────────────────────────────────────────────
 
-function BanniereCard({ b, onEdit, onToggle, onDelete, pending }) {
+function BanniereCard({ b, onEdit, onToggle, onDelete, pending, organisable, dragging, onDragStart, onDragEnd, onDrop }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const statut = STATUTS[b.statutDiffusion] || STATUTS.MASQUEE
 
   const dateLabel = b.dateDebut || b.dateFin
     ? [
@@ -415,11 +474,18 @@ function BanniereCard({ b, onEdit, onToggle, onDelete, pending }) {
     : 'Diffusion sans limite de date'
 
   return (
-    <article className={`group flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${b.actif ? 'border-slate-200' : 'border-slate-200 bg-slate-50'}`}>
+    <article
+      draggable={organisable}
+      onDragStart={event => onDragStart?.(event, b.id)}
+      onDragEnd={onDragEnd}
+      onDragOver={event => organisable && event.preventDefault()}
+      onDrop={event => { event.preventDefault(); onDrop?.(b.id) }}
+      className={`group flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition duration-200 hover:shadow-md ${organisable ? 'cursor-grab border-violet-200 active:cursor-grabbing' : 'border-slate-200 hover:-translate-y-0.5'} ${dragging ? 'scale-[0.98] opacity-40' : ''}`}
+    >
       {/* Image preview */}
       <div className="relative aspect-[16/7] overflow-hidden bg-slate-100">
         {b.imageUrl ? (
-          <img src={imgSrc(b.imageUrl)} alt={b.titre} className={`h-full w-full object-cover transition duration-300 group-hover:scale-[1.02] ${b.actif ? '' : 'grayscale'}`} />
+          <img src={imgSrc(b.imageUrl)} alt={b.titre} className={`h-full w-full object-cover transition duration-300 group-hover:scale-[1.02] ${b.statutDiffusion === 'EN_LIGNE' ? '' : 'grayscale-[35%]'}`} />
         ) : (
           <div className="flex h-full items-center justify-center text-slate-300">
             <Image size={32} />
@@ -427,10 +493,11 @@ function BanniereCard({ b, onEdit, onToggle, onDelete, pending }) {
         )}
         {/* Overlay infos */}
         {/* Badge statut */}
-        <div className={`absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold shadow-sm ${b.actif ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-white'}`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${b.actif ? 'bg-white' : 'bg-slate-300'}`} />
-          {b.actif ? 'Actif' : 'Inactif'}
+        <div className={`absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold shadow-sm ${statut.badge}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${statut.dot}`} />
+          {statut.label}
         </div>
+        {organisable && <div className="absolute left-3 top-3 flex items-center gap-1 rounded-lg bg-white/95 px-2 py-1 text-[10px] font-black text-violet-700 shadow"><GripVertical size={13} /> Déplacer</div>}
       </div>
 
       {/* Infos */}
@@ -452,6 +519,11 @@ function BanniereCard({ b, onEdit, onToggle, onDelete, pending }) {
           <Calendar size={14} className="mt-0.5 shrink-0 text-slate-400" />
           <span>{dateLabel}</span>
         </div>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="rounded-xl bg-slate-50 p-2"><BarChart3 size={13} className="text-sky-500" /><strong className="mt-1 block text-sm text-slate-900">{Number(b.impressions || 0).toLocaleString('fr-FR')}</strong><span className="text-[9px] font-bold uppercase text-slate-400">Vues</span></div>
+          <div className="rounded-xl bg-slate-50 p-2"><MousePointerClick size={13} className="text-violet-500" /><strong className="mt-1 block text-sm text-slate-900">{Number(b.clics || 0).toLocaleString('fr-FR')}</strong><span className="text-[9px] font-bold uppercase text-slate-400">Clics</span></div>
+          <div className="rounded-xl bg-slate-50 p-2"><BadgePercent size={13} className="text-emerald-500" /><strong className="mt-1 block text-sm text-slate-900">{Number(b.tauxClic || 0).toLocaleString('fr-FR')} %</strong><span className="text-[9px] font-bold uppercase text-slate-400">CTR</span></div>
+        </div>
       </div>
 
       {/* Actions */}
@@ -471,7 +543,7 @@ function BanniereCard({ b, onEdit, onToggle, onDelete, pending }) {
           </button>
           <button type="button" onClick={() => onToggle(b)} disabled={pending} aria-label={b.actif ? `Masquer ${b.titre}` : `Afficher ${b.titre}`} className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-bold transition disabled:opacity-60 ${b.actif ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
             {pending ? <Loader2 size={14} className="animate-spin" /> : b.actif ? <EyeOff size={14} /> : <Eye size={14} />}
-            <span className="hidden 2xl:inline">{b.actif ? 'Masquer' : 'Afficher'}</span>
+            <span className="hidden 2xl:inline">{b.actif ? 'Masquer' : b.brouillon ? 'Publier' : 'Afficher'}</span>
           </button>
           <button type="button" onClick={() => setConfirmDelete(true)} disabled={pending} aria-label={`Supprimer ${b.titre}`} className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-2.5 text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-60">
             <Trash2 size={14} />
@@ -480,6 +552,78 @@ function BanniereCard({ b, onEdit, onToggle, onDelete, pending }) {
         )}
         </div>
     </article>
+  )
+}
+
+function BanniereTable({ bannieres, onEdit, onToggle, onDelete, pendingId }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[980px] border-collapse text-left">
+          <thead className="bg-slate-50">
+            <tr className="border-b border-slate-200 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+              <th className="px-4 py-3">Campagne</th>
+              <th className="px-3 py-3">Destination</th>
+              <th className="px-3 py-3">Statut</th>
+              <th className="px-3 py-3">Diffusion</th>
+              <th className="px-3 py-3 text-center">Position</th>
+              <th className="px-3 py-3 text-right">Performance</th>
+              <th className="px-4 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bannieres.map(b => {
+              const statut = STATUTS[b.statutDiffusion] || STATUTS.MASQUEE
+              const pending = pendingId === b.id
+              return (
+                <tr key={b.id} className="border-b border-slate-100 transition last:border-0 hover:bg-slate-50/80">
+                  <td className="px-4 py-3">
+                    <div className="flex min-w-[250px] items-center gap-3">
+                      <div className="h-14 w-24 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                        {b.imageUrl ? <img src={imgSrc(b.imageUrl)} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-slate-300"><Image size={20} /></div>}
+                      </div>
+                      <div className="min-w-0">
+                        {b.tag && <p className="truncate text-[9px] font-black uppercase tracking-wider text-violet-600">{b.tag}</p>}
+                        <p className="max-w-[260px] truncate text-sm font-bold text-slate-950" title={b.titre}>{b.titre}</p>
+                        <p className="mt-0.5 max-w-[260px] truncate text-[11px] text-slate-400" title={b.description}>{b.description || 'Sans description'}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3">
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${PAGE_COLORS[b.pageCible] || 'bg-slate-100 text-slate-600'}`}>{PAGE_LABELS[b.pageCible] || b.pageCible}</span>
+                  </td>
+                  <td className="px-3 py-3">
+                    <span className={`inline-flex min-w-[96px] items-center gap-2 whitespace-nowrap rounded-xl border px-2.5 py-1.5 text-[11px] font-bold ${statut.table}`}>
+                      <span className="relative flex h-2 w-2 shrink-0">
+                        {b.statutDiffusion === 'EN_LIGNE' && <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400 opacity-40" />}
+                        <span className={`relative h-2 w-2 rounded-full ${statut.accent}`} />
+                      </span>
+                      {statut.label}
+                    </span>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 text-[11px] font-medium text-slate-500">{periodeDiffusion(b)}</td>
+                  <td className="px-3 py-3 text-center"><span className="inline-flex h-7 min-w-7 items-center justify-center rounded-lg bg-slate-100 px-2 text-xs font-black text-slate-700">{b.ordre}</span></td>
+                  <td className="px-3 py-3">
+                    <div className="flex justify-end gap-3 whitespace-nowrap">
+                      <span title="Impressions"><strong className="block text-xs text-slate-900">{Number(b.impressions || 0).toLocaleString('fr-FR')}</strong><small className="text-[9px] font-bold uppercase text-slate-400">vues</small></span>
+                      <span title="Clics"><strong className="block text-xs text-slate-900">{Number(b.clics || 0).toLocaleString('fr-FR')}</strong><small className="text-[9px] font-bold uppercase text-slate-400">clics</small></span>
+                      <span title="Taux de clic"><strong className="block text-xs text-emerald-700">{Number(b.tauxClic || 0).toLocaleString('fr-FR')} %</strong><small className="text-[9px] font-bold uppercase text-slate-400">CTR</small></span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-1.5">
+                      <button type="button" onClick={() => onEdit(b)} disabled={pending} title="Modifier" aria-label={`Modifier ${b.titre}`} className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:border-violet-300 hover:text-violet-700 disabled:opacity-50"><Edit2 size={14} /></button>
+                      <button type="button" onClick={() => onToggle(b)} disabled={pending} title={b.actif ? 'Masquer' : b.brouillon ? 'Publier' : 'Afficher'} aria-label={`${b.actif ? 'Masquer' : 'Afficher'} ${b.titre}`} className={`rounded-lg border p-2 disabled:opacity-50 ${b.actif ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>{pending ? <Loader2 size={14} className="animate-spin" /> : b.actif ? <EyeOff size={14} /> : <Eye size={14} />}</button>
+                      <button type="button" onClick={() => window.confirm(`Supprimer définitivement « ${b.titre} » ?`) && onDelete(b)} disabled={pending} title="Supprimer" aria-label={`Supprimer ${b.titre}`} className="rounded-lg border border-slate-200 bg-white p-2 text-slate-400 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"><Trash2 size={14} /></button>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
 }
 
@@ -495,6 +639,13 @@ export default function Bannieres() {
   const [pendingId, setPendingId] = useState(null)
   const [feedback, setFeedback] = useState('')
   const [page, setPage] = useState(1)
+  const [organisation, setOrganisation] = useState(false)
+  const [draggedId, setDraggedId] = useState(null)
+  const [modeAffichage, setModeAffichage] = useState(() => window.localStorage.getItem('bannieres-mode-affichage') === 'tableau' ? 'tableau' : 'cartes')
+
+  useEffect(() => {
+    window.localStorage.setItem('bannieres-mode-affichage', modeAffichage)
+  }, [modeAffichage])
 
   useEffect(() => {
     let cancelled = false
@@ -508,13 +659,47 @@ export default function Bannieres() {
   const handleToggle = async (b) => {
     setPendingId(b.id)
     try {
-      await toggleBanniere(b.id)
-      setBannieres(items => items.map(item => item.id === b.id ? { ...item, actif: !item.actif } : item))
-      setFeedback(`La bannière « ${b.titre} » est maintenant ${b.actif ? 'masquée' : 'visible'}.`)
+      const miseAJour = await toggleBanniere(b.id)
+      setBannieres(items => items.map(item => item.id === b.id ? miseAJour : item))
+      setFeedback(`La campagne « ${b.titre} » est maintenant ${STATUTS[miseAJour.statutDiffusion]?.label.toLocaleLowerCase('fr') || 'mise à jour'}.`)
     } catch {
       setFeedback("L'état de la bannière n'a pas pu être modifié.")
     } finally {
       setPendingId(null)
+    }
+  }
+
+  const activerOrganisation = () => {
+    setOrganisation(active => {
+      if (!active) {
+        setFiltre('TOUS')
+        setStatut('TOUS')
+        setRecherche('')
+        setPage(1)
+      }
+      return !active
+    })
+  }
+
+  const handleDrop = async (targetId) => {
+    if (!draggedId || draggedId === targetId) return setDraggedId(null)
+    const avant = bannieres
+    const ordonnees = [...bannieres].sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0))
+    const sourceIndex = ordonnees.findIndex(item => item.id === draggedId)
+    const cibleIndex = ordonnees.findIndex(item => item.id === targetId)
+    if (sourceIndex < 0 || cibleIndex < 0) return setDraggedId(null)
+    const [deplacee] = ordonnees.splice(sourceIndex, 1)
+    ordonnees.splice(cibleIndex, 0, deplacee)
+    const optimistes = ordonnees.map((item, index) => ({ ...item, ordre: index }))
+    setBannieres(optimistes)
+    setDraggedId(null)
+    try {
+      const sauvegardees = await reordonnerBannieres(optimistes.map(item => item.id))
+      setBannieres(sauvegardees)
+      setFeedback('Le nouvel ordre de diffusion a été enregistré.')
+    } catch {
+      setBannieres(avant)
+      setFeedback("Le classement n'a pas pu être enregistré.")
     }
   }
 
@@ -540,7 +725,7 @@ export default function Bannieres() {
   const terme = recherche.trim().toLocaleLowerCase('fr')
   const filtrees = bannieres
     .filter(b => filtre === 'TOUS' || b.pageCible === filtre)
-    .filter(b => statut === 'TOUS' || (statut === 'ACTIF' ? b.actif : !b.actif))
+    .filter(b => statut === 'TOUS' || b.statutDiffusion === statut)
     .filter(b => !terme || [b.titre, b.description, b.tag].some(value => value?.toLocaleLowerCase('fr').includes(terme)))
     .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0) || a.titre.localeCompare(b.titre, 'fr'))
 
@@ -550,10 +735,14 @@ export default function Bannieres() {
     return acc
   }, {})
 
-  const activeCount = bannieres.filter(b => b.actif).length
+  const statusCounts = bannieres.reduce((acc, b) => {
+    acc[b.statutDiffusion] = (acc[b.statutDiffusion] || 0) + 1
+    return acc
+  }, {})
+  const activeCount = statusCounts.EN_LIGNE || 0
   const hasFilters = filtre !== 'TOUS' || statut !== 'TOUS' || recherche.trim()
   useEffect(() => setPage(1), [filtre, statut, recherche])
-  const bannieresPage = filtrees.slice((page - 1) * 10, page * 10)
+  const bannieresPage = organisation ? filtrees : filtrees.slice((page - 1) * 10, page * 10)
 
   const resetFilters = () => {
     setFiltre('TOUS')
@@ -570,8 +759,11 @@ export default function Bannieres() {
   ]
   const statusOptions = [
     { value: 'TOUS', label: 'Tous les statuts', dot: 'bg-violet-500' },
-    { value: 'ACTIF', label: `Visibles (${activeCount})`, dot: 'bg-emerald-500' },
-    { value: 'INACTIF', label: `Masquées (${bannieres.length - activeCount})`, dot: 'bg-slate-400' },
+    { value: 'BROUILLON', label: `Brouillons (${statusCounts.BROUILLON || 0})`, dot: 'bg-slate-500' },
+    { value: 'PROGRAMMEE', label: `Programmées (${statusCounts.PROGRAMMEE || 0})`, dot: 'bg-sky-500' },
+    { value: 'EN_LIGNE', label: `En ligne (${activeCount})`, dot: 'bg-emerald-500' },
+    { value: 'EXPIREE', label: `Expirées (${statusCounts.EXPIREE || 0})`, dot: 'bg-amber-500' },
+    { value: 'MASQUEE', label: `Masquées (${statusCounts.MASQUEE || 0})`, dot: 'bg-rose-500' },
   ]
 
   return (
@@ -583,20 +775,28 @@ export default function Bannieres() {
           <p className="mt-1 text-sm text-slate-500">Créez, planifiez et contrôlez les visuels affichés dans l’application.</p>
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
             <span><strong className="text-slate-950">{bannieres.length}</strong> au total</span>
-            <span><strong className="text-emerald-600">{activeCount}</strong> visibles</span>
-            <span><strong className="text-slate-600">{bannieres.length - activeCount}</strong> masquées</span>
+            <span><strong className="text-emerald-600">{activeCount}</strong> en ligne</span>
+            <span><strong className="text-sky-600">{statusCounts.PROGRAMMEE || 0}</strong> programmées</span>
+            <span><strong className="text-slate-600">{statusCounts.BROUILLON || 0}</strong> brouillons</span>
           </div>
         </div>
-        <button
-          onClick={() => navigate('/bannieres/nouvelle')}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-700 sm:w-auto"
-        >
-          <Plus size={16} /> Nouvelle bannière
-        </button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <button type="button" onClick={activerOrganisation} className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold transition ${organisation ? 'border-violet-300 bg-violet-50 text-violet-700' : 'border-slate-200 bg-white text-slate-700 hover:border-violet-200'}`}>
+            <GripVertical size={16} /> {organisation ? 'Terminer le classement' : 'Réorganiser'}
+          </button>
+          <button
+            onClick={() => navigate('/bannieres/nouvelle')}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-700"
+          >
+            <Plus size={16} /> Nouvelle bannière
+          </button>
+        </div>
       </div>
 
+      {organisation && <div className="flex items-center gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-800"><GripVertical size={18} className="shrink-0" /><p><strong>Mode classement :</strong> faites glisser une carte à la position souhaitée. Chaque déplacement est enregistré immédiatement.</p></div>}
+
       {/* Recherche et filtres */}
-      <section aria-label="Filtres des bannières" className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+      {!organisation && <section aria-label="Filtres des bannières" className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(300px,1fr)_minmax(220px,0.65fr)_minmax(190px,0.5fr)_auto]">
           <label className="relative block">
             <span className="sr-only">Rechercher une bannière</span>
@@ -609,8 +809,14 @@ export default function Bannieres() {
             <RotateCcw size={15} /> Réinitialiser
           </button>
         </div>
-        <p className="mt-3 text-xs text-slate-500"><strong className="text-slate-800">{filtrees.length}</strong> résultat{filtrees.length !== 1 ? 's' : ''}, classé{filtrees.length !== 1 ? 's' : ''} par position d’affichage.</p>
-      </section>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-slate-500"><strong className="text-slate-800">{filtrees.length}</strong> résultat{filtrees.length !== 1 ? 's' : ''}, classé{filtrees.length !== 1 ? 's' : ''} par position d’affichage.</p>
+          <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1" role="group" aria-label="Mode d'affichage">
+            <button type="button" onClick={() => setModeAffichage('cartes')} aria-pressed={modeAffichage === 'cartes'} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${modeAffichage === 'cartes' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}><LayoutGrid size={14} /> Cartes</button>
+            <button type="button" onClick={() => setModeAffichage('tableau')} aria-pressed={modeAffichage === 'tableau'} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${modeAffichage === 'tableau' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}><List size={15} /> Tableau</button>
+          </div>
+        </div>
+      </section>}
 
       {/* Grille */}
       {loading ? (
@@ -625,7 +831,15 @@ export default function Bannieres() {
           {hasFilters && <button type="button" onClick={resetFilters} className="mt-4 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800">Effacer les filtres</button>}
         </div>
       ) : (
-        <><div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <>{!organisation && modeAffichage === 'tableau' ? (
+          <BanniereTable
+            bannieres={bannieresPage}
+            onEdit={item => navigate(`/bannieres/${item.id}/modifier`)}
+            onToggle={handleToggle}
+            onDelete={handleDelete}
+            pendingId={pendingId}
+          />
+        ) : <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {bannieresPage.map(b => (
             <BanniereCard
               key={b.id}
@@ -634,9 +848,17 @@ export default function Bannieres() {
               onToggle={handleToggle}
               onDelete={handleDelete}
               pending={pendingId === b.id}
+              organisable={organisation}
+              dragging={draggedId === b.id}
+              onDragStart={(event, id) => {
+                event.dataTransfer.effectAllowed = 'move'
+                setDraggedId(id)
+              }}
+              onDragEnd={() => setDraggedId(null)}
+              onDrop={handleDrop}
             />
           ))}
-        </div><Pagination page={page} totalItems={filtrees.length} onPageChange={setPage} /></>
+        </div>}{!organisation && <Pagination page={page} totalItems={filtrees.length} onPageChange={setPage} />}</>
       )}
 
       {feedback && (

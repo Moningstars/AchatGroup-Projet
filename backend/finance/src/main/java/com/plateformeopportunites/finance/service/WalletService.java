@@ -24,6 +24,7 @@ import com.plateformeopportunites.finance.repository.PortefeuilleRepository;
 import com.plateformeopportunites.finance.repository.TransactionPlateformeRepository;
 import com.plateformeopportunites.finance.repository.TransactionRepository;
 import com.plateformeopportunites.finance.repository.WalletPlateformeRepository;
+import com.plateformeopportunites.identity.entity.Utilisateur;
 import com.plateformeopportunites.identity.repository.UtilisateurRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -55,11 +56,21 @@ public class WalletService {
      * utilisateur vient de changer, avec le même contrat d'événement que PaygateService.
      */
     private void notifierSoldeDisponible(UUID participantId, String event, BigDecimal montant, Portefeuille portefeuille, String raison) {
-        pusherNotificationService.notifierUtilisateur(participantId, event, Map.of(
+        Map<String, Object> payload = Map.of(
                 "montant", montant,
                 "nouveauSolde", portefeuille.getSoldeDisponible(),
                 "raison", raison
-        ));
+        );
+        Runnable notification = () -> pusherNotificationService.notifierUtilisateur(participantId, event, payload);
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+                && org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override public void afterCommit() { notification.run(); }
+                    });
+        } else {
+            notification.run();
+        }
     }
 
     private void notifierCredit(UUID participantId, BigDecimal montant, Portefeuille portefeuille, String raison) {
@@ -103,14 +114,18 @@ public class WalletService {
 
     @Transactional
     public void demanderRetrait(UUID participantId, RetraitRequest req) {
-        utilisateurRepository.findById(participantId).ifPresent(u -> {
-            if (u.getNiveauVerification() != NiveauVerification.VERIFIE) {
-                throw new IllegalStateException(
-                    "Vérification d'identité requise. Complétez votre profil dans la section Vérification pour débloquer les retraits.");
-            }
-        });
+        if (req.getMontant() == null || req.getMontant().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Le montant à retirer doit être strictement positif");
+        }
 
-        Portefeuille portefeuille = getPortefeuille(participantId);
+        Utilisateur utilisateur = utilisateurRepository.findById(participantId)
+                .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable"));
+        if (utilisateur.getNiveauVerification() != NiveauVerification.VERIFIE) {
+            throw new IllegalStateException(
+                "Vérification d'identité requise. Complétez votre profil dans la section Vérification pour débloquer les retraits.");
+        }
+
+        Portefeuille portefeuille = getPortefeuilleForUpdate(participantId);
 
         if (portefeuille.getSoldeDisponible().compareTo(req.getMontant()) < 0) {
             throw new IllegalArgumentException("Solde insuffisant");
@@ -132,9 +147,6 @@ public class WalletService {
         notifierDebit(participantId, req.getMontant(), portefeuille, "RETRAIT_DEMANDE");
 
         eventPublisher.publishEvent(new RetraitDemandeEvent(this, participantId, req.getMontant()));
-        eventPublisher.publishEvent(new SseNotificationEvent(this,
-                "admin:global", "RETRAIT_DEMANDE",
-                "{\"utilisateurId\":\"" + participantId + "\",\"montant\":" + req.getMontant().toPlainString() + "}"));
         pusherNotificationService.notifierAdmins("RETRAIT_DEMANDE", Map.of(
                 "utilisateurId", participantId,
                 "montant", req.getMontant()
@@ -159,15 +171,12 @@ public class WalletService {
         if (tx.getType() != TypeTransaction.RETRAIT || tx.getStatut() != StatutTransaction.EN_COURS) {
             throw new IllegalArgumentException("Ce retrait ne peut pas être approuvé");
         }
-        Portefeuille portefeuille = getPortefeuille(tx.getUtilisateurId());
+        Portefeuille portefeuille = getPortefeuilleForUpdate(tx.getUtilisateurId());
         portefeuille.setSoldeGele(portefeuille.getSoldeGele().subtract(tx.getMontant()));
         portefeuilleRepository.save(portefeuille);
         tx.setStatut(StatutTransaction.SUCCESS);
         transactionRepository.save(tx);
 
-        eventPublisher.publishEvent(new SseNotificationEvent(this,
-                "user:" + tx.getUtilisateurId(), "RETRAIT",
-                "{\"statut\":\"APPROUVE\",\"montant\":" + tx.getMontant().toPlainString() + "}"));
         pusherNotificationService.notifierUtilisateur(tx.getUtilisateurId(), "RETRAIT", Map.of(
                 "statut", "APPROUVE",
                 "montant", tx.getMontant()
@@ -181,17 +190,15 @@ public class WalletService {
         if (tx.getType() != TypeTransaction.RETRAIT || tx.getStatut() != StatutTransaction.EN_COURS) {
             throw new IllegalArgumentException("Ce retrait ne peut pas être rejeté");
         }
-        Portefeuille portefeuille = getPortefeuille(tx.getUtilisateurId());
+        Portefeuille portefeuille = getPortefeuilleForUpdate(tx.getUtilisateurId());
         portefeuille.setSoldeGele(portefeuille.getSoldeGele().subtract(tx.getMontant()));
         portefeuille.setSoldeDisponible(portefeuille.getSoldeDisponible().add(tx.getMontant()));
         portefeuilleRepository.save(portefeuille);
         tx.setStatut(StatutTransaction.ECHEC);
         transactionRepository.save(tx);
-        notifierCredit(tx.getUtilisateurId(), tx.getMontant(), portefeuille, "RETRAIT_REJETE");
 
-        eventPublisher.publishEvent(new SseNotificationEvent(this,
-                "user:" + tx.getUtilisateurId(), "RETRAIT",
-                "{\"statut\":\"REJETE\",\"montant\":" + tx.getMontant().toPlainString() + "}"));
+        // Un seul événement "RETRAIT" (statut REJETE) : il contient déjà le montant remboursé,
+        // pas besoin d'un "wallet.credited" séparé pour la même action.
         pusherNotificationService.notifierUtilisateur(tx.getUtilisateurId(), "RETRAIT", Map.of(
                 "statut", "REJETE",
                 "montant", tx.getMontant()
@@ -203,7 +210,7 @@ public class WalletService {
         if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Le montant à geler doit être strictement positif");
         }
-        Portefeuille portefeuille = getPortefeuille(participantId);
+        Portefeuille portefeuille = getPortefeuilleForUpdate(participantId);
         if (portefeuille.getSoldeDisponible().compareTo(montant) < 0) {
             throw new IllegalArgumentException("Solde insuffisant pour participer");
         }
@@ -227,7 +234,7 @@ public class WalletService {
             throw new IllegalArgumentException("Le montant à geler doit être strictement positif");
         }
 
-        Portefeuille portefeuille = getPortefeuille(participantId);
+        Portefeuille portefeuille = getPortefeuilleForUpdate(participantId);
         BigDecimal valeurPoint = getWalletPlateforme().getTauxConversionPoints();
         if (valeurPoint == null || valeurPoint.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalStateException("La valeur d'achat des points n'est pas configurée");
@@ -256,7 +263,7 @@ public class WalletService {
         if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Le montant à débiter doit être strictement positif");
         }
-        Portefeuille portefeuille = getPortefeuille(participantId);
+        Portefeuille portefeuille = getPortefeuilleForUpdate(participantId);
         if (portefeuille.getSoldeGele().compareTo(montant) < 0) {
             throw new IllegalStateException("Solde gelé insuffisant pour finaliser le débit");
         }
@@ -269,7 +276,7 @@ public class WalletService {
         if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Le montant à rembourser doit être strictement positif");
         }
-        Portefeuille portefeuille = getPortefeuille(participantId);
+        Portefeuille portefeuille = getPortefeuilleForUpdate(participantId);
         if (portefeuille.getSoldeGele().compareTo(montant) < 0) {
             throw new IllegalStateException("Solde gelé insuffisant pour rembourser");
         }
@@ -288,7 +295,7 @@ public class WalletService {
         if (valeurPoints.compareTo(montantTotal) > 0) valeurPoints = montantTotal;
         BigDecimal montantCash = montantTotal.subtract(valeurPoints);
 
-        Portefeuille portefeuille = getPortefeuille(participantId);
+        Portefeuille portefeuille = getPortefeuilleForUpdate(participantId);
         if (portefeuille.getSoldeGele().compareTo(montantTotal) < 0) {
             throw new IllegalStateException("Solde gelé insuffisant pour rembourser");
         }
@@ -536,6 +543,15 @@ public class WalletService {
 
     private Portefeuille getPortefeuille(UUID participantId) {
         return portefeuilleRepository.findByUtilisateurId(participantId)
+                .orElseThrow(() -> new IllegalArgumentException("Portefeuille introuvable"));
+    }
+
+    /**
+     * Verrou pessimiste sur le portefeuille : evite qu'une lecture-puis-ecriture concurrente
+     * (double-clic, deux requetes simultanees) ne double-valide un solde deja insuffisant.
+     */
+    private Portefeuille getPortefeuilleForUpdate(UUID participantId) {
+        return portefeuilleRepository.findByUtilisateurIdForUpdate(participantId)
                 .orElseThrow(() -> new IllegalArgumentException("Portefeuille introuvable"));
     }
 

@@ -27,6 +27,7 @@ export const menuSections = [
   {
     title: 'SYSTÈME',
     items: [
+      { label: "Journal d'activité", path: 'journal-activite' },
       { label: 'KYC', path: 'kyc' },
       { label: 'Paramètres', path: 'parametres' },
     ],

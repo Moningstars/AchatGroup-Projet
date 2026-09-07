@@ -25,6 +25,7 @@
          ================================================================== -->
     <modules>
         <module>common</module>
+        <module>audit</module>
         <module>identity</module>
         <module>finance</module>
         <module>opportunite</module>
@@ -54,6 +55,11 @@
             <dependency>
                 <groupId>com.plateformeopportunites</groupId>
                 <artifactId>common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.plateformeopportunites</groupId>
+                <artifactId>audit</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
