@@ -50,9 +50,9 @@ function TikTokLogo({ className = 'h-5 w-5' }) {
 
 function ShareIconButton({ label, caption, onClick, className, children }) {
   return (
-    <button type="button" onClick={onClick} aria-label={label} title={label} className={`flex h-12 min-w-0 items-center justify-center gap-2 rounded-xl px-2 text-[10px] font-black transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-primary/30 ${className}`}>
+    <button type="button" onClick={onClick} aria-label={label} title={label} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-primary/30 ${className}`}>
       {children}
-      <span className="truncate">{caption}</span>
+      <span className="sr-only">{caption}</span>
     </button>
   )
 }
@@ -768,7 +768,7 @@ export default function DetailOpportunite() {
                     Votre lien personnel vous récompense lorsqu’un proche rejoint cette offre et finalise son achat.
                   </p>
                 )}
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <div className="flex flex-wrap gap-2">
                   <ShareIconButton label="Partager via WhatsApp" caption="WhatsApp" onClick={() => handleSocialShare('whatsapp')} className="bg-[#25D366] text-white shadow-sm shadow-emerald-200 hover:bg-[#20bd5a]"><WhatsAppLogo /></ShareIconButton>
                   <ShareIconButton label="Partager via Facebook" caption="Facebook" onClick={() => handleSocialShare('facebook')} className="bg-[#1877F2] text-white shadow-sm shadow-blue-200 hover:bg-[#1268d3]"><FacebookLogo /></ShareIconButton>
                   <ShareIconButton label="Partager via TikTok" caption="TikTok" onClick={() => handleSocialShare('tiktok')} className="bg-slate-950 text-white shadow-sm hover:bg-slate-800"><TikTokLogo /></ShareIconButton>

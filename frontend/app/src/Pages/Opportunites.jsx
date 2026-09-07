@@ -76,6 +76,8 @@ export default function Opportunites() {
   const [selectedCategories, setSelectedCategories] = useState([])
   const [slide, setSlide] = useState(0)
   const [visible, setVisible] = useState(true)
+  const [lastChancePaused, setLastChancePaused] = useState(false)
+  const lastChanceRef = useRef(null)
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -216,6 +218,23 @@ export default function Opportunites() {
     .sort((a, b) => new Date(a.dateExpiration) - new Date(b.dateExpiration))
   , [opportunites])
 
+  useEffect(() => {
+    const rail = lastChanceRef.current
+    if (!rail || expirantBientot.length < 2 || lastChancePaused) return undefined
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
+
+    const id = window.setInterval(() => {
+      const firstCard = rail.firstElementChild
+      if (!firstCard) return
+      const gap = Number.parseFloat(window.getComputedStyle(rail).columnGap) || 12
+      const step = firstCard.getBoundingClientRect().width + gap
+      const reachedEnd = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 8
+      rail.scrollTo({ left: reachedEnd ? 0 : rail.scrollLeft + step, behavior: 'smooth' })
+    }, 3500)
+
+    return () => window.clearInterval(id)
+  }, [expirantBientot.length, lastChancePaused])
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg-light">
@@ -233,7 +252,7 @@ export default function Opportunites() {
     <div className="min-h-screen bg-bg-light selection:bg-accent/30 pb-28">
 
       {/* ── Hero Carousel — pleine largeur ── */}
-      <div className="relative overflow-hidden rounded-none md:rounded-2xl h-[280px] sm:h-[380px] md:h-[540px] md:mx-8 lg:mx-16">
+      <div className="relative h-[250px] overflow-hidden rounded-none sm:h-[360px] md:mx-8 md:h-[500px] md:rounded-2xl lg:mx-16">
 
             {/* Background images — crossfade indépendant du contenu */}
             {heroSlides.map((s, i) => (
@@ -246,27 +265,27 @@ export default function Opportunites() {
             <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/70 to-primary/25" />
 
             {/* Contenu — position absolue pour ne jamais faire bouger le conteneur */}
-            <div className="absolute inset-0 flex flex-col justify-between p-5 sm:p-8 md:p-16"
+            <div className="absolute inset-0 flex flex-col justify-between p-4 sm:p-8 md:p-16"
               style={{ opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(12px)', transition: 'opacity 0.35s ease, transform 0.35s ease' }}
             >
               {/* Haut : tag + titre + description */}
               <div className="max-w-2xl">
-                <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm text-white/90 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] mb-3 sm:mb-8 border border-white/15">
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-white/90 backdrop-blur-sm sm:mb-8 sm:px-4 sm:py-1.5 sm:text-[10px]">
                   <i className={`ti ${heroSlides[slide].icon}`} />
                   <span>{heroSlides[slide].tag}</span>
                 </div>
-                <h1 className="text-3xl sm:text-5xl md:text-7xl font-heading font-black text-white leading-[1.05] mb-4 sm:mb-6 tracking-tighter">
+                <h1 className="mb-2 font-heading text-2xl font-black leading-[1.02] tracking-tighter text-white sm:mb-6 sm:text-5xl md:text-7xl">
                   {heroSlides[slide].title[0]}<br />
                   <span className={heroSlides[slide].accentCls}>{heroSlides[slide].title[1]}</span>
                 </h1>
-                <p className="text-white/60 text-sm sm:text-base md:text-lg max-w-md leading-relaxed line-clamp-2 sm:line-clamp-none">
+                <p className="line-clamp-2 max-w-md text-xs font-medium leading-5 text-white/75 sm:line-clamp-none sm:text-base md:text-lg">
                   {heroSlides[slide].desc}
                 </p>
               </div>
 
               {/* Bas : stat + CTA + dots */}
-              <div className="flex items-end justify-between gap-3 flex-wrap">
-                <div className="h-16 flex flex-col justify-end">
+              <div className="flex items-end justify-between gap-3">
+                <div className="hidden min-h-12 flex-col justify-end sm:flex">
                   {heroSlides[slide].stat?.value ? (
                     <>
                       <span className="block text-white/40 text-[10px] font-black uppercase tracking-[0.2em] mb-1">
@@ -287,10 +306,10 @@ export default function Opportunites() {
                   ) : null}
                 </div>
 
-                <div className="flex flex-col items-end gap-4">
+                <div className="ml-auto flex flex-col items-end gap-2 sm:gap-4">
                   <button
                     onClick={ouvrirCta}
-                    className="bg-accent text-primary px-5 sm:px-8 py-3 sm:py-4 rounded-2xl font-heading font-black text-xs sm:text-sm uppercase tracking-widest shadow-2xl shadow-black/30 hover:brightness-105 active:scale-95 transition-all flex items-center gap-2"
+                    className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 font-heading text-[10px] font-black uppercase tracking-wider text-primary shadow-2xl shadow-black/30 transition-all hover:brightness-105 active:scale-95 sm:rounded-2xl sm:px-8 sm:py-4 sm:text-sm sm:tracking-widest"
                   >
                     {heroSlides[slide].cta.label}
                     <i className="ti ti-arrow-right" />
@@ -337,7 +356,18 @@ export default function Opportunites() {
 
             {/* Liste scrollable horizontalement */}
             <div className="relative -mx-1 px-1">
-              <div className="flex max-w-full gap-3 overflow-x-auto overscroll-x-contain pb-3 snap-x snap-mandatory scrollbar-thin sm:gap-4">
+              <div
+                ref={lastChanceRef}
+                onMouseEnter={() => setLastChancePaused(true)}
+                onMouseLeave={() => setLastChancePaused(false)}
+                onTouchStart={() => setLastChancePaused(true)}
+                onTouchEnd={() => setLastChancePaused(false)}
+                onFocus={() => setLastChancePaused(true)}
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget)) setLastChancePaused(false)
+                }}
+                className="flex max-w-full gap-3 overflow-x-auto overscroll-x-contain pb-3 snap-x snap-mandatory scroll-smooth scrollbar-thin sm:gap-4"
+              >
                 {expirantBientot.map(op => {
                   const diff = op.dateExpiration
                     ? Math.ceil((new Date(op.dateExpiration) - REFERENCE_TEMPS) / (1000 * 60 * 60 * 24))
@@ -510,13 +540,22 @@ export default function Opportunites() {
               </div>
             </div>
 
-            <div className="flex gap-6 overflow-x-auto pb-3 snap-x scrollbar-thin">
+            <div className="flex gap-4 overflow-x-auto pb-3 snap-x scrollbar-thin sm:gap-6">
               {sondages.slice(0, 4).map(s => (
                 <button
                   key={s.id}
                   onClick={() => navigate(`/sondages/${s.id}`)}
-                  className="min-w-[300px] md:min-w-[380px] snap-start text-left bg-primary p-8 border-2 border-primary shadow-2xl shadow-primary/20 group relative overflow-hidden active:scale-[0.98] transition-transform"
+                  className="group relative min-w-[min(82vw,310px)] snap-start overflow-hidden border-2 border-primary bg-primary p-6 text-left shadow-2xl shadow-primary/20 transition-transform active:scale-[0.98] sm:p-8 md:min-w-[380px]"
                 >
+                  {s.imageUrl && (
+                    <img
+                      src={imgUrl(s.imageUrl)}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover opacity-55 transition-transform duration-500 group-hover:scale-105"
+                      onError={(event) => { event.currentTarget.style.display = 'none' }}
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/85 to-primary/45" />
                   <div className="relative z-10 flex flex-col h-full justify-between min-h-[200px]">
                     <div>
                       <div className="flex items-center gap-3 mb-6">
