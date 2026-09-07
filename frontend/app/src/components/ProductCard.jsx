@@ -5,18 +5,20 @@ import { useCountdown } from '../hooks/useCountdown'
 
 function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
 
-function CountdownBadge({ dateExpiration }) {
-  const countdown = useCountdown(dateExpiration, 60_000)
-  if (!countdown || countdown.expired) return null
-  const joursRestants = Math.ceil(countdown.total / 86_400_000)
-  if (joursRestants > 7) return null
-  const urgent = joursRestants <= 1
+function OpportunityCountdown({ dateExpiration }) {
+  const countdown = useCountdown(dateExpiration, 1_000)
+  if (!countdown) return null
+  const pad = value => String(value).padStart(2, '0')
+
   return (
-    <span className={`text-[9px] font-black px-1.5 py-0.5 uppercase ${
-      urgent ? 'bg-urgency text-white' : 'bg-accent text-primary'
-    }`}>
-      {joursRestants <= 1 ? 'Moins de 24 h' : `${joursRestants}j`}
-    </span>
+    <div className="mt-1.5 flex items-center justify-between gap-2 border-t border-white/15 pt-1.5 text-[8px] font-black uppercase tracking-wide text-white/70">
+      <span className="flex items-center gap-1"><i className="ti ti-clock" /> Temps restant</span>
+      <span className={countdown.expired ? 'text-urgency' : 'tabular-nums text-white'}>
+        {countdown.expired
+          ? 'Expirée'
+          : `${countdown.days}j ${pad(countdown.hours)}h ${pad(countdown.minutes)}m ${pad(countdown.seconds)}s`}
+      </span>
+    </div>
   )
 }
 
@@ -54,7 +56,7 @@ const ProductCard = ({ opportunity }) => {
       className="group flex aspect-square min-w-0 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm shadow-primary/5 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/10 active:scale-[0.99]"
     >
       {/* Visuel compact : la carte conserve un format carré sur tous les écrans. */}
-      <div className="relative min-h-0 w-full flex-[1.05] overflow-hidden bg-gray-100">
+      <div className="relative min-h-0 w-full flex-[1.2] overflow-hidden bg-gray-100">
         <img
           src={heroImg}
           alt={titre}
@@ -64,17 +66,12 @@ const ProductCard = ({ opportunity }) => {
 
         {/* Badge réduction */}
         {discount > 0 && (
-          <div className="absolute left-2 top-2 rounded-full bg-urgency px-2 py-1 text-[10px] font-black leading-none text-white shadow-sm">
+          <div className="absolute left-2 top-2 rounded-full bg-success px-2 py-1 text-[10px] font-black leading-none text-white shadow-sm">
             -{discount}%
           </div>
         )}
 
-        {/* Countdown */}
-        <div className="absolute right-2 top-2 overflow-hidden rounded-full shadow-sm">
-          <CountdownBadge dateExpiration={dateExpiration} />
-        </div>
-
-        <div className="absolute bottom-10 left-3">
+        <div className="absolute bottom-[3.7rem] left-3">
           <span className="inline-flex items-center gap-1 rounded-lg bg-primary px-2 py-1 text-[8px] font-black uppercase tracking-wider text-white shadow-sm">
             <i className="ti ti-users-group text-[9px]" /> Opportunité
           </span>
@@ -88,11 +85,12 @@ const ProductCard = ({ opportunity }) => {
           <div className="h-1 overflow-hidden rounded-full bg-white/20">
             <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${progress}%` }} />
           </div>
+          <OpportunityCountdown dateExpiration={dateExpiration} />
         </div>
       </div>
 
       {/* Infos produit */}
-      <div className="flex min-h-0 flex-1 flex-col justify-between gap-1.5 px-3 py-2.5">
+      <div className="flex min-h-0 flex-[0.8] flex-col gap-1.5 px-3 py-2.5">
         <p className="line-clamp-2 min-h-[2.45em] text-[13px] font-black leading-tight text-primary">{titre}</p>
 
         <div>
@@ -114,7 +112,7 @@ const ProductCard = ({ opportunity }) => {
 
         </div>
 
-        <div className="flex items-center justify-between gap-2 border-t border-gray-100 pt-1.5">
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-gray-100 pt-1.5">
           <span className="text-[9px] font-black uppercase tracking-wider text-primary">
             Voir l’offre
           </span>

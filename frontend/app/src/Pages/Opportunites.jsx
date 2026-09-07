@@ -495,7 +495,7 @@ export default function Opportunites() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-4 min-[520px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+              <div className="grid grid-cols-1 gap-4 min-[520px]:grid-cols-2 min-[860px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {filtered.slice(0, 10).map(op => <ProductCard key={op.id} opportunity={op} />)}
               </div>
 

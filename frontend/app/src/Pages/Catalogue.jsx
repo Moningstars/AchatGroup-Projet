@@ -331,7 +331,7 @@ export default function Catalogue() {
           </div>
         ) : (
           <div className="space-y-8">
-            <div className="grid grid-cols-1 gap-4 min-[520px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+            <div className="grid grid-cols-1 gap-4 min-[520px]:grid-cols-2 min-[860px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {visibleItems.map(op => <ProductCard key={op.id} opportunity={op} />)}
             </div>
 
