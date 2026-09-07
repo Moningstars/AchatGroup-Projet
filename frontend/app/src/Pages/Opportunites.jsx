@@ -329,7 +329,7 @@ export default function Opportunites() {
             </div>
       </div>
 
-      <main className="mx-auto w-full max-w-7xl px-4 pt-8 space-y-10 sm:px-5 lg:px-6 xl:px-8">
+      <main className="mx-auto w-full max-w-7xl space-y-6 px-4 pt-6 sm:space-y-10 sm:px-5 sm:pt-8 lg:px-6 xl:px-8">
 
         {/* ── Expire bientôt ── */}
         {expirantBientot.length > 0 && (
@@ -443,8 +443,8 @@ export default function Opportunites() {
         )}
 
         {/* ── Recherche e-commerce ── */}
-        <section className="rounded-3xl border border-gray-100 bg-white p-3 sm:p-4 shadow-sm overflow-hidden">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-center">
+        <section className="overflow-hidden rounded-xl border border-gray-100 bg-white p-2 shadow-sm sm:rounded-3xl sm:p-4">
+          <div className="grid gap-2 sm:gap-3 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-center">
             <div className="relative w-full group">
               <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors" />
               <input
@@ -452,7 +452,7 @@ export default function Opportunites() {
                 placeholder="Rechercher une offre..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full bg-bg-light border-2 border-gray-100 rounded-2xl py-3.5 pl-11 pr-4 focus:outline-none focus:border-primary font-bold text-sm transition-all"
+                className="w-full rounded-lg border-2 border-gray-100 bg-bg-light py-2.5 pl-11 pr-4 text-sm font-bold transition-all focus:border-primary focus:outline-none sm:rounded-2xl sm:py-3.5"
               />
               {searching && (
                 <Loader2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-primary/60" />
@@ -464,7 +464,7 @@ export default function Opportunites() {
               <select
                 value={selectedCategories.length > 1 ? '__MULTI__' : selectedCategories[0] || 'Tout'}
                 onChange={e => selectMainCategory(e.target.value)}
-                className="w-full appearance-none rounded-2xl border-2 border-gray-100 bg-bg-light px-4 py-3.5 pr-10 text-xs font-black uppercase tracking-widest text-primary outline-none transition-all focus:border-primary"
+                className="w-full appearance-none rounded-lg border-2 border-gray-100 bg-bg-light px-4 py-2.5 pr-10 text-[11px] font-black uppercase tracking-wider text-primary outline-none transition-all focus:border-primary sm:rounded-2xl sm:py-3.5 sm:text-xs sm:tracking-widest"
               >
                 {selectedCategories.length > 1 && (
                   <option value="__MULTI__" disabled>{selectedCategories.length} catégories</option>
