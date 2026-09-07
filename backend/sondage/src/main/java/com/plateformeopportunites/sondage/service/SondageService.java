@@ -169,7 +169,7 @@ public class SondageService {
         if (sondageEligibiliteRepository.findBySondageId(sondageId).isEmpty()) {
             throw new IllegalStateException("Impossible d'activer : aucun test d'éligibilité configuré pour ce sondage");
         }
-        if (!sondage.getDateExpiration().isAfter(LocalDateTime.now())) {
+        if (sondage.getDateExpiration() == null || !sondage.getDateExpiration().isAfter(LocalDateTime.now())) {
             throw new IllegalStateException("La date d'expiration doit être future avant l'activation");
         }
         if (sondage.getQuotaVise() == null || sondage.getQuotaVise() < 1
