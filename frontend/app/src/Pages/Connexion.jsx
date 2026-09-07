@@ -9,10 +9,20 @@ import { AsYouType, isValidPhoneNumber } from 'libphonenumber-js'
 
 const DEV_OTP_CODE = '123456'
 const DEV_AUTH_SETTING = import.meta.env.VITE_DEV_AUTH_ENABLED
+const HOSTNAME = typeof window !== 'undefined' ? window.location.hostname : ''
+const IS_PRIVATE_DEV_HOST =
+  ['localhost', '127.0.0.1', '::1'].includes(HOSTNAME) ||
+  /^10\./.test(HOSTNAME) ||
+  /^192\.168\./.test(HOSTNAME) ||
+  /^172\.(1[6-9]|2\d|3[0-1])\./.test(HOSTNAME)
 // En développement Vite, la connexion locale est disponible par défaut.
 // Une valeur explicite `false` permet néanmoins de tester Firebase localement,
-// tandis que les builds de production restent sur Firebase sauf activation volontaire.
-const USE_LOCAL_AUTH = DEV_AUTH_SETTING === 'true' || (import.meta.env.DEV && DEV_AUTH_SETTING !== 'false')
+// tandis qu'un build ouvert sur localhost ou le réseau privé peut continuer à
+// utiliser l'authentification de démonstration lorsque Firebase n'est pas configuré.
+const USE_LOCAL_AUTH = DEV_AUTH_SETTING === 'true' || (
+  DEV_AUTH_SETTING !== 'false' &&
+  (import.meta.env.DEV || (!firebaseConfigured && IS_PRIVATE_DEV_HOST))
+)
 
 const ERREURS_FIREBASE = {
   'auth/invalid-phone-number': 'Numéro de téléphone invalide',
