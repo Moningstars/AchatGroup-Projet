@@ -1716,13 +1716,13 @@ export function NouvelleOpportunitePage() {
   return <NouvelleOpportuniteWizard onClose={() => navigate('/opportunites')} onSaved={() => navigate('/opportunites', { replace: true })} />
 }
 
-export default function Opportunites() {
+export default function Opportunites({ traitementOnly = false }) {
   const navigate = useNavigate()
   const [opportunites, setOpportunites] = useState([])
   const [loading, setLoading]           = useState(true)
   const [actionId, setActionId]         = useState(null)
   const [categorieFiltre, setCategorieFiltre] = useState('TOUTES')
-  const [statutListeFiltre, setStatutListeFiltre] = useState('TOUS')
+  const [statutListeFiltre, setStatutListeFiltre] = useState(traitementOnly ? 'ACTIVE' : 'TOUS')
   const [recherche, setRecherche] = useState('')
   const [triListe, setTriListe] = useState('RECENTES')
   const [filtresOuverts, setFiltresOuverts] = useState(false)

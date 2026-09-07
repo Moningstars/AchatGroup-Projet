@@ -7,6 +7,7 @@ import Sondages from './Pages/Sondages'
 import Utilisateurs from './Pages/Utilisateurs'
 import Portefeuilles from './Pages/Portefeuilles'
 import Commanditaires from './Pages/Commanditaires'
+import Fournisseurs, { NouveauFournisseurPage } from './Pages/Fournisseurs'
 import Parametres from './Pages/Parametres'
 import Kyc from './Pages/Kyc'
 import Bannieres, { BanniereEditorPage } from './Pages/Bannieres'
@@ -36,6 +37,7 @@ function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="opportunites" element={<Opportunites />} />
+          <Route path="opportunites/traitement" element={<Opportunites traitementOnly />} />
           <Route path="opportunites/nouvelle" element={<NouvelleOpportunitePage />} />
           <Route path="opportunites/:id" element={<OpportuniteDetailPage />} />
           <Route path="opportunites/:id/modifier" element={<ModifierOpportunitePage />} />
@@ -43,6 +45,8 @@ function App() {
           <Route path="utilisateurs" element={<Utilisateurs />} />
           <Route path="portefeuilles" element={<Portefeuilles />} />
           <Route path="commanditaires" element={<Commanditaires />} />
+          <Route path="fournisseurs" element={<Fournisseurs />} />
+          <Route path="fournisseurs/nouveau" element={<NouveauFournisseurPage />} />
           <Route path="bannieres" element={<Bannieres />} />
           <Route path="bannieres/nouvelle" element={<BanniereEditorPage />} />
           <Route path="bannieres/:id/modifier" element={<BanniereEditorPage />} />

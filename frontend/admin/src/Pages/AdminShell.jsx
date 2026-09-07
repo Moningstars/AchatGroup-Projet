@@ -24,6 +24,7 @@ function heureRelative(ts) {
 const PAGE_META = {
   '/': { label: "Vue d'ensemble", sub: 'Tableau de bord général' },
   '/opportunites': { label: 'Opportunités', sub: 'Gestion des achats groupés' },
+  '/opportunites/traitement': { label: 'À traiter', sub: 'Suivi des livraisons et participants' },
   '/sondages': { label: 'Sondages', sub: 'Enquêtes rémunérées' },
   '/utilisateurs': { label: 'Utilisateurs', sub: 'Gestion des comptes' },
   '/portefeuilles': { label: 'Portefeuilles', sub: 'Transactions & retraits' },

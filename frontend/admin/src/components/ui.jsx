@@ -172,6 +172,23 @@ export function FilterPill({ label, active, onClick }) {
   )
 }
 
+export function Pagination({ page, totalItems, pageSize = 10, onPageChange }) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
+  if (totalPages <= 1) return null
+
+  return (
+    <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-4 py-3">
+      <button type="button" disabled={page <= 1} onClick={() => onPageChange(page - 1)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 disabled:cursor-not-allowed disabled:opacity-40">
+        Précédent
+      </button>
+      <span className="text-xs font-semibold text-slate-500">Page {page} / {totalPages}</span>
+      <button type="button" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 disabled:cursor-not-allowed disabled:opacity-40">
+        Suivant
+      </button>
+    </div>
+  )
+}
+
 // ── ActionBtn ─────────────────────────────────────────────────────────────────
 
 const AB_VARIANTS = {

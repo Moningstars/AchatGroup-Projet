@@ -40,6 +40,37 @@ function SidebarItem({ label, to, onNavigate }) {
     )
 }
 
+function SidebarSectionItem({ item, onNavigate }) {
+    if (!item.children) {
+        return <SidebarItem label={item.label} to={`/${item.path}`} onNavigate={onNavigate} />
+    }
+
+    return (
+        <div>
+            <SidebarItem label={item.label} to={`/${item.path}`} onNavigate={onNavigate} />
+            <div className="ml-9 mt-0.5 space-y-0.5 border-l border-slate-200 pl-2">
+                {item.children.map(child => (
+                    <NavLink
+                        key={child.path}
+                        to={`/${child.path}`}
+                        end
+                        onClick={onNavigate}
+                        className={({ isActive }) =>
+                            `flex items-center justify-between rounded-lg px-2 py-1.5 text-[11px] font-semibold transition ${isActive
+                                ? 'bg-violet-50 text-violet-700'
+                                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                            }`
+                        }
+                    >
+                        <span>{child.label}</span>
+                        {child.treatmentBadge && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
+                    </NavLink>
+                ))}
+            </div>
+        </div>
+    )
+}
+
 function initiales(nom) {
     if (!nom) return 'AD'
     return nom.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
@@ -83,7 +114,7 @@ export default function NavBar() {
                         <p className="mb-1.5 px-2 text-[8px] font-extrabold uppercase tracking-[0.18em] text-slate-400">{section.title}</p>
                         <div className="space-y-0.5">
                             {section.items.map((item) => (
-                                <SidebarItem key={item.path} label={item.label} to={`/${item.path}`} onNavigate={() => setOpen(false)} />
+                                <SidebarSectionItem key={item.path} item={item} onNavigate={() => setOpen(false)} />
                             ))}
                         </div>
                     </div>

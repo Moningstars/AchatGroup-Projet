@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom'
 import {
-  ShieldCheck, Users, Loader2, ChevronRight, ChevronDown, CheckCircle2, AlertCircle, Layers, Timer, Minus, Plus, Copy, Share2, ShoppingCart, PackageCheck, ExternalLink, Gift, Store, Coins, Sparkles
+  ShieldCheck, Users, Loader2, ChevronRight, ChevronDown, CheckCircle2, AlertCircle, Layers, Timer, Minus, Plus, Copy, Share2, ShoppingCart, PackageCheck, ExternalLink, Gift, Store, Coins
 } from 'lucide-react'
+import { FacebookIcon, InstagramIcon, WhatsAppIcon } from '../common/Footer/SocialIcons'
 import { getOpportunite, getOpportunites, getMesParticipationsOpportunites, getSolde, souscrire, imgUrl } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useCountdown } from '../hooks/useCountdown'
@@ -208,6 +209,21 @@ export default function DetailOpportunite() {
     }
   }
 
+  const handleShareWhatsApp = () => {
+    const url = `${window.location.origin}/opportunity/${id}`
+    const text = `${opportunite?.titre || 'Campagne OpportuniHub'} - ${url}`
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank')
+  }
+
+  const handleShareFacebook = () => {
+    const url = `${window.location.origin}/opportunity/${id}`
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank')
+  }
+
+  const handleShareInstagram = () => {
+    window.open('https://www.instagram.com/', '_blank')
+  }
+
   const handleShare = async () => {
     const url = getShareUrl()
     const message = getShareMessage()
@@ -329,8 +345,8 @@ export default function DetailOpportunite() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 lg:items-start">
 
-          {/* Gallery */}
-          <div className="lg:col-span-7 space-y-6">
+          {/* Media : photos + miniatures — toujours en premier, y compris sur mobile */}
+          <div className="order-1 lg:order-none lg:col-start-1 lg:col-span-7 lg:row-start-1 space-y-6">
 
             {/* Image principale — hauteur fixe, clic = lightbox */}
             <div
@@ -380,8 +396,10 @@ export default function DetailOpportunite() {
                 ))}
               </div>
             )}
+          </div>
 
-            {/* Contenu produit : reste sous la galerie pour occuper naturellement la colonne gauche. */}
+          {/* Détails : infos produit + fournisseur — passent après le bloc info sur mobile */}
+          <div className="order-3 lg:order-none lg:col-start-1 lg:col-span-7 lg:row-start-2 space-y-6">
             <section className="rounded-3xl border-2 border-gray-100 bg-white p-5 sm:p-6">
               <div className="flex items-center gap-2">
                 <PackageCheck size={16} className="text-primary" />
@@ -475,8 +493,8 @@ export default function DetailOpportunite() {
             </div>
           )}
 
-          {/* Info */}
-          <div className="lg:col-span-5 flex flex-col gap-5 lg:sticky lg:top-24">
+          {/* Info : titre, prix, progression, quantité, CTA — passe avant les détails produit/fournisseur sur mobile */}
+          <div className="order-2 lg:order-none lg:col-start-8 lg:col-span-5 lg:row-start-1 lg:row-span-2 flex flex-col gap-5 lg:sticky lg:top-24">
 
             {/* Status + catégorie */}
             <div className="flex items-center gap-2 flex-wrap">
@@ -639,7 +657,6 @@ export default function DetailOpportunite() {
               </label>
             )}
 
-            {/* Partage et parrainage */}
             <div className={`overflow-hidden rounded-2xl border-2 bg-white transition-all ${shareOpen ? 'border-primary/15 shadow-soft' : 'border-gray-100'}`}>
               <div className="flex items-center gap-3 p-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/5 text-primary">
@@ -704,32 +721,6 @@ export default function DetailOpportunite() {
               {joinError && <p className="text-urgency text-xs font-bold text-center bg-urgency/5 p-3 rounded-xl border border-urgency/10">{joinError}</p>}
             </div>
           </div>
-
-          {/* Fiche produit enrichie — sous la galerie en desktop, tout en bas en mobile */}
-          {(opportunite.specsPointsForts || opportunite.specsCasUsage || opportunite.specsFinePrint) && (
-            <div className="lg:col-span-7 bg-white rounded-2xl border-2 border-gray-100 p-5 space-y-3">
-              <div className="flex items-center gap-2">
-                <Sparkles size={14} className="text-primary" />
-                <span className="text-[10px] font-black text-primary uppercase tracking-widest">Points clés</span>
-              </div>
-              {opportunite.specsPointsForts && (
-                <ul className="space-y-1.5">
-                  {opportunite.specsPointsForts.split('\n').filter(Boolean).map((line, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                      <CheckCircle2 size={14} className="text-success shrink-0 mt-0.5" />
-                      {line}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {opportunite.specsCasUsage && (
-                <p className="text-sm text-gray-500 leading-relaxed">{opportunite.specsCasUsage}</p>
-              )}
-              {opportunite.specsFinePrint && (
-                <p className="text-[11px] text-gray-400 italic border-t border-gray-50 pt-2.5">{opportunite.specsFinePrint}</p>
-              )}
-            </div>
-          )}
 
         </div>
 

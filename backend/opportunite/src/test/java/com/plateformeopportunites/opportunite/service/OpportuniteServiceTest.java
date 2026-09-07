@@ -2,7 +2,6 @@ package com.plateformeopportunites.opportunite.service;
 
 import com.plateformeopportunites.common.enums.StatutOpportunite;
 import com.plateformeopportunites.common.enums.StatutParticipation;
-import com.plateformeopportunites.common.enums.ModePlafond;
 import com.plateformeopportunites.common.event.QuotaAtteintEvent;
 import com.plateformeopportunites.common.event.RemboursementEvent;
 import com.plateformeopportunites.common.redis.RedisService;
@@ -184,36 +183,12 @@ class OpportuniteServiceTest {
     }
 
     @Test
-    void creer_modePlafonne_sansSeuilMaximal_leveException() {
-        CreerOpportuniteRequest request = requestCreation(ModePlafond.PLAFONNE, null);
+    void creer_seuilMaximalInferieurAuMinimum_leveException() {
+        CreerOpportuniteRequest request = requestCreation(5);
         when(administrateurRepository.findById(any())).thenReturn(Optional.of(
                 com.plateformeopportunites.identity.entity.Administrateur.builder().id(UUID.randomUUID()).build()));
 
         assertThrows(IllegalArgumentException.class, () -> opportuniteService.creer(UUID.randomUUID(), request));
-    }
-
-    @Test
-    void creer_modePlafonne_seuilMinimumHorsPalier_leveException() {
-        CreerOpportuniteRequest request = requestCreation(ModePlafond.PLAFONNE, 100);
-        request.setSeuilMinimum(10);
-        when(administrateurRepository.findById(any())).thenReturn(Optional.of(
-                com.plateformeopportunites.identity.entity.Administrateur.builder().id(UUID.randomUUID()).build()));
-
-        assertThrows(IllegalArgumentException.class, () -> opportuniteService.creer(UUID.randomUUID(), request));
-    }
-
-    @Test
-    void creer_modeIllimite_ignoreSeuilMaximal() {
-        CreerOpportuniteRequest request = requestCreation(ModePlafond.ILLIMITE, 100);
-        when(administrateurRepository.findById(any())).thenReturn(Optional.of(
-                com.plateformeopportunites.identity.entity.Administrateur.builder().id(UUID.randomUUID()).build()));
-        when(opportuniteRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-        OpportuniteService service = opportuniteService;
-        assertDoesNotThrow(() -> service.creer(UUID.randomUUID(), request));
-        verify(opportuniteRepository).save(argThat(opportunite ->
-                opportunite.getModePlafond() == ModePlafond.ILLIMITE
-                        && opportunite.getSeuilMaximal() == null));
     }
 
     // ── cloturerAvecSucces ───────────────────────────────────────────────────
@@ -288,12 +263,11 @@ class OpportuniteServiceTest {
         verify(eventPublisher).publishEvent(any(RemboursementEvent.class));
     }
 
-    private CreerOpportuniteRequest requestCreation(ModePlafond modePlafond, Integer seuilMaximal) {
+    private CreerOpportuniteRequest requestCreation(Integer seuilMaximal) {
         CreerOpportuniteRequest request = new CreerOpportuniteRequest();
         request.setTitre("Opportunité test");
         request.setPrixNormal(new BigDecimal("5000"));
         request.setSeuilMinimum(10);
-        request.setModePlafond(modePlafond);
         request.setSeuilMaximal(seuilMaximal);
         request.setDateExpiration(LocalDateTime.now().plusDays(1));
         CreerOpportuniteRequest.PalierPrixRequest palier = new CreerOpportuniteRequest.PalierPrixRequest();
