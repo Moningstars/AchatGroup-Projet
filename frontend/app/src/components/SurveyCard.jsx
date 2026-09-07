@@ -1,7 +1,5 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, Users } from 'lucide-react';
-import { formatMontant } from '../utils/format';
 
 const SurveyCard = ({ survey, variant = 'grid' }) => {
   if (!survey) return null;
@@ -17,7 +15,7 @@ const SurveyCard = ({ survey, variant = 'grid' }) => {
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
               <span className="text-[10px] text-white/50 font-bold uppercase tracking-widest">Reward</span>
-              <span className="text-2xl font-extrabold text-accent">{formatMontant(recompense)} <span className="text-xs">FCFA</span></span>
+              <span className="text-2xl font-extrabold text-accent">{(recompense || 0).toLocaleString('fr-FR')} <span className="text-xs">FCFA</span></span>
             </div>
             <Link to={`/sondages/${id}`} className="bg-white text-primary px-6 py-3 rounded-2xl text-xs font-extrabold shadow-lg active:scale-95 transition-transform">Take Now</Link>
           </div>
@@ -32,7 +30,7 @@ const SurveyCard = ({ survey, variant = 'grid' }) => {
   return (
     <article className="bg-white rounded-3xl overflow-hidden relative border-2 border-gray-100 flex flex-col group hover:border-primary transition-all break-inside-avoid mb-4">
       <div className="relative overflow-hidden">
-        <div className="reward-badge absolute top-2 right-2 z-10">Gagnez {formatMontant(recompense)} FCFA</div>
+        <div className="reward-badge absolute top-2 right-2 z-10">Gagnez {(recompense || 0).toLocaleString('fr-FR')} FCFA</div>
         <img 
           src={image || 'https://images.unsplash.com/photo-1734255026082-82fdc81991f0?auto=format&w=400&q=80&fit=crop'} 
           alt={titre} 

@@ -23,7 +23,7 @@ export default function Dashboard() {
       .then(([s, opps]) => { setStats(s); setOpportunites(opps) })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [])
+  }, [off, on])
 
   // Les agrégats (moyennes, soldes...) sont recalculés côté serveur — on les
   // rafraîchit (avec un léger debounce) plutôt que de les recalculer en JS.
@@ -60,7 +60,7 @@ export default function Dashboard() {
       off('RETRAIT_DEMANDE', refetchStats)
       off('OPPORTUNITE_PRESQUE_COMPLETE', onPresqueComplete)
     }
-  }, [])
+  }, [off, on])
 
   if (loading) return <Spinner />
 

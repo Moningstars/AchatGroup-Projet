@@ -11,12 +11,13 @@ import {
 } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useSSE } from '../hooks/useSSE'
-import { formatMontant } from '../utils/format'
 
 function formatDate(dt) {
   if (!dt) return '—'
   return new Date(dt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
 }
+function formatMontant(n) { return Number(n || 0).toLocaleString('fr-FR') }
+
 // ─── Composant question ───────────────────────────────────────────────────────
 
 function QuestionField({ q, value, onChange }) {
@@ -139,9 +140,9 @@ function SondageCard({ sondage }) {
           <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/90 to-primary/60" />
         </div>
       )}
-      
+
       <div className="absolute -right-12 -top-12 w-40 h-40 bg-accent/10 rounded-full blur-2xl pointer-events-none z-0" />
-      
+
       <div className="relative z-10 p-6">
         <div className="inline-flex items-center gap-2 bg-success/20 text-success px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-success/30 mb-4 shadow-sm shadow-success/10">
           <i className="ti ti-forms text-[10px]" /> Sondage rémunéré

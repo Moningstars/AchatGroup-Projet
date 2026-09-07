@@ -12,7 +12,10 @@ const SSE_BASE = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_U
  */
 export function useSSE(path, handlers, token) {
   const handlersRef = useRef(handlers)
-  handlersRef.current = handlers
+
+  useEffect(() => {
+    handlersRef.current = handlers
+  }, [handlers])
 
   useEffect(() => {
     if (!path) return
@@ -36,5 +39,5 @@ export function useSSE(path, handlers, token) {
       types.forEach(t => es.removeEventListener(t, dispatch))
       es.close()
     }
-  }, [path, token]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [path, token])
 }

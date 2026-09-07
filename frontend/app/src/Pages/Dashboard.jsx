@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowRight, Wallet, ShoppingBag, FileText, TrendingUp, Loader2, Clock } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getSolde, getTransactions, getOpportunites, getSondages } from '../services/api'
-import { formatMontant } from '../utils/format'
 
+function formatMontant(n) { return Number(n || 0).toLocaleString('fr-FR') }
 function formatDate(dt) {
   if (!dt) return '—'
   return new Date(dt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
@@ -169,7 +169,7 @@ export default function Dashboard() {
                 <button key={s.id} onClick={() => navigate(`/sondages/${s.id}`)} className="text-left rounded-xl border border-slate-200 p-4 hover:border-violet-300 hover:bg-violet-50 transition">
                   <p className="text-sm font-semibold text-slate-800 truncate">{s.titre}</p>
                   <p className="text-xs text-slate-500 mt-1 line-clamp-2">{s.description}</p>
-                  <p className="mt-2 text-xs font-bold text-violet-600">{formatMontant(s.recompense)} FCFA</p>
+                  <p className="mt-2 text-xs font-bold text-violet-600">{Number(s.recompense).toLocaleString('fr-FR')} FCFA</p>
                 </button>
               ))}
             </div>

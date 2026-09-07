@@ -4,28 +4,26 @@ import { Loader2 } from 'lucide-react'
 import { getSondages, getBannieres, imgUrl } from '../services/api'
 import PageCarousel from '../components/PageCarousel'
 import { useSSE } from '../hooks/useSSE'
-import { formatMontant } from '../utils/format'
 
-const fmt = formatMontant
+function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
+const REFERENCE_TEMPS = Date.now()
 
 
 function formatDate(dt) {
   if (!dt) return null
   const d = new Date(dt)
-  const diff = Math.ceil((d - Date.now()) / (1000 * 60 * 60 * 24))
+  const diff = Math.ceil((d - REFERENCE_TEMPS) / (1000 * 60 * 60 * 24))
   if (diff <= 0) return 'Expiré'
   if (diff === 1) return 'Expire demain'
   if (diff <= 7) return `Expire dans ${diff}j`
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
 }
-
 const STATUT = {
   ACTIF: { label: 'Ouvert', cls: 'bg-success/15 text-success border-success/20' },
   EN_ATTENTE: { label: 'En attente', cls: 'bg-accent/15 text-accent border-accent/20' },
   EN_ATTENTE_DISTRIBUTION: { label: 'En validation', cls: 'bg-blue-500/10 text-blue-600 border-blue-200' },
   CLOTURE: { label: 'Clôturé', cls: 'bg-gray-100 text-gray-400 border-gray-200' },
 }
-
 const GRID_LIMIT = 10 // 5 col × 2 lignes
 
 export default function Sondages() {
@@ -40,6 +38,7 @@ export default function Sondages() {
   useEffect(() => {
     getBannieres('SONDAGES')
       .then(data => setSlides(data.map(b => ({
+        id: b.id,
         img: imgUrl(b.imageUrl),
         tag: b.tag,
         icon: b.icone,
@@ -197,7 +196,6 @@ export default function Sondages() {
     </div>
   )
 }
-
 function SurveyCardFeatured({ survey: s, onClick }) {
   const statut = STATUT[s.statut] || STATUT.CLOTURE
   const expiry = formatDate(s.dateExpiration)
@@ -262,7 +260,6 @@ function SurveyCardFeatured({ survey: s, onClick }) {
     </button>
   )
 }
-
 function SurveyCardCompact({ survey: s, onClick }) {
   const statut = STATUT[s.statut] || STATUT.CLOTURE
   const expiry = formatDate(s.dateExpiration)
@@ -316,57 +313,6 @@ function SurveyCardCompact({ survey: s, onClick }) {
           </p>
         )}
       </div>
-    </button>
-  )
-}
-
-function SurveyCard({ survey: s, onClick }) {
-  const statut = STATUT[s.statut] || STATUT.CLOTURE
-  const expiry = formatDate(s.dateExpiration)
-  const pct = s.quotaVise ? Math.min(100, Math.round((s.repondantsActuels / s.quotaVise) * 100)) : null
-
-  return (
-    <button
-      onClick={onClick}
-      className="w-full text-left bg-white rounded-2xl p-5 border-2 border-gray-100 hover:border-primary/20 shadow-sm active:scale-[0.98] transition-all"
-    >
-      <div className="flex justify-between items-start mb-4">
-        <div className="w-11 h-11 bg-primary/5 rounded-xl flex items-center justify-center">
-          <i className="ti ti-forms text-xl text-primary" />
-        </div>
-        <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg border uppercase tracking-tight ${statut.cls}`}>
-          {statut.label}
-        </span>
-      </div>
-
-      <h3 className="font-heading font-bold text-sm text-primary leading-tight mb-2 line-clamp-2">{s.titre}</h3>
-      {s.description && (
-        <p className="text-xs text-gray-400 font-medium line-clamp-2 mb-4">{s.description}</p>
-      )}
-
-      <div className="flex items-baseline gap-1.5 mb-4">
-        <span className="text-2xl font-heading font-extrabold text-accent">{fmt(s.recompense)}</span>
-        <span className="text-xs font-bold text-gray-400">FCFA{s.typeRecompense === 'POINTS' ? ' → pts' : ''}</span>
-      </div>
-
-      {pct !== null && (
-        <div className="mb-3">
-          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full rounded-full bg-success transition-all" style={{ width: `${pct}%` }} />
-          </div>
-          <div className="flex justify-between text-[10px] text-gray-400 font-bold mt-1">
-            <span>{s.repondantsActuels}/{s.quotaVise} répondants</span>
-            <span>{pct}%</span>
-          </div>
-        </div>
-      )}
-
-      {expiry && (
-        <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-bold">
-          <i className="ti ti-clock text-xs" />
-          {expiry}
-        </div>
-      )}
     </button>
   )
 }

@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { enregistrerClicBanniere, enregistrerImpressionBanniere } from '../services/api'
 
 export default function PageCarousel({ slides }) {
+  const navigate = useNavigate()
   const [current, setCurrent] = useState(0)
   const [visible, setVisible] = useState(true)
+  const impressionsVues = useRef(new Set())
 
   const goTo = useCallback((idx) => {
     setVisible(false)
@@ -13,11 +17,34 @@ export default function PageCarousel({ slides }) {
   }, [])
 
   useEffect(() => {
+    if (slides.length < 2) return undefined
     const id = setInterval(() => goTo((c) => (c + 1) % slides.length), 4000)
     return () => clearInterval(id)
   }, [goTo, slides.length])
 
+  useEffect(() => {
+    const id = slides[current]?.id
+    if (!id || impressionsVues.current.has(id)) return
+    impressionsVues.current.add(id)
+    enregistrerImpressionBanniere(id)
+  }, [current, slides])
+
+  useEffect(() => {
+    if (current >= slides.length) setCurrent(0)
+  }, [current, slides.length])
+
+  if (slides.length === 0) return null
   const s = slides[current]
+
+  const ouvrirLien = () => {
+    if (!s.lien) return
+    enregistrerClicBanniere(s.id)
+    if (/^https?:\/\//i.test(s.lien)) {
+      window.location.assign(s.lien)
+    } else if (s.lien.startsWith('/')) {
+      navigate(s.lien)
+    }
+  }
 
   return (
     <div className="relative overflow-hidden rounded-xl h-52 md:h-64 w-full">
@@ -48,14 +75,24 @@ export default function PageCarousel({ slides }) {
         <p className="text-white/60 text-sm font-medium max-w-xs leading-relaxed">
           {s.desc}
         </p>
+        {s.lien && (
+          <button
+            type="button"
+            onClick={ouvrirLien}
+            className="mt-4 inline-flex w-fit items-center gap-2 rounded-xl bg-white px-4 py-2 text-xs font-black text-primary shadow-lg transition hover:-translate-y-0.5 hover:bg-accent focus:outline-none focus:ring-2 focus:ring-white/70"
+          >
+            En savoir plus <i className="ti ti-arrow-right" />
+          </button>
+        )}
       </div>
 
       {/* Dots */}
       <div className="absolute bottom-4 left-8 flex items-center gap-1.5">
         {slides.map((_, i) => (
           <button
-            key={i}
+            key={slides[i].id || i}
             onClick={() => goTo(i)}
+            aria-label={`Afficher la bannière ${i + 1}`}
             className={`rounded-full transition-all duration-300 ${i === current ? 'w-6 h-1.5 bg-accent' : 'w-1.5 h-1.5 bg-white/30 hover:bg-white/60'}`}
           />
         ))}

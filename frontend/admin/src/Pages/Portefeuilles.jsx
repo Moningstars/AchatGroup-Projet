@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Loader2, CheckCircle, XCircle, X, Plus, Receipt, Pencil, Check } from 'lucide-react'
-import { Badge, Card, Table, Th, Td, Tr, Spinner, EmptyState, Tabs } from '../components/ui'
+import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, Loader2, CheckCircle, XCircle, Plus, Receipt, Pencil, Check } from 'lucide-react'
+import { Badge, Card, Table, Th, Td, Tr, Spinner, EmptyState, Pagination, Tabs } from '../components/ui'
 import { usePusher } from '../context/PusherContext'
 import {
   getAdminTransactions, getRetraitsEnAttente, approuverRetrait, rejeterRetrait,
@@ -27,7 +28,7 @@ const STATUT_COLOR = { EN_COURS: 'sky', SUCCESS: 'emerald', ECHOUE: 'rose', ANNU
 const STATUT_LABEL = { EN_COURS: 'En cours', SUCCESS: 'Complète', ECHOUE: 'Échec', ANNULE: 'Annulé' }
 const CREDIT_TYPES = ['DEPOT', 'RECOMPENSE', 'REMBOURSEMENT']
 
-function AlimenterModal({ onClose, onSaved }) {
+function AlimenterWalletForm({ onClose, onSaved }) {
   const [montant, setMontant]       = useState('')
   const [description, setDescription] = useState('')
   const [loading, setLoading]       = useState(false)
@@ -50,13 +51,11 @@ function AlimenterModal({ onClose, onSaved }) {
   }
 
   return (
-    <div className="admin-modal-layer fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl sm:p-6">
+    <div className="mx-auto w-full max-w-3xl pb-8">
+      <div className="w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <div className="mb-5 flex items-center justify-between">
           <h3 className="text-base font-bold text-slate-900">Alimenter le wallet plateforme</h3>
-          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 transition">
-            <X size={16} />
-          </button>
+          <button onClick={onClose} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"><ArrowLeft size={14} /> Retour</button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -100,6 +99,7 @@ function AlimenterModal({ onClose, onSaved }) {
 }
 
 export default function Portefeuilles() {
+  const navigate = useNavigate()
   const { on, off } = usePusher()
   const [wallet, setWallet]           = useState(null)
   const [transactions, setTransactions] = useState([])
@@ -107,8 +107,9 @@ export default function Portefeuilles() {
   const [loadingWallet, setLoadingWallet] = useState(true)
   const [loadingTxs, setLoadingTxs]   = useState(true)
   const [tab, setTab]                 = useState(0)
+  const [transactionsPage, setTransactionsPage] = useState(1)
+  const [retraitsPage, setRetraitsPage] = useState(1)
   const [actionId, setActionId]       = useState(null)
-  const [showAlimenter, setShowAlimenter]   = useState(false)
   const [editTaux, setEditTaux]             = useState(false)
   const [tauxInput, setTauxInput]           = useState('')
   const [savingTaux, setSavingTaux]         = useState(false)
@@ -190,15 +191,15 @@ export default function Portefeuilles() {
     finally { setActionId(null) }
   }
 
+  useEffect(() => {
+    setTransactionsPage(1)
+    setRetraitsPage(1)
+  }, [tab])
+  const transactionsPageItems = transactions.slice((transactionsPage - 1) * 10, transactionsPage * 10)
+  const retraitsPageItems = retraits.slice((retraitsPage - 1) * 10, retraitsPage * 10)
+
   return (
     <div className="space-y-4">
-      {showAlimenter && (
-        <AlimenterModal
-          onClose={() => setShowAlimenter(false)}
-          onSaved={() => { setShowAlimenter(false); setLoadingWallet(true); fetchWallet() }}
-        />
-      )}
-
       {/* ── Wallet banner ── */}
       <section className="relative overflow-hidden rounded-3xl bg-violet-600 p-5 text-white shadow-lift sm:p-6">
         <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full border-[44px] border-white/10" />
@@ -210,7 +211,7 @@ export default function Portefeuilles() {
             <h2 className="mt-1 text-sm font-semibold text-slate-200">Wallet OpportuniHub</h2>
           </div>
           <button
-            onClick={() => setShowAlimenter(true)}
+            onClick={() => navigate('/portefeuilles/alimenter')}
             className="flex items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-violet-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
           >
             <Plus size={14} /> Alimenter
@@ -370,7 +371,7 @@ export default function Portefeuilles() {
               ) : transactions.length === 0 ? (
                 <EmptyState icon={Receipt} title="Aucune transaction" />
               ) : (
-                <Table>
+                <><Table>
                   <thead>
                     <tr>
                       <Th>Type</Th>
@@ -382,7 +383,7 @@ export default function Portefeuilles() {
                     </tr>
                   </thead>
                   <tbody>
-                    {transactions.map(t => {
+                    {transactionsPageItems.map(t => {
                       const isCredit = CREDIT_TYPES.includes(t.type)
                       const pointReward = t.type === 'RECOMPENSE' && t.reference?.startsWith('PARRAINAGE_')
                       return (
@@ -402,6 +403,7 @@ export default function Portefeuilles() {
                     })}
                   </tbody>
                 </Table>
+                <Pagination page={transactionsPage} totalItems={transactions.length} onPageChange={setTransactionsPage} /></>
               )}
             </>
           )}
@@ -421,7 +423,7 @@ export default function Portefeuilles() {
                   <p className="text-sm font-semibold text-slate-400">Aucun retrait en attente</p>
                 </div>
               ) : (
-                <Table>
+                <><Table>
                   <thead>
                     <tr>
                       <Th>Utilisateur</Th>
@@ -432,7 +434,7 @@ export default function Portefeuilles() {
                     </tr>
                   </thead>
                   <tbody>
-                    {retraits.map(t => (
+                    {retraitsPageItems.map(t => (
                       <Tr key={t.id}>
                         <Td><span className="font-mono text-[11px] text-slate-500">{t.utilisateurId?.slice(0, 8)}…</span></Td>
                         <Td><span className="font-semibold text-rose-600 tabular-nums">-{fmt(t.montant)} FCFA</span></Td>
@@ -462,6 +464,7 @@ export default function Portefeuilles() {
                     ))}
                   </tbody>
                 </Table>
+                <Pagination page={retraitsPage} totalItems={retraits.length} onPageChange={setRetraitsPage} /></>
               )}
             </>
           )}
@@ -469,4 +472,9 @@ export default function Portefeuilles() {
       </Card>
     </div>
   )
+}
+
+export function AlimenterPortefeuillePage() {
+  const navigate = useNavigate()
+  return <AlimenterWalletForm onClose={() => navigate('/portefeuilles')} onSaved={() => navigate('/portefeuilles')} />
 }

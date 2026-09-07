@@ -1,11 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { usePusher } from './PusherContext'
 import { useAuth } from './AuthContext'
-import { formatMontant } from '../utils/format'
 
 const NotificationsContext = createContext(null)
 
-const fmt = formatMontant
+function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
 
 // Raisons de wallet.credited/wallet.debited qui n'ont pas déjà leur propre notification
 // spécifique (RECOMPENSE a son propre événement Pusher "RECOMPENSE").
@@ -144,7 +143,7 @@ export function NotificationsProvider({ children }) {
 
     Object.entries(handlers).forEach(([event, handler]) => on(event, handler))
     return () => { Object.entries(handlers).forEach(([event, handler]) => off(event, handler)) }
-  }, [isAuthenticated])
+  }, [isAuthenticated, off, on])
 
   const dismissToast = (id) => setToasts(prev => prev.filter(t => t.id !== id))
   const dismissNotification = (id) => setNotifications(prev => prev.filter(n => n.id !== id))

@@ -1,5 +1,4 @@
-import React, { useState } from 'react'
-import { formatMontant } from '../utils/format'
+import { useState } from 'react'
 
 export default function RetraitModal({ open, onClose, onConfirm, balance, loading, error }) {
   const [amount, setAmount] = useState('')
@@ -24,7 +23,7 @@ export default function RetraitModal({ open, onClose, onConfirm, balance, loadin
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg">
         <h4 className="mb-4 text-lg font-semibold">Retirer du portefeuille</h4>
         <div className="mb-4 text-sm text-slate-600">
-          Solde disponible : <span className="font-semibold">{formatMontant(balance)} FCFA</span>
+          Solde disponible : <span className="font-semibold">{balance.toLocaleString()} FCFA</span>
         </div>
         <label className="mb-2 block text-sm font-medium text-slate-700">Montant (FCFA)</label>
         <input

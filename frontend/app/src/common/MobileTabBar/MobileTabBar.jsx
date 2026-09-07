@@ -26,6 +26,7 @@ export default function MobileTabBar() {
               <NavLink
                 key={path}
                 to={path}
+                aria-label={label}
                 className={`-mt-6 w-14 h-14 rounded-full flex items-center justify-center shadow-xl border-4 border-white active:scale-90 transition-transform ${
                   isActive ? 'bg-primary' : 'bg-primary/80'
                 }`}
@@ -39,6 +40,7 @@ export default function MobileTabBar() {
             <NavLink
               key={path}
               to={path}
+              aria-label={label}
               className="flex flex-col items-center gap-1 pt-1 px-3 active:scale-90 transition-transform"
             >
               <Icon

@@ -4,6 +4,7 @@ import com.plateformeopportunites.common.enums.StatutCommanditaire;
 import com.plateformeopportunites.identity.dto.AlimenterCommanditaireRequest;
 import com.plateformeopportunites.identity.dto.CommanditaireResponse;
 import com.plateformeopportunites.identity.dto.CreerCommanditaireRequest;
+import com.plateformeopportunites.identity.dto.ChangerStatutCommanditaireRequest;
 import com.plateformeopportunites.identity.dto.MouvementCommanditaireResponse;
 import com.plateformeopportunites.identity.entity.Commanditaire;
 import com.plateformeopportunites.identity.repository.CommanditaireRepository;
@@ -50,18 +51,22 @@ public class AdminCommanditaireController {
 
     @PatchMapping("/{id}/activer")
     @Transactional
-    public ResponseEntity<CommanditaireResponse> activer(@PathVariable UUID id) {
+    public ResponseEntity<CommanditaireResponse> activer(@PathVariable UUID id,
+                                                          @RequestBody(required = false) ChangerStatutCommanditaireRequest request) {
         return commanditaireRepository.findById(id).map(c -> {
             c.setStatut(StatutCommanditaire.ACTIF);
+            c.setMotifStatut(request == null ? null : request.getMotif());
             return ResponseEntity.ok(toResponse(commanditaireRepository.save(c)));
         }).orElse(ResponseEntity.notFound().build());
     }
 
     @PatchMapping("/{id}/suspendre")
     @Transactional
-    public ResponseEntity<CommanditaireResponse> suspendre(@PathVariable UUID id) {
+    public ResponseEntity<CommanditaireResponse> suspendre(@PathVariable UUID id,
+                                                            @RequestBody(required = false) ChangerStatutCommanditaireRequest request) {
         return commanditaireRepository.findById(id).map(c -> {
             c.setStatut(StatutCommanditaire.SUSPENDU);
+            c.setMotifStatut(request == null ? null : request.getMotif());
             return ResponseEntity.ok(toResponse(commanditaireRepository.save(c)));
         }).orElse(ResponseEntity.notFound().build());
     }

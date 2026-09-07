@@ -61,13 +61,13 @@ export const getOpportunite = (id) =>
   api.get(`/opportunites/${id}`).then((r) => r.data)
 
 export const souscrire = (id, quantite = 1, options = {}) =>
-  api.post(`/opportunites/${id}/souscrire`, null, {
-    params: {
-      quantite,
-      parrainId: options.parrainId || undefined,
-      utiliserPoints: Boolean(options.utiliserPoints),
-    },
-    headers: options.idempotencyKey ? { 'Idempotency-Key': options.idempotencyKey } : undefined,
+  api.post(`/opportunites/${id}/souscrire`, {
+    quantite,
+    parrainId: options.parrainId || undefined,
+    utiliserPoints: Boolean(options.utiliserPoints),
+    reponsesComplementaires: options.reponsesComplementaires || undefined,
+  }, {
+    headers: { 'Idempotency-Key': options.requestId || crypto.randomUUID() },
   }).then((r) => r.data)
 
 export const getMesParticipationsOpportunites = () =>
@@ -141,3 +141,9 @@ export const soumettrePreuve = (sondageId, file) => {
 // Bannières
 export const getBannieres = (page) =>
   api.get('/bannieres', { params: { page } }).then(r => r.data)
+
+export const enregistrerImpressionBanniere = (id) =>
+  id ? api.post(`/bannieres/${id}/impression`).catch(() => null) : Promise.resolve()
+
+export const enregistrerClicBanniere = (id) =>
+  id ? api.post(`/bannieres/${id}/clic`).catch(() => null) : Promise.resolve()

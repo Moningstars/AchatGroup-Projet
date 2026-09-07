@@ -5,9 +5,8 @@ import RechargeModal from './RechargeModal'
 import RetraitModal from './RetraitModal'
 import { getSolde, demanderRetrait, getTransactions, getKycStatus } from '../services/api'
 import { usePusher } from '../context/PusherContext'
-import { formatMontant } from '../utils/format'
 
-const fmt = formatMontant
+function fmt(val) { return Number(val || 0).toLocaleString('fr-FR') }
 
 const TYPE_LABEL = { DEPOT: 'Dépôt', RETRAIT: 'Retrait', GEL: 'Gel fonds', DEBIT: 'Débit achat', REMBOURSEMENT: 'Remboursement', RECOMPENSE: 'Récompense', CONVERSION_POINTS: 'Conversion de points' }
 const TYPE_DOT   = { DEPOT: 'bg-success shadow-[0_0_8px_rgba(39,174,96,0.5)]', RECOMPENSE: 'bg-accent shadow-[0_0_8px_rgba(246,166,35,0.5)]', REMBOURSEMENT: 'bg-indigo-500', RETRAIT: 'bg-blue-500', GEL: 'bg-gray-300', DEBIT: 'bg-urgency', CONVERSION_POINTS: 'bg-yellow-400' }
@@ -45,6 +44,7 @@ export default function Portefeuille() {
   const [isRechargeOpen, setRechargeOpen] = useState(false)
   const [isWithdrawOpen, setWithdrawOpen] = useState(false)
   const [actionError, setActionError]     = useState('')
+  const [retraitLoading, setRetraitLoading] = useState(false)
   const [kycNiveau, setKycNiveau]         = useState(null)
   const [showKycGate, setShowKycGate]     = useState(false)
   const [hideBalance, setHideBalance]     = useState(false)
@@ -65,7 +65,12 @@ export default function Portefeuille() {
   useEffect(() => {
     on('wallet.credited', fetchData)
     on('wallet.debited', fetchData)
-    return () => { off('wallet.credited', fetchData); off('wallet.debited', fetchData) }
+    on('RETRAIT', fetchData)
+    return () => {
+      off('wallet.credited', fetchData)
+      off('wallet.debited', fetchData)
+      off('RETRAIT', fetchData)
+    }
   }, [fetchData, off, on])
 
   useEffect(() => {
@@ -74,15 +79,18 @@ export default function Portefeuille() {
   }, [fetchData])
 
   const handleRetrait = async (amount, coordonnees) => {
+    if (retraitLoading) return
     const val = parseFloat(amount)
     if (!val || val < 1000) { setActionError('Montant minimum 1 000 FCFA'); return }
     if (!coordonnees?.trim()) { setActionError('Numéro requis'); return }
     setActionError('')
+    setRetraitLoading(true)
     try {
       await demanderRetrait(val, coordonnees.trim())
       await fetchData()
       setWithdrawOpen(false)
     } catch (e) { setActionError(e.response?.data?.message || 'Erreur retrait') }
+    finally { setRetraitLoading(false) }
   }
 
   const openRetrait = () => {
@@ -173,7 +181,7 @@ export default function Portefeuille() {
                 <p className="text-[10px] font-black uppercase tracking-[0.25em] opacity-50 mb-1.5">Solde disponible</p>
                 <div className="flex items-baseline gap-2">
                   <span className="text-4xl font-heading font-black tabular-nums tracking-tighter">
-                    {hideBalance ? '••••••' : fmt(solde)}
+                    {hideBalance ? '••••••' : solde.toLocaleString('fr-FR')}
                   </span>
                   <span className="text-base font-bold opacity-50">FCFA</span>
                 </div>
@@ -184,7 +192,7 @@ export default function Portefeuille() {
                 <div>
                   <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-1">Gelé</p>
                   <p className="text-sm font-bold tabular-nums text-accent">
-                    {hideBalance ? '••••' : `${fmt(soldeGele)} FCFA`}
+                    {hideBalance ? '••••' : `${soldeGele.toLocaleString('fr-FR')} FCFA`}
                   </p>
                 </div>
               </div>
@@ -405,7 +413,7 @@ export default function Portefeuille() {
         onClose={() => { setRechargeOpen(false); fetchData() }}
         onSuccess={() => { fetchData() }}
       />
-      <RetraitModal open={isWithdrawOpen} onClose={() => setWithdrawOpen(false)} onConfirm={handleRetrait} balance={solde} />
+      <RetraitModal open={isWithdrawOpen} onClose={() => setWithdrawOpen(false)} onConfirm={handleRetrait} balance={solde} loading={retraitLoading} error={isWithdrawOpen ? actionError : ''} />
 
       {/* KYC Gate Modal */}
       {showKycGate && (

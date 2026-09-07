@@ -36,6 +36,11 @@ public class AdminSondageController {
         return ResponseEntity.ok(sondageService.listerTous());
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<SondageResponse> consulter(@PathVariable UUID id) {
+        return ResponseEntity.ok(sondageService.getById(id));
+    }
+
     @PostMapping
     public ResponseEntity<SondageResponse> creer(Authentication auth,
                                                   @Valid @RequestBody CreerSondageRequest req) {
