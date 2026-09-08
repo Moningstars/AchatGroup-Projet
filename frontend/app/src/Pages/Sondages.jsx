@@ -4,8 +4,7 @@ import { Loader2 } from 'lucide-react'
 import { getSondages, getBannieres, imgUrl } from '../services/api'
 import PageCarousel from '../components/PageCarousel'
 import { useSSE } from '../hooks/useSSE'
-
-function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
+import { formatMontant as fmt } from '../utils/format'
 const REFERENCE_TEMPS = Date.now()
 
 

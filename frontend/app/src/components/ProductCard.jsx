@@ -2,8 +2,7 @@ import { Link } from 'react-router-dom'
 import { imgUrl } from '../services/api'
 import { calculerProgression } from '../utils/progression'
 import { useCountdown } from '../hooks/useCountdown'
-
-function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
+import { formatMontant as fmt } from '../utils/format'
 
 function OpportunityCountdown({ dateExpiration }) {
   const countdown = useCountdown(dateExpiration, 1_000)

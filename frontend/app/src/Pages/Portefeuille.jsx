@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Loader2, Eye, EyeOff, ArrowDownLeft, ArrowUpRight, TrendingUp, ShoppingBag, Wallet, Lock, Coins, Gift } from 'lucide-react'
 import RechargeModal from './RechargeModal'
 import RetraitModal from './RetraitModal'
 import { getSolde, demanderRetrait, getTransactions, getKycStatus } from '../services/api'
 import { usePusher } from '../context/PusherContext'
-
-function fmt(val) { return Number(val || 0).toLocaleString('fr-FR') }
+import { formatMontant as fmt } from '../utils/format'
 
 const TYPE_LABEL = { DEPOT: 'Dépôt', RETRAIT: 'Retrait', GEL: 'Gel fonds', DEBIT: 'Débit achat', REMBOURSEMENT: 'Remboursement', RECOMPENSE: 'Récompense', CONVERSION_POINTS: 'Conversion de points' }
 const TYPE_DOT   = { DEPOT: 'bg-success shadow-[0_0_8px_rgba(39,174,96,0.5)]', RECOMPENSE: 'bg-accent shadow-[0_0_8px_rgba(246,166,35,0.5)]', REMBOURSEMENT: 'bg-indigo-500', RETRAIT: 'bg-blue-500', GEL: 'bg-gray-300', DEBIT: 'bg-urgency', CONVERSION_POINTS: 'bg-yellow-400' }
@@ -36,15 +35,25 @@ const TX_FILTERS = [
 
 export default function Portefeuille() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { on, off } = usePusher()
 
   const [portefeuille, setPortefeuille]   = useState(null)
   const [transactions, setTransactions]   = useState([])
   const [loading, setLoading]             = useState(true)
   const [isRechargeOpen, setRechargeOpen] = useState(false)
+  const [rechargeInitialAmount, setRechargeInitialAmount] = useState('')
   const [isWithdrawOpen, setWithdrawOpen] = useState(false)
   const [actionError, setActionError]     = useState('')
   const [retraitLoading, setRetraitLoading] = useState(false)
+
+  useEffect(() => {
+    if (!location.state?.openRecharge) return
+    setActionError('')
+    setRechargeInitialAmount(String(Math.max(500, Number(location.state.montantManquant || 0))))
+    setRechargeOpen(true)
+    navigate('/portefeuille', { replace: true, state: null })
+  }, [location.state?.montantManquant, location.state?.openRecharge, navigate])
   const [kycNiveau, setKycNiveau]         = useState(null)
   const [showKycGate, setShowKycGate]     = useState(false)
   const [hideBalance, setHideBalance]     = useState(false)
@@ -181,7 +190,7 @@ export default function Portefeuille() {
                 <p className="text-[10px] font-black uppercase tracking-[0.25em] opacity-50 mb-1.5">Solde disponible</p>
                 <div className="flex items-baseline gap-2">
                   <span className="text-4xl font-heading font-black tabular-nums tracking-tighter">
-                    {hideBalance ? '••••••' : solde.toLocaleString('fr-FR')}
+                    {hideBalance ? '••••••' : fmt(solde)}
                   </span>
                   <span className="text-base font-bold opacity-50">FCFA</span>
                 </div>
@@ -192,7 +201,7 @@ export default function Portefeuille() {
                 <div>
                   <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-1">Gelé</p>
                   <p className="text-sm font-bold tabular-nums text-accent">
-                    {hideBalance ? '••••' : `${soldeGele.toLocaleString('fr-FR')} FCFA`}
+                    {hideBalance ? '••••' : `${fmt(soldeGele)} FCFA`}
                   </p>
                 </div>
               </div>
@@ -410,6 +419,7 @@ export default function Portefeuille() {
       {/* ── Modals ── */}
       <RechargeModal
         open={isRechargeOpen}
+        initialAmount={rechargeInitialAmount}
         onClose={() => { setRechargeOpen(false); fetchData() }}
         onSuccess={() => { fetchData() }}
       />

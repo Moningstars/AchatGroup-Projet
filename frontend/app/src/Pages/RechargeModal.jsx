@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Loader2, X, CheckCircle2, AlertCircle, Smartphone, FlaskConical } from 'lucide-react'
 import { initierRechargePaygate, getPaygateMode } from '../services/api'
+import { formatMontant } from '../utils/format'
 
 const NETWORKS = [
   { value: 'FLOOZ', label: 'Moov Money (FLOOZ)', icon: '🟠', color: 'orange' },
@@ -9,7 +10,7 @@ const NETWORKS = [
 
 const QUICK_AMOUNTS = [1000, 2000, 5000, 10000, 25000]
 
-export default function RechargeModal({ open, onClose, onSuccess }) {
+export default function RechargeModal({ open, onClose, onSuccess, initialAmount = '' }) {
   const [step, setStep] = useState('form') // 'form' | 'pending' | 'success' | 'error'
   const [network, setNetwork] = useState('FLOOZ')
   const [telephone, setTelephone] = useState('')
@@ -20,8 +21,10 @@ export default function RechargeModal({ open, onClose, onSuccess }) {
   const [isDevMode, setIsDevMode] = useState(false)
 
   useEffect(() => {
-    if (open) getPaygateMode().then(r => setIsDevMode(r.devMode)).catch(() => {})
-  }, [open])
+    if (!open) return
+    if (initialAmount) setMontant(String(initialAmount))
+    getPaygateMode().then(r => setIsDevMode(r.devMode)).catch(() => {})
+  }, [initialAmount, open])
 
   if (!open) return null
 
@@ -169,7 +172,7 @@ export default function RechargeModal({ open, onClose, onSuccess }) {
                           : 'bg-gray-50 text-gray-500 border-gray-100 hover:border-gray-300'
                       }`}
                     >
-                      {a.toLocaleString('fr-FR')}
+                      {formatMontant(a)}
                     </button>
                   ))}
                 </div>
@@ -201,7 +204,7 @@ export default function RechargeModal({ open, onClose, onSuccess }) {
               >
                 {loading
                   ? <Loader2 size={18} className="animate-spin" />
-                  : <>Payer {montant ? `${Number(montant).toLocaleString('fr-FR')} FCFA` : ''} →</>
+                  : <>Payer {montant ? `${formatMontant(montant)} FCFA` : ''} →</>
                 }
               </button>
             </div>

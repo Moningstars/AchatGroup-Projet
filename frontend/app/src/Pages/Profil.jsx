@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getSolde, getKycStatus } from '../services/api'
-
-function fmt(n) { return Number(n || 0).toLocaleString('fr-FR') }
+import { formatMontant as fmt } from '../utils/format'
 
 const KYC_CONFIG = {
   AUCUN:      { icon: 'ti-id-badge-off',  color: 'bg-orange-50 border-orange-200', iconColor: 'text-orange-500', label: 'Non vérifié',             desc: 'Vérifiez votre identité pour débloquer les retraits.' },

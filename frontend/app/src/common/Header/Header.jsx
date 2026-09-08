@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { usePusher } from '../../context/PusherContext'
 import { useNotifications } from '../../context/NotificationsContext'
 import { getSolde, getKycStatus } from '../../services/api'
+import { formatMontant } from '../../utils/format'
 
 const NOTIF_ICONS = {
   success: <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />,
@@ -140,7 +141,7 @@ const Header = () => {
             {/* Solde — masqué sur mobile pour ne pas couvrir le nom de l'app */}
             <Link to="/portefeuille" className="hidden sm:flex bg-primary text-white pl-2 pr-3 py-1.5 rounded-full text-xs font-bold items-center gap-1.5 shadow-md shadow-primary/10 hover:bg-primary/90 transition-colors active:scale-95">
               <i className="ti ti-wallet text-sm text-accent" />
-              <span className="font-heading">{solde.toLocaleString('fr-FR')} <span className="text-[10px] opacity-70">FCFA</span></span>
+              <span className="font-heading">{formatMontant(solde)} <span className="text-[10px] opacity-70">FCFA</span></span>
             </Link>
 
             {/* Bouton notifications + panneau */}

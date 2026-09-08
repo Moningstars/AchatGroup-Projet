@@ -9,6 +9,7 @@ import {
   passerEligibilite, repondreASondage, getKycStatus, getMesParticipationsSondages,
   imgUrl,
 } from '../services/api'
+import { formatMontant } from '../utils/format'
 import { useAuth } from '../context/AuthContext'
 import { useSSE } from '../hooks/useSSE'
 
@@ -16,7 +17,6 @@ function formatDate(dt) {
   if (!dt) return '—'
   return new Date(dt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
 }
-function formatMontant(n) { return Number(n || 0).toLocaleString('fr-FR') }
 
 // ─── Composant question ───────────────────────────────────────────────────────
 

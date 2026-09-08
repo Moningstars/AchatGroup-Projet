@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom'
 import {
-  ShieldCheck, Users, Loader2, ChevronRight, CheckCircle2, AlertCircle, Layers, Timer, Minus, Plus, Copy, Share2, ShoppingCart, PackageCheck, ExternalLink, Gift, Store, Coins, Sparkles
+  ShieldCheck, Users, Loader2, ChevronRight, CheckCircle2, AlertCircle, Layers, Timer, Minus, Plus, Copy, Share2, ShoppingCart, PackageCheck, ExternalLink, Gift, Store, Coins
 } from 'lucide-react'
 import { getOpportunite, getOpportunites, getMesParticipationsOpportunites, getSolde, souscrire, imgUrl } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useCountdown } from '../hooks/useCountdown'
 import { useSSE } from '../hooks/useSSE'
 import ProductCard from '../components/ProductCard'
+import { formatMontant as fmt } from '../utils/format'
 import { calculerProgression } from '../utils/progression'
 
-function fmt(val) { return Number(val || 0).toLocaleString('fr-FR') }
 function pad(n) { return String(n).padStart(2, '0') }
 
 function WhatsAppLogo({ className = 'h-5 w-5' }) {
@@ -199,6 +199,18 @@ export default function DetailOpportunite() {
       setJoinError(erreurComplementaire)
       return
     }
+    const montantADebiter = Math.max(0, totalCommande - (utiliserPoints ? reductionPoints : 0))
+    const soldeDisponible = Number(wallet?.soldeDisponible ?? wallet?.solde ?? 0)
+    if (wallet && soldeDisponible < montantADebiter) {
+      navigate('/portefeuille', {
+        state: {
+          openRecharge: true,
+          montantManquant: Math.ceil(montantADebiter - soldeDisponible),
+          returnTo: `${window.location.pathname}${window.location.search}`,
+        },
+      })
+      return
+    }
     setJoinError(''); setJoining(true)
     try {
       const ref = searchParams.get('ref')
@@ -215,6 +227,17 @@ export default function DetailOpportunite() {
       // Réactive le bouton après un court instant pour permettre d'ajouter encore de la quantité.
       setTimeout(() => setJoinSuccess(false), 2500)
     } catch (e) {
+      const errorPayload = `${e.response?.data?.code || ''} ${e.response?.data?.motif || ''} ${e.response?.data?.message || ''}`
+      if (/solde|fonds|portefeuille|insuffisant/i.test(errorPayload)) {
+        navigate('/portefeuille', {
+          state: {
+            openRecharge: true,
+            montantManquant: Math.ceil(montantADebiter),
+            returnTo: `${window.location.pathname}${window.location.search}`,
+          },
+        })
+        return
+      }
       setJoinError(e.response?.data?.message || 'Impossible de rejoindre.')
     } finally { setJoining(false) }
   }
@@ -369,10 +392,13 @@ export default function DetailOpportunite() {
           <span className="text-primary/40 truncate max-w-[150px] md:max-w-none">{opportunite.titre}</span>
         </nav>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 lg:items-start">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-12">
+
+          {/* Colonne gauche indépendante : évite que la hauteur des actions repousse la description. */}
+          <div className="contents lg:col-span-7 lg:block lg:space-y-6">
 
           {/* Media : photos + miniatures — toujours en premier, y compris sur mobile */}
-          <div className="order-1 lg:order-none lg:col-start-1 lg:col-span-7 lg:row-start-1 space-y-6">
+          <div className="order-1 space-y-6">
 
             {/* Image principale — hauteur fixe, clic = lightbox */}
             <div
@@ -425,7 +451,7 @@ export default function DetailOpportunite() {
           </div>
 
           {/* Informations réunies dans une seule fiche à onglets. */}
-          <div className="order-3 lg:order-none lg:col-start-1 lg:col-span-7 lg:row-start-2">
+          <div className="order-3">
             <section className="overflow-hidden rounded-3xl border-2 border-gray-100 bg-white">
               <div className="grid grid-cols-2 border-b border-gray-100 bg-gray-50/70 p-1.5">
                 <button type="button" onClick={() => setActiveInfoTab('produit')} className={`flex min-w-0 items-center justify-center gap-2 rounded-2xl px-2 py-3 text-xs font-black transition ${activeInfoTab === 'produit' ? 'bg-white text-primary shadow-sm' : 'text-gray-400 hover:text-primary'}`}>
@@ -483,6 +509,7 @@ export default function DetailOpportunite() {
               </div>
             </section>
           </div>
+          </div>
 
           {/* Lightbox */}
           {lightbox && (
@@ -528,7 +555,7 @@ export default function DetailOpportunite() {
           )}
 
           {/* Info : titre, prix, progression, quantité, CTA — passe avant les détails produit/fournisseur sur mobile */}
-          <div className="order-2 lg:order-none lg:col-start-8 lg:col-span-5 lg:row-start-1 lg:row-span-2 flex flex-col gap-5 lg:sticky lg:top-24">
+          <div className="order-2 flex flex-col gap-5 lg:col-span-5 lg:sticky lg:top-24">
 
             {/* Status + catégorie */}
             <div className="flex items-center gap-2 flex-wrap">
@@ -746,11 +773,11 @@ export default function DetailOpportunite() {
 
             {/* Partage et parrainage — toujours déplié */}
             <div className="overflow-hidden rounded-2xl border-2 border-primary/10 bg-white shadow-soft">
-              <div className="flex items-start gap-3 p-3">
+              <div className="flex flex-col items-center justify-center gap-2 p-3 text-center sm:flex-row sm:text-left">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/5 text-primary">
                   {dejaSouscrit ? <Gift size={18} /> : <Share2 size={18} />}
                 </div>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0">
                   <p className="text-xs font-black leading-5 text-primary">
                     {dejaSouscrit ? 'Invitez vos proches et gagnez des points' : "Partager l'offre avec vos proches"}
                   </p>
@@ -768,7 +795,7 @@ export default function DetailOpportunite() {
                     Votre lien personnel vous récompense lorsqu’un proche rejoint cette offre et finalise son achat.
                   </p>
                 )}
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap justify-center gap-2">
                   <ShareIconButton label="Partager via WhatsApp" caption="WhatsApp" onClick={() => handleSocialShare('whatsapp')} className="bg-[#25D366] text-white shadow-sm shadow-emerald-200 hover:bg-[#20bd5a]"><WhatsAppLogo /></ShareIconButton>
                   <ShareIconButton label="Partager via Facebook" caption="Facebook" onClick={() => handleSocialShare('facebook')} className="bg-[#1877F2] text-white shadow-sm shadow-blue-200 hover:bg-[#1268d3]"><FacebookLogo /></ShareIconButton>
                   <ShareIconButton label="Partager via TikTok" caption="TikTok" onClick={() => handleSocialShare('tiktok')} className="bg-slate-950 text-white shadow-sm hover:bg-slate-800"><TikTokLogo /></ShareIconButton>
@@ -806,32 +833,6 @@ export default function DetailOpportunite() {
               {joinError && <p className="text-urgency text-xs font-bold text-center bg-urgency/5 p-3 rounded-xl border border-urgency/10">{joinError}</p>}
             </div>
           </div>
-
-          {/* Fiche produit enrichie — sous la galerie en desktop, tout en bas en mobile */}
-          {(opportunite.specsPointsForts || opportunite.specsCasUsage || opportunite.specsFinePrint) && (
-            <div className="lg:col-span-7 bg-white rounded-2xl border-2 border-gray-100 p-5 space-y-3">
-              <div className="flex items-center gap-2">
-                <Sparkles size={14} className="text-primary" />
-                <span className="text-[10px] font-black text-primary uppercase tracking-widest">Points clés</span>
-              </div>
-              {opportunite.specsPointsForts && (
-                <ul className="space-y-1.5">
-                  {opportunite.specsPointsForts.split('\n').filter(Boolean).map((line, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                      <CheckCircle2 size={14} className="text-success shrink-0 mt-0.5" />
-                      {line}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {opportunite.specsCasUsage && (
-                <p className="text-sm text-gray-500 leading-relaxed">{opportunite.specsCasUsage}</p>
-              )}
-              {opportunite.specsFinePrint && (
-                <p className="text-[11px] text-gray-400 italic border-t border-gray-50 pt-2.5">{opportunite.specsFinePrint}</p>
-              )}
-            </div>
-          )}
 
         </div>
 
