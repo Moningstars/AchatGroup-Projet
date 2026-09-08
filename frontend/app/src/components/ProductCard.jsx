@@ -52,7 +52,7 @@ const ProductCard = ({ opportunity }) => {
   return (
     <Link
       to={`/opportunity/${id}`}
-      className="group flex aspect-square min-w-0 flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-gray-200 hover:shadow-xl hover:shadow-primary/10 active:scale-[0.99]"
+      className="group flex h-[22rem] min-w-0 flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-gray-200 hover:shadow-xl hover:shadow-primary/10 active:scale-[0.99] sm:h-auto sm:aspect-[4/5]"
     >
       {/* Une grande image, comme une fiche produit de catalogue. */}
       <div className="relative min-h-0 w-full flex-[1.35] overflow-hidden bg-gray-100">
