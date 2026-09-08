@@ -27,6 +27,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
@@ -57,12 +58,13 @@ public class PaygateService {
     public InitierRechargePaygateResponse initierRecharge(UUID utilisateurId,
                                                            InitierRechargePaygateRequest req) {
         String identifier = UUID.randomUUID().toString();
+        String telephone = normaliserTelephone(req.getTelephone());
 
         PaiementPaygate paiement = PaiementPaygate.builder()
                 .utilisateurId(utilisateurId)
                 .identifier(identifier)
                 .montant(req.getMontant())
-                .telephone(req.getTelephone())
+                .telephone(telephone)
                 .network(req.getNetwork())
                 .statut(StatutPaiementPaygate.EN_ATTENTE)
                 .build();
@@ -81,47 +83,120 @@ public class PaygateService {
         // ── MODE PRODUCTION : appel réel à l'API PayGate ──
         Map<String, Object> body = Map.of(
                 "auth_token", authToken,
-                "phone_number", req.getTelephone(),
+                "phone_number", telephone,
                 "amount", req.getMontant().intValue(),
-                "description", "Recharge portefeuille OpportuniHub",
+                "description", "Recharge portefeuille Miitcha Deal",
                 "identifier", identifier,
                 "network", req.getNetwork()
         );
 
         try {
             String jsonBody = objectMapper.writeValueAsString(body);
-            HttpClient client = HttpClient.newHttpClient();
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(apiUrl))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
-                    .build();
-
-            HttpResponse<String> response = client.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-            JsonNode json = objectMapper.readTree(response.body());
+            HttpResponse<String> response = envoyerPaygate(apiUrl, body);
+            JsonNode json = lireReponsePaygate(response);
 
             int status = json.path("status").asInt(-1);
             String txReference = json.path("tx_reference").asText(null);
 
             paiement.setTxReference(txReference);
 
-            if (status != 0) {
+            if (status != 0 || txReference == null || txReference.isBlank()) {
                 paiement.setStatut(StatutPaiementPaygate.ECHOUE);
                 paiementPaygateRepository.save(paiement);
                 return new InitierRechargePaygateResponse(identifier, txReference, status,
-                        resolvePaygateError(status));
+                        resolveInitiationError(status));
             }
 
             paiementPaygateRepository.save(paiement);
-            return new InitierRechargePaygateResponse(identifier, txReference, 0,
-                    "Paiement initié. Confirmez sur votre téléphone.");
+            return new InitierRechargePaygateResponse(identifier, txReference, 2,
+                    "Demande envoyée. Confirmez le paiement TMoney sur votre téléphone.");
 
-        } catch (IOException | InterruptedException e) {
-            log.error("Erreur appel PayGate", e);
+        } catch (IOException e) {
+            log.error("Erreur appel PayGate : {}", e.getMessage());
             paiement.setStatut(StatutPaiementPaygate.ECHOUE);
             paiementPaygateRepository.save(paiement);
-            throw new RuntimeException("Impossible de contacter PayGate. Réessayez.");
+            throw new IllegalStateException("PayGate est momentanément indisponible. Réessayez dans quelques instants.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            paiement.setStatut(StatutPaiementPaygate.ECHOUE);
+            paiementPaygateRepository.save(paiement);
+            throw new IllegalStateException("La demande de paiement a été interrompue. Réessayez.");
         }
+    }
+
+    @Transactional
+    public InitierRechargePaygateResponse verifierStatut(UUID utilisateurId, String identifier) {
+        PaiementPaygate paiement = paiementPaygateRepository
+                .findByIdentifierAndUtilisateurId(identifier, utilisateurId)
+                .orElseThrow(() -> new IllegalArgumentException("Transaction de recharge introuvable."));
+
+        if (paiement.getStatut() == StatutPaiementPaygate.CONFIRME) {
+            return statutResponse(paiement, 0, "Recharge confirmée. Votre portefeuille a été crédité.");
+        }
+        if (paiement.getStatut() == StatutPaiementPaygate.ECHOUE) {
+            return statutResponse(paiement, 6, "Cette recharge a échoué ou a été annulée.");
+        }
+        if (devMode) {
+            return statutResponse(paiement, 2, "Confirmation du paiement en cours.");
+        }
+
+        Map<String, Object> body = Map.of(
+                "auth_token", authToken,
+                "tx_reference", paiement.getTxReference()
+        );
+
+        try {
+            String statusUrl = apiUrl.replaceFirst("/pay/?$", "/status");
+            HttpResponse<String> response = envoyerPaygate(statusUrl, body);
+            JsonNode json = lireReponsePaygate(response);
+            int status = json.path("status").asInt(-1);
+
+            if (status == 0) {
+                String paymentReference = json.path("payment_reference").asText(paiement.getTxReference());
+                crediterPortefeuille(paiement, paymentReference);
+                return statutResponse(paiement, 0, "Paiement confirmé. Votre portefeuille a été crédité.");
+            }
+            if (status == 4 || status == 6) {
+                paiement.setStatut(StatutPaiementPaygate.ECHOUE);
+                paiementPaygateRepository.save(paiement);
+                String message = status == 4 ? "La demande TMoney a expiré." : "Le paiement TMoney a été annulé.";
+                return statutResponse(paiement, status, message);
+            }
+            return statutResponse(paiement, 2, "En attente de votre confirmation TMoney.");
+        } catch (IOException e) {
+            log.warn("Vérification PayGate indisponible pour {} : {}", identifier, e.getMessage());
+            return statutResponse(paiement, 2, "Paiement en cours de vérification.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return statutResponse(paiement, 2, "Paiement en cours de vérification.");
+        }
+    }
+
+    private HttpResponse<String> envoyerPaygate(String url, Map<String, Object> body)
+            throws IOException, InterruptedException {
+        String jsonBody = objectMapper.writeValueAsString(body);
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(30))
+                    .header("Accept", "application/json")
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                    .build();
+        return client.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private JsonNode lireReponsePaygate(HttpResponse<String> response) throws IOException {
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new IOException("Réponse HTTP " + response.statusCode());
+        }
+        JsonNode json = objectMapper.readTree(response.body());
+        if (!json.isObject() || !json.has("status")) {
+            throw new IOException("Réponse PayGate invalide");
+        }
+        return json;
     }
 
     @Transactional
@@ -175,12 +250,28 @@ public class PaygateService {
         );
     }
 
-    private String resolvePaygateError(int status) {
+    private InitierRechargePaygateResponse statutResponse(PaiementPaygate paiement, int status, String message) {
+        return new InitierRechargePaygateResponse(
+                paiement.getIdentifier(), paiement.getTxReference(), status, message);
+    }
+
+    private String normaliserTelephone(String valeur) {
+        String telephone = valeur == null ? "" : valeur.replaceAll("\\D", "");
+        if (telephone.startsWith("228") && telephone.length() == 11) {
+            telephone = telephone.substring(3);
+        }
+        if (!telephone.matches("\\d{8}")) {
+            throw new IllegalArgumentException("Le numéro doit contenir exactement 8 chiffres togolais.");
+        }
+        return telephone;
+    }
+
+    private String resolveInitiationError(int status) {
         return switch (status) {
-            case 2 -> "Token d'authentification invalide.";
-            case 4 -> "Paramètres de paiement invalides.";
-            case 6 -> "Paiement en double détecté.";
-            default -> "Erreur PayGate (code " + status + ").";
+            case 2 -> "Le service de paiement est mal configuré. Contactez le support.";
+            case 4 -> "Numéro ou montant refusé par PayGate. Vérifiez le réseau choisi et le numéro.";
+            case 6 -> "Cette demande existe déjà. Relancez une nouvelle recharge.";
+            default -> "PayGate a renvoyé une réponse invalide. Réessayez dans quelques instants.";
         };
     }
 }

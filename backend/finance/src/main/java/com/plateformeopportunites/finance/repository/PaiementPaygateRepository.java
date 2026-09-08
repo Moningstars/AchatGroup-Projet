@@ -8,4 +8,5 @@ import java.util.UUID;
 
 public interface PaiementPaygateRepository extends JpaRepository<PaiementPaygate, UUID> {
     Optional<PaiementPaygate> findByIdentifier(String identifier);
+    Optional<PaiementPaygate> findByIdentifierAndUtilisateurId(String identifier, UUID utilisateurId);
 }

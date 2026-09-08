@@ -39,6 +39,15 @@ public class PaygateController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Vérifier le statut réel d'une recharge PayGate")
+    @GetMapping("/api/wallet/recharger/paygate/{identifier}/status")
+    public ResponseEntity<InitierRechargePaygateResponse> verifierStatut(
+            Authentication auth,
+            @PathVariable String identifier) {
+        UUID userId = UUID.fromString(auth.getName());
+        return ResponseEntity.ok(paygateService.verifierStatut(userId, identifier));
+    }
+
     @Operation(summary = "Webhook de confirmation PayGate (endpoint public)")
     @PostMapping("/api/paiements/webhook/paygate")
     public ResponseEntity<Void> webhook(@RequestBody PaygateWebhookPayload payload) {

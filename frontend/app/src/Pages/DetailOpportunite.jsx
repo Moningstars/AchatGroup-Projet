@@ -3,7 +3,7 @@ import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom'
 import {
   ShieldCheck, Users, Loader2, ChevronRight, CheckCircle2, AlertCircle, Layers, Timer, Minus, Plus, Copy, Share2, ShoppingCart, PackageCheck, ExternalLink, Gift, Store, Coins
 } from 'lucide-react'
-import { getOpportunite, getOpportunites, getMesParticipationsOpportunites, getSolde, souscrire, imgUrl } from '../services/api'
+import { getApiErrorMessage, getOpportunite, getOpportunites, getMesParticipationsOpportunites, getSolde, souscrire, imgUrl } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useCountdown } from '../hooks/useCountdown'
 import { useSSE } from '../hooks/useSSE'
@@ -240,7 +240,7 @@ export default function DetailOpportunite() {
         })
         return
       }
-      setJoinError(e.response?.data?.message || 'Impossible de rejoindre.')
+      setJoinError(getApiErrorMessage(e, 'La réservation n’a pas pu être effectuée. Réessayez.'))
     } finally { setJoining(false) }
   }
 

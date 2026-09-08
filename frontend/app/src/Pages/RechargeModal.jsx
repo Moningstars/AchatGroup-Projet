@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Loader2, X, CheckCircle2, AlertCircle, Smartphone, FlaskConical } from 'lucide-react'
-import { initierRechargePaygate, getPaygateMode } from '../services/api'
+import { getApiErrorMessage, initierRechargePaygate, getPaygateMode, verifierRechargePaygate } from '../services/api'
 import { formatMontant } from '../utils/format'
 
 const NETWORKS = [
@@ -18,6 +18,7 @@ export default function RechargeModal({ open, onClose, onSuccess, onReturn, init
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [txRef, setTxRef] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [isDevMode, setIsDevMode] = useState(false)
 
   useEffect(() => {
@@ -25,6 +26,47 @@ export default function RechargeModal({ open, onClose, onSuccess, onReturn, init
     if (initialAmount) setMontant(String(initialAmount))
     getPaygateMode().then(r => setIsDevMode(r.devMode)).catch(() => {})
   }, [initialAmount, open])
+
+  useEffect(() => {
+    if (!open || step !== 'pending' || !identifier) return
+
+    let cancelled = false
+    let checks = 0
+    const verifier = async () => {
+      try {
+        const result = await verifierRechargePaygate(identifier)
+        if (cancelled) return
+        if (result.paygateStatus === 0) {
+          setStep('success')
+          onSuccess?.()
+          return
+        }
+        if (result.paygateStatus === 4 || result.paygateStatus === 6) {
+          setError(result.message || 'Le paiement TMoney n’a pas été validé.')
+          setStep('form')
+          return
+        }
+        checks += 1
+        if (checks >= 40) {
+          setError('La confirmation prend plus de temps que prévu. Vérifiez votre solde TMoney puis réessayez.')
+          setStep('form')
+        }
+      } catch (e) {
+        checks += 1
+        if (!cancelled && checks >= 3) {
+          setError(getApiErrorMessage(e, 'Impossible de vérifier le paiement pour le moment.'))
+        }
+      }
+    }
+
+    const firstCheck = window.setTimeout(verifier, 2500)
+    const interval = window.setInterval(verifier, 3000)
+    return () => {
+      cancelled = true
+      window.clearTimeout(firstCheck)
+      window.clearInterval(interval)
+    }
+  }, [identifier, onSuccess, open, step])
 
   if (!open) return null
 
@@ -34,6 +76,7 @@ export default function RechargeModal({ open, onClose, onSuccess, onReturn, init
     setTelephone('')
     setError('')
     setTxRef('')
+    setIdentifier('')
   }
 
   const handleClose = () => {
@@ -49,12 +92,17 @@ export default function RechargeModal({ open, onClose, onSuccess, onReturn, init
   const handleSubmit = async () => {
     const amt = Number(montant)
     if (!montant || amt < 500) { setError('Montant minimum : 500 FCFA'); return }
-    if (!telephone.trim()) { setError('Entrez votre numéro de téléphone'); return }
+    const numero = telephone.replace(/\D/g, '').replace(/^228(?=\d{8}$)/, '')
+    if (!/^\d{8}$/.test(numero)) {
+      setError('Entrez les 8 chiffres de votre numéro togolais.')
+      return
+    }
 
     setError('')
     setLoading(true)
     try {
-      const res = await initierRechargePaygate(amt, network, telephone.trim())
+      const res = await initierRechargePaygate(amt, network, numero)
+      setIdentifier(res.identifier || '')
       if (res.paygateStatus === 0) {
         setTxRef(res.txReference || res.identifier)
         // En mode dev le solde est crédité immédiatement, on passe direct à success
@@ -64,19 +112,39 @@ export default function RechargeModal({ open, onClose, onSuccess, onReturn, init
         } else {
           setStep('pending')
         }
+      } else if (res.paygateStatus === 2 && res.identifier) {
+        setTxRef(res.txReference || res.identifier)
+        setStep('pending')
       } else {
         setError(res.message || 'Échec du paiement')
       }
     } catch (e) {
-      setError(e.response?.data?.message || 'Erreur réseau. Réessayez.')
+      setError(getApiErrorMessage(e, 'La recharge n’a pas pu être lancée. Réessayez.'))
     } finally {
       setLoading(false)
     }
   }
 
-  const handleConfirmSuccess = () => {
-    setStep('success')
-    if (onSuccess) onSuccess()
+  const handleVerifyNow = async () => {
+    if (!identifier || loading) return
+    setLoading(true)
+    setError('')
+    try {
+      const result = await verifierRechargePaygate(identifier)
+      if (result.paygateStatus === 0) {
+        setStep('success')
+        onSuccess?.()
+      } else if (result.paygateStatus === 4 || result.paygateStatus === 6) {
+        setError(result.message || 'Le paiement n’a pas été validé.')
+        setStep('form')
+      } else {
+        setError('Paiement toujours en attente. Confirmez la demande TMoney sur votre téléphone.')
+      }
+    } catch (e) {
+      setError(getApiErrorMessage(e, 'Impossible de vérifier le paiement pour le moment.'))
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -256,12 +324,14 @@ export default function RechargeModal({ open, onClose, onSuccess, onReturn, init
               )}
               <div className="flex flex-col gap-2">
                 <button
-                  onClick={handleConfirmSuccess}
+                  onClick={handleVerifyNow}
+                  disabled={loading}
                   className="w-full bg-success text-white font-black py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
                 >
-                  <CheckCircle2 size={18} />
-                  J'ai confirmé le paiement
+                  {loading ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                  Vérifier mon paiement
                 </button>
+                {error && <p className="text-xs font-bold text-amber-600">{error}</p>}
                 <button
                   onClick={handleClose}
                   className="w-full text-gray-400 font-black text-xs uppercase tracking-widest py-2 hover:text-primary transition-colors"

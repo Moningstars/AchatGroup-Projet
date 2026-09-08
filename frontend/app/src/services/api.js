@@ -10,6 +10,21 @@ export const imgUrl = (url) =>
 
 export const api = axios.create({ baseURL: BASE_URL })
 
+export const getApiErrorMessage = (error, fallback = 'Une erreur est survenue. Réessayez.') => {
+  const status = error?.response?.status
+  const serverMessage = error?.response?.data?.message
+  if (status === 401) return 'Votre session a expiré. Reconnectez-vous puis réessayez.'
+  if (status === 403) return 'Cette action n’est pas autorisée pour votre compte.'
+  if (status >= 500) return 'Le service est momentanément indisponible. Réessayez dans quelques instants.'
+  if (typeof serverMessage === 'string' && serverMessage.trim()) return serverMessage
+  if (!error?.response) return 'Connexion au serveur impossible. Vérifiez votre réseau puis réessayez.'
+  return fallback
+}
+
+const createRequestId = () =>
+  globalThis.crypto?.randomUUID?.()
+  || `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem(TOKEN_KEY)
   if (token) config.headers.Authorization = `Bearer ${token}`
@@ -67,7 +82,7 @@ export const souscrire = (id, quantite = 1, options = {}) =>
     utiliserPoints: Boolean(options.utiliserPoints),
     reponsesComplementaires: options.reponsesComplementaires || undefined,
   }, {
-    headers: { 'Idempotency-Key': options.requestId || crypto.randomUUID() },
+    headers: { 'Idempotency-Key': options.requestId || createRequestId() },
   }).then((r) => r.data)
 
 export const getMesParticipationsOpportunites = () =>
@@ -86,6 +101,9 @@ export const recharger = (montant, moyenPaiement, reference) =>
 
 export const initierRechargePaygate = (montant, network, telephone) =>
   api.post('/wallet/recharger/paygate', { montant, network, telephone }).then((r) => r.data)
+
+export const verifierRechargePaygate = (identifier) =>
+  api.get(`/wallet/recharger/paygate/${identifier}/status`).then((r) => r.data)
 
 export const getPaygateMode = () =>
   api.get('/wallet/recharger/paygate/mode').then((r) => r.data)
