@@ -11,11 +11,32 @@ import {
 } from '../services/api'
 import { formatMontant } from '../utils/format'
 import { useAuth } from '../context/AuthContext'
+import { useCountdown } from '../hooks/useCountdown'
 import { useSSE } from '../hooks/useSSE'
+
+const SURVEY_FALLBACK_IMAGES = ['/hero/slide-2.jpg', '/hero/slide-3.jpg', '/hero/slide-4.jpg']
 
 function formatDate(dt) {
   if (!dt) return '—'
   return new Date(dt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
+}
+
+function surveyImage(sondage) {
+  if (sondage?.imageUrl) return imgUrl(sondage.imageUrl)
+  const key = String(sondage?.id || sondage?.titre || 'sondage')
+  const index = [...key].reduce((total, char) => total + char.charCodeAt(0), 0) % SURVEY_FALLBACK_IMAGES.length
+  return SURVEY_FALLBACK_IMAGES[index]
+}
+
+function useFallbackImage(event) {
+  const image = event.currentTarget
+  if (image.dataset.fallbackApplied === 'true') return
+  image.dataset.fallbackApplied = 'true'
+  image.src = '/hero/slide-2.jpg'
+}
+
+function pad(value) {
+  return String(value || 0).padStart(2, '0')
 }
 
 // ─── Composant question ───────────────────────────────────────────────────────
@@ -133,13 +154,16 @@ function SondageCard({ sondage }) {
 
   return (
     <div className="bg-primary rounded-3xl text-white shadow-2xl shadow-primary/25 relative overflow-hidden">
-      {/* Image de couverture en fond */}
-      {sondage.imageUrl && (
-        <div className="absolute inset-0 z-0">
-          <img src={imgUrl(sondage.imageUrl)} alt="" className="w-full h-full object-cover opacity-30" />
-          <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/90 to-primary/60" />
-        </div>
-      )}
+      {/* Image de couverture en fond, avec repli visuel si aucune image n'est renseignée. */}
+      <div className="absolute inset-0 z-0">
+        <img
+          src={surveyImage(sondage)}
+          alt=""
+          onError={useFallbackImage}
+          className="h-full w-full object-cover opacity-40"
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/95 via-primary/85 to-primary/65" />
+      </div>
 
       <div className="absolute -right-12 -top-12 w-40 h-40 bg-accent/10 rounded-full blur-2xl pointer-events-none z-0" />
 
@@ -172,11 +196,55 @@ function SondageCard({ sondage }) {
             <p className="text-[10px] text-white/40 font-bold mt-1">{pct}% atteint</p>
           </div>
         )}
-        {sondage.dateExpiration && (
-          <div className="flex items-center gap-1.5 text-[11px] text-white/40 font-bold">
-            <Clock size={11} /> Expire le {formatDate(sondage.dateExpiration)}
+        {sondage.dateExpiration && <DeadlineCountdown dateExpiration={sondage.dateExpiration} />}
+      </div>
+    </div>
+  )
+}
+
+function DeadlineCountdown({ dateExpiration }) {
+  const countdown = useCountdown(dateExpiration)
+  if (!countdown) return null
+
+  if (countdown.expired) {
+    return (
+      <div className="flex items-center gap-2 border-t border-white/10 pt-3 text-xs font-black text-white/60">
+        <Clock size={14} className="text-accent" />
+        Sondage terminé
+      </div>
+    )
+  }
+
+  const units = [
+    ['Jours', countdown.days],
+    ['Heures', countdown.hours],
+    ['Min', countdown.minutes],
+    ['Sec', countdown.seconds],
+  ]
+
+  return (
+    <div className="border-t border-white/10 pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-primary shadow-lg shadow-accent/20">
+            <Clock size={16} />
+          </span>
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">Temps restant</p>
+            <p className="text-[10px] font-bold text-white/60">Jusqu'au {formatDate(dateExpiration)}</p>
           </div>
-        )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          {units.map(([label, value], index) => (
+            <div key={label} className="flex items-center gap-1.5">
+              {index > 0 && <span className="font-heading text-sm font-black text-white/35">:</span>}
+              <div className="min-w-10 bg-white/10 px-2 py-1.5 text-center backdrop-blur-sm ring-1 ring-white/10">
+                <span className="block font-heading text-sm font-black leading-none text-white tabular-nums">{pad(value)}</span>
+                <span className="mt-1 block text-[7px] font-black uppercase tracking-wider text-white/45">{label}</span>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
