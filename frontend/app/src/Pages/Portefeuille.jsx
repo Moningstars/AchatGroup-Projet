@@ -43,6 +43,7 @@ export default function Portefeuille() {
   const [loading, setLoading]             = useState(true)
   const [isRechargeOpen, setRechargeOpen] = useState(false)
   const [rechargeInitialAmount, setRechargeInitialAmount] = useState('')
+  const [rechargeContext, setRechargeContext] = useState(null)
   const [isWithdrawOpen, setWithdrawOpen] = useState(false)
   const [actionError, setActionError]     = useState('')
   const [retraitLoading, setRetraitLoading] = useState(false)
@@ -51,9 +52,21 @@ export default function Portefeuille() {
     if (!location.state?.openRecharge) return
     setActionError('')
     setRechargeInitialAmount(String(Math.max(500, Number(location.state.montantManquant || 0))))
+    setRechargeContext({
+      insufficientFunds: true,
+      opportunityTitle: location.state.opportunityTitle || '',
+      returnTo: location.state.returnTo || '',
+      missingAmount: Math.max(0, Number(location.state.montantManquant || 0)),
+    })
     setRechargeOpen(true)
     navigate('/portefeuille', { replace: true, state: null })
-  }, [location.state?.montantManquant, location.state?.openRecharge, navigate])
+  }, [
+    location.state?.montantManquant,
+    location.state?.openRecharge,
+    location.state?.opportunityTitle,
+    location.state?.returnTo,
+    navigate,
+  ])
   const [kycNiveau, setKycNiveau]         = useState(null)
   const [showKycGate, setShowKycGate]     = useState(false)
   const [hideBalance, setHideBalance]     = useState(false)
@@ -227,7 +240,12 @@ export default function Portefeuille() {
             {/* Boutons d'action */}
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => { setActionError(''); setRechargeOpen(true) }}
+                onClick={() => {
+                  setActionError('')
+                  setRechargeInitialAmount('')
+                  setRechargeContext(null)
+                  setRechargeOpen(true)
+                }}
                 className="bg-primary text-white py-4 rounded-2xl flex flex-col items-center gap-1.5 hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20"
               >
                 <ArrowDownLeft size={20} />
@@ -420,8 +438,16 @@ export default function Portefeuille() {
       <RechargeModal
         open={isRechargeOpen}
         initialAmount={rechargeInitialAmount}
-        onClose={() => { setRechargeOpen(false); fetchData() }}
+        context={rechargeContext}
+        onClose={() => { setRechargeOpen(false); setRechargeContext(null); fetchData() }}
         onSuccess={() => { fetchData() }}
+        onReturn={() => {
+          const returnTo = rechargeContext?.returnTo
+          setRechargeOpen(false)
+          setRechargeContext(null)
+          fetchData()
+          if (returnTo?.startsWith('/')) navigate(returnTo)
+        }}
       />
       <RetraitModal open={isWithdrawOpen} onClose={() => setWithdrawOpen(false)} onConfirm={handleRetrait} balance={solde} loading={retraitLoading} error={isWithdrawOpen ? actionError : ''} />
 

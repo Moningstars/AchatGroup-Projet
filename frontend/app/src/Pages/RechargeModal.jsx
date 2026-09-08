@@ -10,7 +10,7 @@ const NETWORKS = [
 
 const QUICK_AMOUNTS = [1000, 2000, 5000, 10000, 25000]
 
-export default function RechargeModal({ open, onClose, onSuccess, initialAmount = '' }) {
+export default function RechargeModal({ open, onClose, onSuccess, onReturn, initialAmount = '', context = null }) {
   const [step, setStep] = useState('form') // 'form' | 'pending' | 'success' | 'error'
   const [network, setNetwork] = useState('FLOOZ')
   const [telephone, setTelephone] = useState('')
@@ -39,6 +39,11 @@ export default function RechargeModal({ open, onClose, onSuccess, initialAmount 
   const handleClose = () => {
     reset()
     onClose()
+  }
+
+  const handleReturn = () => {
+    reset()
+    onReturn()
   }
 
   const handleSubmit = async () => {
@@ -100,6 +105,26 @@ export default function RechargeModal({ open, onClose, onSuccess, initialAmount 
           {/* ── FORM ── */}
           {step === 'form' && (
             <div className="space-y-5">
+              {context?.insufficientFunds && (
+                <div className="flex items-start gap-3 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3.5">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent text-primary">
+                    <AlertCircle size={18} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-heading text-sm font-black text-primary">Solde insuffisant</p>
+                    <p className="mt-0.5 text-xs font-medium leading-relaxed text-gray-600">
+                      Rechargez votre portefeuille pour continuer à profiter
+                      {context.opportunityTitle ? <> de <span className="font-black text-primary">« {context.opportunityTitle} »</span></> : ' de cette opportunité'}.
+                    </p>
+                    {context.missingAmount > 0 && (
+                      <p className="mt-1.5 text-[11px] font-black text-accent">
+                        Montant manquant : {formatMontant(context.missingAmount)} FCFA
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Bandeau mode test */}
               {isDevMode && (
                 <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
@@ -264,12 +289,21 @@ export default function RechargeModal({ open, onClose, onSuccess, initialAmount 
                   }
                 </p>
               </div>
-              <button
-                onClick={handleClose}
-                className="w-full bg-primary text-white font-black py-3.5 rounded-2xl active:scale-[0.98] transition-all"
-              >
-                Fermer
-              </button>
+              {context?.returnTo && onReturn ? (
+                <button
+                  onClick={handleReturn}
+                  className="w-full rounded-2xl bg-primary py-3.5 font-black text-white transition-all active:scale-[0.98]"
+                >
+                  Continuer avec cette opportunité →
+                </button>
+              ) : (
+                <button
+                  onClick={handleClose}
+                  className="w-full rounded-2xl bg-primary py-3.5 font-black text-white transition-all active:scale-[0.98]"
+                >
+                  Fermer
+                </button>
+              )}
             </div>
           )}
         </div>

@@ -206,6 +206,7 @@ export default function DetailOpportunite() {
         state: {
           openRecharge: true,
           montantManquant: Math.ceil(montantADebiter - soldeDisponible),
+          opportunityTitle: opportunite.titre,
           returnTo: `${window.location.pathname}${window.location.search}`,
         },
       })
@@ -233,6 +234,7 @@ export default function DetailOpportunite() {
           state: {
             openRecharge: true,
             montantManquant: Math.ceil(montantADebiter),
+            opportunityTitle: opportunite.titre,
             returnTo: `${window.location.pathname}${window.location.search}`,
           },
         })
