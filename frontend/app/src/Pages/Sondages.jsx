@@ -95,7 +95,7 @@ export default function Sondages() {
       <div className="sticky top-0 z-40 glass-header border-b border-gray-100/70 px-4 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="font-heading font-extrabold text-xl tracking-tight text-primary leading-none">Sondages</h1>
+            <h1 className="font-heading font-extrabold text-xl tracking-tight text-primary leading-none">Miitchs i</h1>
             <p className="text-[11px] text-success font-bold uppercase tracking-widest mt-0.5">
               {actifs.length} disponible{actifs.length !== 1 ? 's' : ''}
             </p>
@@ -152,7 +152,7 @@ export default function Sondages() {
               <i className="ti ti-forms text-4xl text-gray-200" />
             </div>
             <p className="font-heading font-extrabold text-lg text-primary">
-              {search || rewardFilter !== 'TOUS' ? 'Aucun résultat' : 'Aucun sondage disponible'}
+              {search || rewardFilter !== 'TOUS' ? 'Aucun résultat' : 'Aucun Miitch i disponible'}
             </p>
             <p className="text-xs text-gray-400 font-bold">
               {search || rewardFilter !== 'TOUS' ? 'Modifiez votre recherche ou vos filtres' : 'Revenez bientôt !'}
@@ -175,7 +175,7 @@ export default function Sondages() {
               <section className="space-y-4">
                 {featured && gridItems.length > 0 && (
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">
-                    {actifs.slice(1).length > 0 ? 'Autres sondages' : 'Terminés ou en attente'}
+                    {actifs.slice(1).length > 0 ? 'Autres Miitchs i' : 'Terminés ou en attente'}
                   </p>
                 )}
                 <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">

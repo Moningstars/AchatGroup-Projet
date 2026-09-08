@@ -33,13 +33,13 @@ const HERO_SLIDES = [
     bg: '/hero/slide-1.jpg',
   },
   {
-    tag: 'Sondages Rémunérés',
+    tag: 'Miitchs i Rémunérés',
     icon: 'ti-clipboard-check',
     title: ['Répondez.', 'Encaissez.'],
     accentCls: 'text-accent',
     desc: 'Donnez votre avis sur des produits et services, et recevez une récompense directement dans votre portefeuille.',
-    stat: { value: '500 – 5 000', unit: 'FCFA', label: 'par sondage complété' },
-    cta: { label: 'Voir les sondages', path: '/sondages' },
+    stat: { value: '500 – 5 000', unit: 'FCFA', label: 'par Miitch i complété' },
+    cta: { label: 'Voir les Miitchs i', path: '/sondages' },
     bg: '/hero/slide-2.jpg',
   },
   {
@@ -262,7 +262,7 @@ export default function Opportunites() {
         <div className="flex flex-col items-center gap-4">
           <div className="w-14 h-14 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
           <p className="font-heading font-extrabold text-primary text-sm uppercase tracking-widest animate-pulse">
-            OpportuniHub se prépare...
+            Miitcha Deal se prépare...
           </p>
         </div>
       </div>
@@ -596,7 +596,7 @@ export default function Opportunites() {
                     <div>
                       <div className="flex items-center gap-3 mb-6">
                         <span className="bg-accent text-primary px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest">
-                          Sondage
+                          Miitch i
                         </span>
                         {formatDate(s.dateExpiration) && (
                           <span className="text-white/40 text-[10px] font-bold uppercase tracking-widest">
@@ -643,7 +643,7 @@ export default function Opportunites() {
                     L'achat groupé<br /><span className="text-accent">réinventé</span> pour<br />l'Afrique de l'Ouest.
                   </h2>
                   <p className="text-white/60 text-base leading-relaxed mb-8">
-                    OpportuniHub est la première plateforme collaborative d'achat groupé et de sondages rémunérés en Afrique de l'Ouest. Notre mission : donner à chaque consommateur le pouvoir de négocier comme un professionnel.
+                    Miitcha Deal est la première plateforme collaborative d'achat groupé et de Miitchs i rémunérés en Afrique de l'Ouest. Notre mission : donner à chaque consommateur le pouvoir de négocier comme un professionnel.
                   </p>
                   <div className="flex flex-wrap gap-3">
                     {['Togo', 'Bénin', 'Côte d\'Ivoire', 'Sénégal'].map(p => (
@@ -654,7 +654,7 @@ export default function Opportunites() {
                 <div className="grid grid-cols-1 gap-4">
                   {[
                     { icon: 'ti-users-group', titre: 'Force collective', desc: 'Plus on est nombreux, plus les prix baissent. Rejoignez un groupe et accédez aux tarifs de gros réservés aux professionnels.' },
-                    { icon: 'ti-clipboard-check', titre: 'Sondages rémunérés', desc: 'Votre avis a de la valeur. Répondez à des sondages et recevez des récompenses directement dans votre portefeuille.' },
+                    { icon: 'ti-clipboard-check', titre: 'Miitchs i rémunérés', desc: 'Votre avis a de la valeur. Répondez à des Miitchs i et recevez des récompenses directement dans votre portefeuille.' },
                     { icon: 'ti-shield-check', titre: 'Paiement sécurisé', desc: 'Votre argent est protégé jusqu\'à la livraison. Remboursement garanti si l\'achat groupé n\'atteint pas son seuil.' },
                   ].map(v => (
                     <div key={v.titre} className="bg-white/5 border border-white/10 rounded-2xl p-5 flex gap-4">

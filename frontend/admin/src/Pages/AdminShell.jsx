@@ -23,12 +23,12 @@ function heureRelative(ts) {
 
 const PAGE_META = {
   '/': { label: "Vue d'ensemble", sub: 'Tableau de bord général' },
-  '/opportunites': { label: 'Opportunités', sub: 'Gestion des achats groupés' },
-  '/sondages': { label: 'Sondages', sub: 'Enquêtes rémunérées' },
+  '/opportunites': { label: 'Miitchs', sub: 'Gestion des achats groupés' },
+  '/sondages': { label: 'Miitchs i', sub: 'Enquêtes rémunérées' },
   '/utilisateurs': { label: 'Utilisateurs', sub: 'Gestion des comptes' },
   '/portefeuilles': { label: 'Portefeuilles', sub: 'Transactions & retraits' },
-  '/fournisseurs': { label: 'Fournisseurs', sub: 'Approvisionnement des opportunités' },
-  '/commanditaires': { label: 'Commanditaires', sub: 'Sponsors des sondages' },
+  '/fournisseurs': { label: 'Fournisseurs', sub: 'Approvisionnement des Miitchs' },
+  '/commanditaires': { label: 'Commanditaires', sub: 'Sponsors des Miitchs i' },
   '/bannieres': { label: 'Bannières', sub: 'Publicités affichées dans l\'app' },
   '/kyc': { label: 'KYC', sub: "Vérification d'identité" },
   '/parametres': { label: 'Paramètres', sub: 'Configuration du compte' },
@@ -37,27 +37,27 @@ const PAGE_META = {
 
 function getPageMeta(pathname) {
   if (pathname === '/opportunites/nouvelle') {
-    return { label: 'Nouvelle opportunité', sub: 'Création guidée de la campagne' }
+    return { label: 'Nouveau Miitch', sub: 'Création guidée de la campagne' }
   }
   if (pathname === '/opportunites/traitement') {
-    return { label: 'Opportunités à traiter', sub: 'Préparation, livraison et clôture des dossiers' }
+    return { label: 'Miitchs à traiter', sub: 'Préparation, livraison et clôture des dossiers' }
   }
   if (pathname === '/opportunites/tentatives') {
     return { label: 'Tentatives non abouties', sub: 'Analyse des souscriptions échouées' }
   }
   if (pathname.startsWith('/opportunites/')) {
     return pathname.endsWith('/modifier')
-      ? { label: 'Modifier une opportunité', sub: 'Configuration de la campagne' }
-      : { label: "Détail de l’opportunité", sub: 'Pilotage de la campagne' }
+      ? { label: 'Modifier un Miitch', sub: 'Configuration de la campagne' }
+      : { label: 'Détail du Miitch', sub: 'Pilotage de la campagne' }
   }
   if (pathname === '/sondages/nouveau') {
-    return { label: 'Nouveau sondage', sub: 'Création complète de l’enquête' }
+    return { label: 'Nouveau Miitch i', sub: 'Création complète de l’enquête' }
   }
   if (pathname === '/fournisseurs/nouveau') {
-    return { label: 'Nouveau fournisseur', sub: 'Référencement d’un fournisseur d’opportunité' }
+    return { label: 'Nouveau fournisseur', sub: 'Référencement d’un fournisseur de Miitch' }
   }
   if (pathname === '/commanditaires/nouveau') {
-    return { label: 'Nouveau commanditaire', sub: 'Référencement d’un sponsor de sondage' }
+    return { label: 'Nouveau commanditaire', sub: 'Référencement d’un sponsor de Miitch i' }
   }
   if (pathname === '/portefeuilles/alimenter') {
     return { label: 'Alimenter la trésorerie', sub: 'Crédit du wallet plateforme' }
@@ -66,10 +66,10 @@ function getPageMeta(pathname) {
     return { label: 'Détail utilisateur', sub: 'Compte, identité et vérification' }
   }
   if (pathname.startsWith('/sondages/')) {
-    if (pathname.endsWith('/modifier')) return { label: 'Modifier le sondage', sub: 'Paramètres de l’enquête' }
+    if (pathname.endsWith('/modifier')) return { label: 'Modifier le Miitch i', sub: 'Paramètres de l’enquête' }
     if (pathname.endsWith('/eligibilite')) return { label: 'Test d’éligibilité', sub: 'Présélection des participants' }
     if (pathname.endsWith('/reponses')) return { label: 'Réponses à valider', sub: 'Contrôle des participations' }
-    if (pathname.endsWith('/resultats')) return { label: 'Résultats du sondage', sub: 'Analyse et répondants' }
+    if (pathname.endsWith('/resultats')) return { label: 'Résultats du Miitch i', sub: 'Analyse et répondants' }
   }
   if (pathname === '/bannieres/nouvelle') {
     return { label: 'Nouvelle bannière', sub: 'Création du contenu publicitaire' }
@@ -77,7 +77,7 @@ function getPageMeta(pathname) {
   if (pathname.startsWith('/bannieres/') && pathname.endsWith('/modifier')) {
     return { label: 'Modifier une bannière', sub: 'Configuration du contenu publicitaire' }
   }
-  return PAGE_META[pathname] || { label: 'Administration', sub: 'OpportuniHub' }
+  return PAGE_META[pathname] || { label: 'Administration', sub: 'Miitcha Deal' }
 }
 
 export default function AdminShell() {

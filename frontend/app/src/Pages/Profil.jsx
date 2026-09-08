@@ -191,7 +191,7 @@ export default function Profil() {
 
         {/* ── Version ── */}
         <p className="text-center text-[10px] text-gray-300 font-bold uppercase tracking-widest pt-4">
-          OpportuniHub · v1.0
+          Miitcha Deal · v1.0
         </p>
       </div>
     </div>

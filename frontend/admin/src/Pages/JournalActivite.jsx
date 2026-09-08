@@ -15,7 +15,7 @@ const ACTIONS = [
 ]
 
 const MODULE_LABELS = {
-  AUTHENTIFICATION: 'Authentification', OPPORTUNITES: 'Opportunités', SONDAGES: 'Sondages',
+  AUTHENTIFICATION: 'Authentification', OPPORTUNITES: 'Miitchs', SONDAGES: 'Miitchs i',
   UTILISATEURS: 'Utilisateurs', FINANCES: 'Finances', FOURNISSEURS: 'Fournisseurs',
   COMMANDITAIRES: 'Commanditaires', BANNIERES: 'Bannières', KYC: 'KYC', STATISTIQUES: 'Statistiques',
 }

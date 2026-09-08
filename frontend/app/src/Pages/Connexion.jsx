@@ -241,7 +241,7 @@ export default function Connexion() {
             <div className="w-8 h-8 bg-accent rounded-xl flex items-center justify-center shadow-lg shadow-accent/20">
               <ShieldCheck size={18} className="text-primary" />
             </div>
-            <span className="font-heading font-extrabold text-lg tracking-tight">OpportuniHub</span>
+            <span className="font-heading font-extrabold text-lg tracking-tight">Miitcha Deal</span>
           </div>
 
           <div className="z-10 text-center space-y-3 max-w-[220px]">

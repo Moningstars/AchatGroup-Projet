@@ -20,7 +20,7 @@ function buildMessage(type, data) {
     return `"${data.titre}" expire sous 24h et n'a que ${data.participantsActuels}/${data.seuilMinimum} participants — risque d'échec.`
   }
   if (type === 'SONDAGE_BUDGET_PRESQUE_EPUISE') {
-    return `Le budget du sondage "${data.titre}" est presque épuisé (${fmt(data.budgetDistribue)}/${fmt(data.budgetReserve)} FCFA distribués).`
+    return `Le budget du Miitch i "${data.titre}" est presque épuisé (${fmt(data.budgetDistribue)}/${fmt(data.budgetReserve)} FCFA distribués).`
   }
   return null
 }

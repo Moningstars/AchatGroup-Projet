@@ -75,12 +75,12 @@ export default function Dashboard() {
 
   const kpis = [
     {
-      icon: Package, label: 'Opportunités',
+      icon: Package, label: 'Miitchs',
       value: fmt(stats?.totalOpportunites), sub: `${fmt(stats?.opportunitesActives)} actives`,
       accentColor: '#6D28D9',
     },
     {
-      icon: ClipboardList, label: 'Sondages',
+      icon: ClipboardList, label: 'Miitchs i',
       value: fmt(stats?.totalSondages), sub: `${fmt(stats?.sondagesActifs)} actifs`,
       accentColor: '#4F46E5',
     },
@@ -91,7 +91,7 @@ export default function Dashboard() {
     },
     {
       icon: TrendingUp, label: 'Taux remplissage',
-      value: `${stats?.tauxRemplissageMoyen ?? 0}%`, sub: 'moyenne des opportunités',
+      value: `${stats?.tauxRemplissageMoyen ?? 0}%`, sub: 'moyenne des Miitchs',
       accentColor: '#0284C7',
     },
     {
@@ -112,9 +112,9 @@ export default function Dashboard() {
   ]
 
   const ratios = [
-    { label: 'Opportunités actives',   value: stats?.opportunitesActives ?? 0,  total: stats?.totalOpportunites ?? 1,  color: '#6D28D9' },
-    { label: 'Opportunités clôturées', value: stats?.opportunitesCloturees ?? 0, total: stats?.totalOpportunites ?? 1,  color: '#059669' },
-    { label: 'Sondages actifs',        value: stats?.sondagesActifs ?? 0,        total: stats?.totalSondages ?? 1,      color: '#4F46E5' },
+    { label: 'Miitchs actives',   value: stats?.opportunitesActives ?? 0,  total: stats?.totalOpportunites ?? 1,  color: '#6D28D9' },
+    { label: 'Miitchs clôturées', value: stats?.opportunitesCloturees ?? 0, total: stats?.totalOpportunites ?? 1,  color: '#059669' },
+    { label: 'Miitchs i actifs',        value: stats?.sondagesActifs ?? 0,        total: stats?.totalSondages ?? 1,      color: '#4F46E5' },
     { label: 'Utilisateurs actifs',    value: stats?.utilisateursActifs ?? 0,    total: stats?.totalUtilisateurs ?? 1,  color: '#0284C7' },
   ]
 
@@ -139,11 +139,11 @@ export default function Dashboard() {
             <p className="mt-1.5 text-2xl font-black tracking-tight tabular-nums sm:text-3xl">{fmt(stats?.soldePlateforme)} <span className="text-xs font-semibold text-violet-100">FCFA</span></p>
             <Link
               to="/portefeuilles"
-              aria-label="Ouvrir la trésorerie OpportuniHub"
+              aria-label="Ouvrir la trésorerie Miitcha Deal"
               className="group mt-auto flex items-center justify-between border-t border-white/15 pt-3 text-[10px] outline-none"
             >
               <span className="font-semibold text-violet-100 transition-colors group-hover:text-white">
-                Trésorerie OpportuniHub
+                Trésorerie Miitcha Deal
               </span>
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-violet-700 shadow-sm transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-focus-visible:ring-2 group-focus-visible:ring-emerald-300 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-violet-600">
                 <ArrowUpRight size={16} aria-hidden="true" />
@@ -176,10 +176,10 @@ export default function Dashboard() {
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft lg:col-span-2">
-          <p className="text-[13px] font-bold text-slate-900 mb-0.5">Opportunités récentes</p>
+          <p className="text-[13px] font-bold text-slate-900 mb-0.5">Miitchs récentes</p>
           <p className="text-[11px] text-slate-400 mb-4">{opportunites.length} au total</p>
           {recentOpps.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-8">Aucune opportunité</p>
+            <p className="text-sm text-slate-400 text-center py-8">Aucun Miitch</p>
           ) : (
             <div className="space-y-4">
               {recentOpps.map(op => {

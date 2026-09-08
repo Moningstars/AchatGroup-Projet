@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
-import { User, Wallet, ShieldCheck, ShieldX, ShieldAlert, Clock, LogOut, Bell, CheckCircle2, XCircle, Trash2, X, Home, ClipboardList } from 'lucide-react'
+import { User, Wallet, ShieldCheck, ShieldX, ShieldAlert, Clock, LogOut, Bell, CheckCircle2, XCircle, Trash2, X, ClipboardList } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { usePusher } from '../../context/PusherContext'
 import { useNotifications } from '../../context/NotificationsContext'
@@ -114,8 +114,8 @@ const Header = () => {
           <i className="ti ti-building-community text-xl" />
         </div>
         <div className="flex flex-col">
-          <h1 className="text-primary font-heading font-extrabold text-lg leading-none">OpportuniHub</h1>
-          <span className="text-[10px] text-success font-bold uppercase tracking-widest hidden sm:block">Community Power</span>
+          <h1 className="text-primary font-heading font-extrabold text-lg leading-none">Miitcha Deal</h1>
+          <span className="text-[10px] text-success font-bold uppercase tracking-widest hidden sm:block">Le Pouvoir de nous</span>
         </div>
       </Link>
 
@@ -125,8 +125,8 @@ const Header = () => {
           {isAuthenticated ? (
             <>
               <Link to="/" className={`text-sm font-bold transition-colors ${pathname === '/' ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}>Accueil</Link>
-              <Link to="/opportunites" className={`text-sm font-bold transition-colors ${pathname === '/opportunites' ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}>Opportunités</Link>
-              <Link to="/sondages"    className={`text-sm font-bold transition-colors ${pathname === '/sondages'    ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}>Sondages</Link>
+              <Link to="/opportunites" className={`text-sm font-bold transition-colors ${pathname === '/opportunites' ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}>Miitchs</Link>
+              <Link to="/sondages"    className={`text-sm font-bold transition-colors ${pathname === '/sondages'    ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}>Miitchs i</Link>
             </>
           ) : (
             <>
@@ -244,20 +244,12 @@ const Header = () => {
                   {/* Navigation */}
                   <div className="py-1">
                     <Link
-                      to="/"
-                      onClick={() => setOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors md:hidden"
-                    >
-                      <Home size={16} className="text-gray-400" />
-                      Accueil
-                    </Link>
-                    <Link
                       to="/historique"
                       onClick={() => setOpen(false)}
                       className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                     >
                       <ClipboardList size={16} className="text-gray-400" />
-                      Mes participations
+                      Mes Miitchs
                     </Link>
                     <Link
                       to="/portefeuille"

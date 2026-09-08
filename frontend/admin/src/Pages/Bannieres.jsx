@@ -18,7 +18,7 @@ const BASE_URL = `http://${window.location.hostname}:8080`
 const PAGE_OPTS = [
   { value: 'ACCUEIL',   label: 'Accueil' },
   { value: 'CATALOGUE', label: 'Catalogue' },
-  { value: 'SONDAGES',  label: 'Sondages' },
+  { value: 'SONDAGES',  label: 'Miitchs i' },
   { value: 'TOUTES',    label: 'Toutes les pages' },
 ]
 
@@ -29,7 +29,7 @@ const PAGE_COLORS = {
   TOUTES:    'bg-emerald-100 text-emerald-700',
 }
 
-const PAGE_LABELS = { ACCUEIL: 'Accueil', CATALOGUE: 'Catalogue', SONDAGES: 'Sondages', TOUTES: 'Toutes' }
+const PAGE_LABELS = { ACCUEIL: 'Accueil', CATALOGUE: 'Catalogue', SONDAGES: 'Miitchs i', TOUTES: 'Toutes' }
 
 const STATUTS = {
   BROUILLON: { label: 'Brouillon', badge: 'bg-slate-700 text-white', dot: 'bg-slate-300', table: 'border-slate-200 bg-slate-50 text-slate-700', accent: 'bg-slate-400' },
@@ -49,7 +49,7 @@ const BANNER_ICONS = [
   { value: 'ti-trophy', label: 'Récompense', icon: Trophy },
   { value: 'ti-wallet', label: 'Portefeuille', icon: WalletCards },
   { value: 'ti-clipboard-text', label: 'Sondage', icon: ClipboardList },
-  { value: 'ti-package', label: 'Opportunité', icon: Package },
+  { value: 'ti-package', label: 'Miitch', icon: Package },
   { value: 'ti-heart', label: 'Favori', icon: Heart },
   { value: 'ti-star', label: 'Vedette', icon: Star },
   { value: 'ti-bolt', label: 'Offre flash', icon: Zap },

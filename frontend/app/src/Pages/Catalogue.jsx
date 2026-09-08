@@ -229,7 +229,7 @@ export default function Catalogue() {
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div>
-              <h1 className="font-heading font-extrabold text-lg text-primary leading-none">Opportunités</h1>
+              <h1 className="font-heading font-extrabold text-lg text-primary leading-none">Miitchs</h1>
               <p className="text-[11px] text-success font-bold uppercase tracking-widest mt-0.5">
                 {actives} active{actives !== 1 ? 's' : ''}
               </p>
@@ -274,7 +274,7 @@ export default function Catalogue() {
         <div className="relative z-30 rounded-3xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-gray-100 pb-4">
             <div>
-              <p className="font-heading text-sm font-black text-primary">Affiner les opportunités</p>
+              <p className="font-heading text-sm font-black text-primary">Affiner les Miitchs</p>
               <p className="mt-1 text-[11px] font-semibold text-gray-400">
                 Choisissez une catégorie, puis l’ordre d’affichage.
               </p>

@@ -77,7 +77,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: 'Offres actives', value: loading ? '…' : opsActives.length, icon: ShoppingBag, color: 'text-indigo-600', bg: 'bg-indigo-50', action: () => navigate('/') },
-            { label: 'Sondages ouverts', value: loading ? '…' : sondsActifs.length, icon: FileText, color: 'text-violet-600', bg: 'bg-violet-50', action: () => navigate('/sondages') },
+            { label: 'Miitchs i ouverts', value: loading ? '…' : sondsActifs.length, icon: FileText, color: 'text-violet-600', bg: 'bg-violet-50', action: () => navigate('/sondages') },
             { label: 'Points', value: loading || !solde ? '…' : formatMontant(solde.soldePoints), icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50', action: null },
             { label: 'Transactions', value: loading ? '…' : transactions.length, icon: Clock, color: 'text-slate-600', bg: 'bg-slate-100', action: () => navigate('/historique') },
           ].map((m) => (
@@ -158,7 +158,7 @@ export default function Dashboard() {
         {!loading && sondsActifs.length > 0 && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-bold text-slate-900">Sondages disponibles</h2>
+              <h2 className="text-base font-bold text-slate-900">Miitchs i disponibles</h2>
               <button onClick={() => navigate('/sondages')} className="flex items-center gap-1 text-xs text-indigo-600 font-semibold hover:underline">
                 Tout voir <ArrowRight size={13} />
               </button>

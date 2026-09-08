@@ -24,7 +24,7 @@ const STATUT_OP_OPPORTUNITE = {
 }
 
 const LIVRAISON = {
-  EN_ATTENTE_QUOTA: ['Opportunité en cours', 0], A_PREPARER: ['Paiement validé', 20],
+  EN_ATTENTE_QUOTA: ['Miitch en cours', 0], A_PREPARER: ['Paiement validé', 20],
   PREPARATION: ['Lot transmis au partenaire', 40], PRET_LIVRAISON: ['Partenaire confirmé', 55],
   EN_LIVRAISON: ['Date promise communiquée', 75], LIVRE_A_CONFIRMER: ['Votre confirmation est attendue', 90],
   LIVRE_CONFIRME: ['Terminée', 100], ECHEC_LIVRAISON: ['Anomalie', 70], LITIGE: ['Litige', 70], ANNULE: ['Annulée', 0],
@@ -40,8 +40,8 @@ const STATUT_SONDAGE = {
 const ETAPE_SONDAGE = {
   ACTIF: 'Réponses ouvertes',
   EN_ATTENTE_DISTRIBUTION: 'Validation des participations',
-  CLOTURE: 'Sondage finalisé',
-  ANNULE: 'Sondage annulé',
+  CLOTURE: 'Miitch i finalisé',
+  ANNULE: 'Miitch i annulé',
 }
 
 function StatutBadge({ map, keyVal }) {
@@ -66,8 +66,8 @@ function EmptyState({ tab }) {
         <p className="font-heading font-bold text-primary text-lg">Aucune participation</p>
         <p className="text-xs text-gray-400 font-bold mt-1">
           {tab === 'opportunites'
-            ? 'Rejoignez une opportunité d\'achat groupé pour la voir ici'
-            : 'Répondez à un sondage pour le voir ici'}
+            ? 'Rejoignez un Miitch d\'achat groupé pour le voir ici'
+            : 'Répondez à un Miitch i pour le voir ici'}
         </p>
       </div>
     </div>
@@ -114,14 +114,14 @@ export default function History() {
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div>
-              <h1 className="font-heading font-extrabold text-lg text-primary leading-none">Mes Participations</h1>
-              <p className="text-[11px] text-gray-400 font-bold mt-0.5">Opportunités et sondages</p>
+              <h1 className="font-heading font-extrabold text-lg text-primary leading-none">Mes Miitchs</h1>
+              <p className="text-[11px] text-gray-400 font-bold mt-0.5">Miitchs et Miitchs i</p>
             </div>
           </div>
           <div className="flex items-center gap-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-            <span>{opportunites.length} offre{opportunites.length > 1 ? 's' : ''}</span>
+            <span>{opportunites.length} Miitch{opportunites.length > 1 ? 's' : ''}</span>
             <span className="w-1 h-1 rounded-full bg-gray-300" />
-            <span>{sondages.length} sondage{sondages.length > 1 ? 's' : ''}</span>
+            <span>{sondages.length} Miitch{sondages.length > 1 ? 's' : ''} i</span>
           </div>
         </div>
       </div>
@@ -141,7 +141,7 @@ export default function History() {
               <p className="text-[9px] text-gray-400 font-bold">FCFA</p>
             </div>
             <div className="bg-white rounded-2xl p-4 border-2 border-gray-100">
-              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Sondages complétés</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Miitchs i complétés</p>
               <p className="text-2xl font-heading font-black text-primary">{sondages.length}</p>
             </div>
             <div className="bg-white rounded-2xl p-4 border-2 border-gray-100">
@@ -163,7 +163,7 @@ export default function History() {
             }`}
           >
             <ShoppingBag size={14} />
-            Opportunités
+            Miitchs
             {opportunites.length > 0 && (
               <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${tab === 'opportunites' ? 'bg-white/20' : 'bg-gray-100'}`}>
                 {opportunites.length}
@@ -179,7 +179,7 @@ export default function History() {
             }`}
           >
             <ClipboardList size={14} />
-            Sondages
+            Miitchs i
             {sondages.length > 0 && (
               <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${tab === 'sondages' ? 'bg-white/20' : 'bg-gray-100'}`}>
                 {sondages.length}

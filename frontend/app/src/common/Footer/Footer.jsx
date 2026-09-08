@@ -5,8 +5,8 @@ import { FacebookIcon, InstagramIcon, XIcon, WhatsAppIcon } from './SocialIcons'
 const TRUST_CHIPS = ['Paiement sécurisé', "Identité vérifiée (KYC)", 'Support réactif']
 
 const PLATEFORME_LINKS = [
-  { label: 'Opportunités', to: '/opportunites' },
-  { label: 'Sondages rémunérés', to: '/sondages' },
+  { label: 'Miitchs', to: '/opportunites' },
+  { label: 'Miitchs i rémunérés', to: '/sondages' },
   { label: 'Mon portefeuille', to: '/portefeuille' },
   { label: 'Historique des participations', to: '/historique' },
 ]
@@ -47,7 +47,7 @@ const Footer = () => {
             <div className="w-9 h-9 bg-accent rounded-xl flex items-center justify-center text-white shrink-0 group-hover:scale-105 transition-transform">
               <i className="ti ti-building-community text-xl" />
             </div>
-            <span className="font-heading font-extrabold text-lg text-white">OpportuniHub</span>
+            <span className="font-heading font-extrabold text-lg text-white">Miitcha Deal</span>
           </Link>
           <p className="text-sm text-[#9FB4C4] mb-5">
             Vos fonds sont protégés et votre identité vérifiée à chaque étape — participez en toute confiance.
@@ -63,7 +63,7 @@ const Footer = () => {
         </div>
 
         <div className="max-w-xs w-full">
-          <h4 className="font-heading font-extrabold text-sm text-white mb-2.5">Recevoir les prochaines opportunités</h4>
+          <h4 className="font-heading font-extrabold text-sm text-white mb-2.5">Recevoir les prochaines Miitchs</h4>
           <form onSubmit={(e) => e.preventDefault()} className="flex rounded-full border border-white/20 overflow-hidden">
             <input
               type="email"
@@ -131,7 +131,7 @@ const Footer = () => {
 
       {/* Barre légale */}
       <div className="flex flex-wrap justify-between items-center gap-3 px-6 py-5 md:px-10">
-        <span className="text-xs text-[#7C93A5]">© {new Date().getFullYear()} OpportuniHub. Tous droits réservés.</span>
+        <span className="text-xs text-[#7C93A5]">© {new Date().getFullYear()} Miitcha Deal. Tous droits réservés.</span>
         <div className="flex gap-4">
           <a href="#" className="text-xs text-[#9FB4C4] hover:text-white transition-colors">CGU</a>
           <a href="#" className="text-xs text-[#9FB4C4] hover:text-white transition-colors">Confidentialité</a>

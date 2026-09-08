@@ -114,7 +114,7 @@ export default function RechargeModal({ open, onClose, onSuccess, onReturn, init
                     <p className="font-heading text-sm font-black text-primary">Solde insuffisant</p>
                     <p className="mt-0.5 text-xs font-medium leading-relaxed text-gray-600">
                       Rechargez votre portefeuille pour continuer à profiter
-                      {context.opportunityTitle ? <> de <span className="font-black text-primary">« {context.opportunityTitle} »</span></> : ' de cette opportunité'}.
+                      {context.opportunityTitle ? <> de <span className="font-black text-primary">« {context.opportunityTitle} »</span></> : ' de ce Miitch'}.
                     </p>
                     {context.missingAmount > 0 && (
                       <p className="mt-1.5 text-[11px] font-black text-accent">
@@ -294,7 +294,7 @@ export default function RechargeModal({ open, onClose, onSuccess, onReturn, init
                   onClick={handleReturn}
                   className="w-full rounded-2xl bg-primary py-3.5 font-black text-white transition-all active:scale-[0.98]"
                 >
-                  Continuer avec cette opportunité →
+                  Continuer avec ce Miitch →
                 </button>
               ) : (
                 <button

@@ -8,8 +8,8 @@ import { getAdminOpportunites } from '../services/api'
 
 const iconMap = {
     "Vue d'ensemble": IconDashboard,
-    "Opportunités": IconBox,
-    "Sondages": IconSurvey,
+    "Miitchs": IconBox,
+    "Miitchs i": IconSurvey,
     "Utilisateurs": IconUsers,
     "Portefeuilles": IconWallet,
     "Fournisseurs": IconBox,
@@ -76,7 +76,7 @@ export default function NavBar() {
                         <span className="relative text-[13px] font-black leading-none text-white">OH</span>
                     </div>
                     <div>
-                        <p className="text-[13px] font-extrabold leading-none tracking-tight text-slate-950">OpportuniHub</p>
+                        <p className="text-[13px] font-extrabold leading-none tracking-tight text-slate-950">Miitcha Deal</p>
                         <p className="mt-1 text-[8px] font-bold uppercase tracking-[0.16em] text-violet-600">Administration</p>
                     </div>
                 </div>

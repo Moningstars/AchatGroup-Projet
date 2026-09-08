@@ -58,7 +58,7 @@ function ShareIconButton({ label, caption, onClick, className, children }) {
 }
 
 const SUIVI_PARTICIPATION = {
-  EN_ATTENTE_QUOTA: 'Opportunité en cours',
+  EN_ATTENTE_QUOTA: 'Miitch en cours',
   A_PREPARER: 'Paiement validé',
   PREPARATION: 'Lot transmis au partenaire',
   PRET_LIVRAISON: 'Partenaire confirmé',
@@ -261,7 +261,7 @@ export default function DetailOpportunite() {
     const message = getShareMessage()
     if (navigator.share) {
       try {
-        await navigator.share({ title: opportunite?.titre || 'Opportunité OpportuniHub', text: message, url })
+        await navigator.share({ title: opportunite?.titre || 'Miitch sur Miitcha Deal', text: message, url })
       } catch (error) {
         if (error?.name !== 'AbortError') await handleCopyLink()
       }
@@ -299,13 +299,13 @@ export default function DetailOpportunite() {
   }
 
   const getShareMessage = () => {
-    const ancienMessage = 'Rejoignez vite cette opportunité et profitez de ce produit à un prix imbattable !'
+    const ancienMessage = 'Rejoignez vite ce Miitch et profitez de ce produit à un prix imbattable !'
     const messageConfigure = opportunite?.messagePartage?.trim()
     const template = messageConfigure && messageConfigure !== ancienMessage
       ? messageConfigure
-      : "🔥 Bon plan OpportuniHub !\n\nDécouvrez « {titre} » à partir de {prix} FCFA grâce à l’achat groupé.\n⏳ Rejoignez l’offre avant sa clôture et profitez du meilleur tarif.\n\n👉 Voir l’offre et participer :"
+      : "🔥 Bon plan Miitcha Deal !\n\nDécouvrez « {titre} » à partir de {prix} FCFA grâce à l’achat groupé.\n⏳ Rejoignez l’offre avant sa clôture et profitez du meilleur tarif.\n\n👉 Voir l’offre et participer :"
     return template
-      .replaceAll('{titre}', opportunite?.titre || 'cette opportunité')
+      .replaceAll('{titre}', opportunite?.titre || 'ce Miitch')
       .replaceAll('{prix}', fmt(opportunite?.prixActuel || opportunite?.prixNormal))
   }
 
@@ -367,7 +367,7 @@ export default function DetailOpportunite() {
   const capacitePalier = palierEstOuvert ? null : Math.max(1, palierFin - palierDebut + 1)
   const progressPalier = capacitePalier ? Math.min(100, Math.round((uniteDansPalier / capacitePalier) * 100)) : 100
   const messageProgression = !activationAtteinte
-    ? `Plus que ${Math.max(0, Number(opportunite.seuilMinimum || 0) - participantsActuels)} unité${Math.max(0, Number(opportunite.seuilMinimum || 0) - participantsActuels) > 1 ? 's' : ''} pour activer l’opportunité`
+    ? `Plus que ${Math.max(0, Number(opportunite.seuilMinimum || 0) - participantsActuels)} unité${Math.max(0, Number(opportunite.seuilMinimum || 0) - participantsActuels) > 1 ? 's' : ''} pour activer le Miitch`
     : prochainPalier
       ? `Plus que ${Math.max(0, Number(prochainPalier.seuilMin || 0) - participantsActuels)} unité${Math.max(0, Number(prochainPalier.seuilMin || 0) - participantsActuels) > 1 ? 's' : ''} pour passer au prix de ${fmt(prochainPalier.prix)} FCFA`
       : 'Dernier palier atteint : chaque nouvelle unité garde le meilleur prix disponible.'
@@ -387,7 +387,7 @@ export default function DetailOpportunite() {
         
         {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
-          <Link to="/" className="hover:text-primary transition-colors">OpportuniHub</Link>
+          <Link to="/" className="hover:text-primary transition-colors">Miitcha Deal</Link>
           <ChevronRight size={10} />
           <span className="text-primary">{opportunite.categorie || 'Offre'}</span>
           <ChevronRight size={10} />
@@ -603,7 +603,7 @@ export default function DetailOpportunite() {
                 <div className="h-full bg-success rounded-full transition-all duration-700" style={{ width: `${progressPalier}%` }} />
               </div>
               <p className={`text-[10px] font-bold ${activationAtteinte ? 'text-success' : 'text-gray-400'}`}>{messageProgression}</p>
-              {activationAtteinte && progressionValidee && <p className="text-[10px] text-gray-400 font-semibold">Seuil minimum atteint : l’opportunité est validée si elle se clôture maintenant.</p>}
+              {activationAtteinte && progressionValidee && <p className="text-[10px] text-gray-400 font-semibold">Seuil minimum atteint : le Miitch est validé s’il se clôture maintenant.</p>}
               {phaseProgression === 'plafond' && (
                 <p className={`text-[10px] font-bold ${isComplet ? 'text-urgency' : 'text-accent'}`}>
                   {isComplet ? 'Stock épuisé' : `Plus que ${unitésRestantes} unité${unitésRestantes > 1 ? 's' : ''} disponible${unitésRestantes > 1 ? 's' : ''}`}
@@ -652,7 +652,7 @@ export default function DetailOpportunite() {
                   {dejaSouscrit ? <CheckCircle2 size={20} className="text-success shrink-0 mt-0.5" /> : <ShieldCheck size={20} className="text-primary shrink-0 mt-0.5" />}
                   <div className="min-w-0 flex-1">
                     <p className={`font-heading font-black text-sm ${dejaSouscrit ? 'text-success' : 'text-primary'}`}>
-                      {dejaSouscrit ? 'Vous avez déjà rejoint cette opportunité' : 'Réservez maintenant, sans achat définitif immédiat'}
+                      {dejaSouscrit ? 'Vous avez déjà rejoint ce Miitch' : 'Réservez maintenant, sans achat définitif immédiat'}
                     </p>
                     {dejaSouscrit ? (
                       <p className="text-xs text-success/80 font-bold mt-1">
@@ -666,7 +666,7 @@ export default function DetailOpportunite() {
                     <div className="mt-3 flex flex-col items-start gap-2 rounded-xl bg-white/70 px-3 py-2 min-[430px]:flex-row min-[430px]:items-center min-[430px]:justify-between">
                       <span className="flex min-w-0 items-center gap-2 text-[10px] font-black uppercase tracking-wider text-primary sm:text-[11px]">
                         <PackageCheck size={14} />
-                        <span className="min-w-0 break-words">{dejaSouscrit ? (SUIVI_PARTICIPATION[maParticipation.statutLivraison] || 'Opportunité en cours') : (activationAtteinte ? 'Opportunité déjà validée' : 'En attente du seuil minimum')}</span>
+                        <span className="min-w-0 break-words">{dejaSouscrit ? (SUIVI_PARTICIPATION[maParticipation.statutLivraison] || 'Miitch en cours') : (activationAtteinte ? 'Miitch déjà validée' : 'En attente du seuil minimum')}</span>
                       </span>
                       <span className={`text-[11px] font-black tabular-nums ${dejaSouscrit ? 'text-success' : 'text-primary'}`}>
                         {dejaSouscrit ? `${maParticipation.progressionLivraison || 0}%` : `${participantsActuels}/${opportunite.seuilMinimum}`}
@@ -676,7 +676,7 @@ export default function DetailOpportunite() {
                       <p className={`mt-2 text-xs ${dejaSouscrit ? 'text-success/80' : 'text-primary/70'}`}>
                         {dejaSouscrit
                           ? 'Besoin de plus d’unités ? Choisissez une quantité ci-dessous : elle sera ajoutée à votre commande existante.'
-                          : 'Choisissez la quantité voulue ci-dessous pour rejoindre cette opportunité.'}
+                          : 'Choisissez la quantité voulue ci-dessous pour rejoindre ce Miitch.'}
                       </p>
                     )}
                   </div>
@@ -813,7 +813,7 @@ export default function DetailOpportunite() {
             <div className="pt-2 space-y-3 mt-auto">
               {!souscriptionOuverte && (
                 <div className="text-urgency text-xs font-bold bg-urgency/5 p-3 rounded-xl border border-urgency/10">
-                  {opportunite.raisonIndisponibilite || (isExpired ? 'Cette opportunité est expirée.' : 'Cette opportunité ne peut plus recevoir de réservations.')}
+                  {opportunite.raisonIndisponibilite || (isExpired ? 'Ce Miitch est expiré.' : 'Ce Miitch ne peut plus recevoir de réservations.')}
                 </div>
               )}
               <button
@@ -843,7 +843,7 @@ export default function DetailOpportunite() {
           <section className="pt-16 space-y-8">
             <div className="flex items-end justify-between">
               <div className="flex flex-col gap-1">
-                <h2 className="text-3xl font-heading font-extrabold text-primary tracking-tight">Plus d'Opportunités</h2>
+                <h2 className="text-3xl font-heading font-extrabold text-primary tracking-tight">Plus d'Miitchs</h2>
                 <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Dans la catégorie {opportunite.categorie}</p>
               </div>
               <Link to="/" className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2 hover:text-accent transition-colors">

@@ -29,7 +29,7 @@ export default function Parametres() {
               <Badge color="violet">{admin?.role || 'ADMIN'}</Badge>
             </div>
             <p className="mt-1 truncate text-sm text-slate-500">{admin?.email || 'Adresse email non disponible'}</p>
-            <p className="mt-3 max-w-2xl text-xs leading-5 text-slate-400">Compte actuellement connecté à l’espace de gestion OpportuniHub.</p>
+            <p className="mt-3 max-w-2xl text-xs leading-5 text-slate-400">Compte actuellement connecté à l’espace de gestion Miitcha Deal.</p>
           </div>
         </div>
       </Card>
@@ -63,7 +63,7 @@ export default function Parametres() {
           <p className="mt-1 text-xs leading-5 text-slate-400">Informations techniques de la plateforme.</p>
           <dl className="mt-6 space-y-4">
             {[
-              ['Application', 'OpportuniHub'],
+              ['Application', 'Miitcha Deal'],
               ['Version', '1.0.0'],
               ['Backend', 'Spring Boot 3.3'],
             ].map(([label, value]) => (

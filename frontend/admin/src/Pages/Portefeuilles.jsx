@@ -208,7 +208,7 @@ export default function Portefeuilles() {
         <div className="mb-5 flex items-center justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Trésorerie plateforme</p>
-            <h2 className="mt-1 text-sm font-semibold text-slate-200">Wallet OpportuniHub</h2>
+            <h2 className="mt-1 text-sm font-semibold text-slate-200">Wallet Miitcha Deal</h2>
           </div>
           <button
             onClick={() => navigate('/portefeuilles/alimenter')}

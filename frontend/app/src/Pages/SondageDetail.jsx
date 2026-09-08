@@ -169,7 +169,7 @@ function SondageCard({ sondage }) {
 
       <div className="relative z-10 p-6">
         <div className="inline-flex items-center gap-2 bg-success/20 text-success px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-success/30 mb-4 shadow-sm shadow-success/10">
-          <i className="ti ti-forms text-[10px]" /> Sondage rémunéré
+          <i className="ti ti-forms text-[10px]" /> Miitch i rémunéré
         </div>
         <h1 className="text-xl font-heading font-extrabold mb-2 leading-tight">{sondage.titre}</h1>
         {sondage.description && (
@@ -210,7 +210,7 @@ function DeadlineCountdown({ dateExpiration }) {
     return (
       <div className="flex items-center gap-2 border-t border-white/10 pt-3 text-xs font-black text-white/60">
         <Clock size={14} className="text-accent" />
-        Sondage terminé
+        Miitch i terminé
       </div>
     )
   }
@@ -314,7 +314,7 @@ function EligibiliteStep({ sondageId, eligibilite, onPassed, onFailed }) {
       </div>
 
       <div className="rounded-2xl bg-accent/8 border border-accent/20 p-4 text-sm text-primary/80 font-medium">
-        Répondez correctement à ces questions pour accéder au sondage rémunéré.
+        Répondez correctement à ces questions pour accéder au Miitch i rémunéré.
       </div>
 
       <div className="space-y-6">
@@ -408,7 +408,7 @@ function SondageStep({ sondage, onDone }) {
           <ClipboardList size={20} className="text-primary" />
         </div>
         <div>
-          <h2 className="text-sm font-black text-primary">Questions du sondage</h2>
+          <h2 className="text-sm font-black text-primary">Questions du Miitch i</h2>
           <p className="text-[11px] text-gray-400 font-bold">{sondage.questions?.length || 0} question{(sondage.questions?.length || 0) > 1 ? 's' : ''}</p>
         </div>
       </div>
@@ -539,10 +539,10 @@ export default function SondageDetail() {
         <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center border-2 border-gray-100">
           <AlertCircle size={36} className="text-gray-200" />
         </div>
-        <p className="font-heading font-extrabold text-lg text-primary">Sondage introuvable</p>
+        <p className="font-heading font-extrabold text-lg text-primary">Miitch i introuvable</p>
         <button onClick={() => navigate('/sondages')}
           className="text-sm font-black text-primary uppercase tracking-widest border-2 border-primary/20 px-6 py-2.5 rounded-full hover:bg-primary hover:text-white transition-all">
-          Retour aux sondages
+          Retour aux Miitchs i
         </button>
       </div>
     )
@@ -564,7 +564,7 @@ export default function SondageDetail() {
           <div className="text-center">
             <h2 className="text-xl font-heading font-extrabold text-primary mb-2">Vérification d'identité requise</h2>
             <p className="text-sm text-gray-500 font-medium leading-relaxed">
-              Ce sondage est réservé aux participants dont l'identité a été vérifiée (KYC).
+              Ce Miitch i est réservé aux participants dont l'identité a été vérifiée (KYC).
             </p>
           </div>
 
@@ -601,7 +601,7 @@ export default function SondageDetail() {
             )}
             <button onClick={() => navigate('/sondages')}
               className="w-full py-3.5 rounded-2xl border-2 border-gray-100 text-gray-500 text-sm font-black hover:border-primary hover:text-primary transition-all">
-              Retour aux sondages
+              Retour aux Miitchs i
             </button>
           </div>
         </div>
@@ -627,7 +627,7 @@ export default function SondageDetail() {
         </div>
         <button onClick={() => navigate('/sondages')}
           className="mt-2 px-8 py-4 rounded-2xl bg-primary text-white text-sm font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-primary/20">
-          Voir d'autres sondages
+          Voir d'autres Miitchs i
         </button>
       </div>
     )
@@ -641,7 +641,7 @@ export default function SondageDetail() {
       <div className="min-h-screen bg-bg-light p-4 sm:p-6 flex flex-col items-center justify-center pb-28">
         <div className="w-full max-w-md rounded-3xl border-2 border-gray-100 bg-white p-6 sm:p-8 shadow-sm">
           <button onClick={() => navigate('/sondages')} className="mb-6 inline-flex items-center gap-2 text-xs font-black text-gray-400 hover:text-primary">
-            <ArrowLeft size={15} /> Retour aux sondages
+            <ArrowLeft size={15} /> Retour aux Miitchs i
           </button>
           <div className={`mb-5 flex h-16 w-16 items-center justify-center rounded-2xl ${payee ? 'bg-success/10' : rejetee ? 'bg-urgency/10' : 'bg-accent/10'}`}>
             {payee ? <CheckCircle2 size={32} className="text-success" /> : rejetee ? <XCircle size={32} className="text-urgency" /> : <Clock size={32} className="text-accent" />}
@@ -660,7 +660,7 @@ export default function SondageDetail() {
                 : rejetee
                   ? 'La vérification de votre participation n’a pas permis de la valider. Aucun versement ne sera effectué.'
                   : participation.statutSondage === 'EN_ATTENTE_DISTRIBUTION'
-                    ? 'Le sondage est fermé aux nouvelles réponses. Les participations reçues sont maintenant en cours de validation.'
+                    ? 'Le Miitch i est fermé aux nouvelles réponses. Les participations reçues sont maintenant en cours de validation.'
                     : 'Votre réponse est bien enregistrée. Aucune preuve supplémentaire n’est obligatoire ; notre équipe vous notifiera après sa décision.'}
             </p>
           </div>
@@ -693,12 +693,12 @@ export default function SondageDetail() {
           <p className="text-gray-500 text-sm font-medium leading-relaxed max-w-xs">
             Votre score au test est de{' '}
             <span className="font-black text-urgency">{Number(tauxEchec || 0).toFixed(0)}%</span>.
-            Vous n'avez pas atteint le seuil requis pour ce sondage.
+            Vous n'avez pas atteint le seuil requis pour ce Miitch i.
           </p>
         </div>
         <button onClick={() => navigate('/sondages')}
           className="mt-2 px-8 py-4 rounded-2xl bg-primary text-white text-sm font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-primary/20">
-          Voir d'autres sondages
+          Voir d'autres Miitchs i
         </button>
       </div>
     )
@@ -713,7 +713,7 @@ export default function SondageDetail() {
         {/* Retour */}
         <button onClick={() => navigate('/sondages')}
           className="flex items-center gap-2 text-sm font-black text-gray-400 hover:text-primary transition-colors">
-          <ArrowLeft size={16} /> Retour aux sondages
+          <ArrowLeft size={16} /> Retour aux Miitchs i
         </button>
 
         {/* Carte info */}
@@ -741,7 +741,7 @@ export default function SondageDetail() {
         {step === 'ferme' && (
           <div className="bg-white border-2 border-gray-100 rounded-2xl p-5 flex items-start gap-3">
             <AlertCircle size={18} className="text-accent shrink-0 mt-0.5" />
-            <p className="text-sm text-primary font-bold">Ce sondage n'est plus ouvert aux réponses.</p>
+            <p className="text-sm text-primary font-bold">Ce Miitch i n'est plus ouvert aux réponses.</p>
           </div>
         )}
 
@@ -752,7 +752,7 @@ export default function SondageDetail() {
             <p className="text-sm text-primary font-bold">
               Vous devez être{' '}
               <button onClick={() => navigate('/connexion')} className="underline font-black">connecté</button>
-              {' '}pour participer à ce sondage.
+              {' '}pour participer à ce Miitch i.
             </p>
           </div>
         )}

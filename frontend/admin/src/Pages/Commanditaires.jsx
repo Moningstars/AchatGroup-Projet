@@ -93,7 +93,7 @@ export default function Commanditaires() {
       <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-violet-950 px-5 py-5 text-white sm:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4"><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10"><Building2 /></span>
-            <div><h2 className="text-lg font-extrabold">Commanditaires des sondages</h2><p className="mt-1 text-xs text-slate-300">Identité, validation, budgets engagés et historique financier.</p></div>
+            <div><h2 className="text-lg font-extrabold">Commanditaires des Miitchs i</h2><p className="mt-1 text-xs text-slate-300">Identité, validation, budgets engagés et historique financier.</p></div>
           </div>
           <button onClick={() => navigate('/commanditaires/nouveau')} className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-extrabold text-slate-950"><Plus size={16} /> Nouveau commanditaire</button>
         </div>
@@ -113,7 +113,7 @@ export default function Commanditaires() {
     {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error} <button onClick={load} className="font-black underline">Réessayer</button></p>}
     <Card noPad>
       {loading ? <Spinner py="py-16" /> : filtered.length === 0 ? <div className="p-14 text-center"><Building2 className="mx-auto text-slate-300" size={34} /><h3 className="mt-4 font-extrabold">Aucun commanditaire trouvé</h3></div> : <>
-        <Table><thead><tr><Th>Commanditaire</Th><Th>Statut</Th><Th>Financement</Th><Th>Sondages</Th><Th>Contact</Th><Th>Action</Th></tr></thead>
+        <Table><thead><tr><Th>Commanditaire</Th><Th>Statut</Th><Th>Financement</Th><Th>Miitchs i</Th><Th>Contact</Th><Th>Action</Th></tr></thead>
           <tbody>{pageItems.map(c => <Tr key={c.id}>
             <Td><button onClick={() => navigate(`/commanditaires/${c.id}`)} className="flex items-center gap-3 text-left"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-100 text-xs font-black text-violet-700">{initiales(c)}</span><span><strong className="block text-[12.5px] text-slate-900">{c.nom} {c.prenom}</strong><span className="text-[11px] text-slate-500">{c.societe}</span></span></button></Td>
             <Td><Badge color={STATUT_COLOR[c.statut]}>{STATUT_LABEL[c.statut]}</Badge></Td>
@@ -196,17 +196,17 @@ export function CommanditaireDetailPage() {
     </div>
 
     <div className="grid gap-4 lg:grid-cols-[1.05fr_.95fr]">
-      <Card><h3 className="font-extrabold">Alimenter le budget</h3><p className="mt-1 text-xs text-slate-500">Cette somme pourra être réservée lors de l’activation d’un sondage sponsorisé.</p>
+      <Card><h3 className="font-extrabold">Alimenter le budget</h3><p className="mt-1 text-xs text-slate-500">Cette somme pourra être réservée lors de l’activation d’un Miitch i sponsorisé.</p>
         <form onSubmit={fund} className="mt-4 grid gap-3 sm:grid-cols-2"><label><span className={labelCls}>Montant FCFA</span><input className={inputCls} required min="1" type="number" value={amount} onChange={e => setAmount(e.target.value)} /></label><label><span className={labelCls}>Référence</span><input className={inputCls} value={reference} onChange={e => setReference(e.target.value)} placeholder="Virement, facture…" /></label><button disabled={action === 'fund'} className="sm:col-span-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white">{action === 'fund' ? 'Traitement…' : 'Créditer le commanditaire'}</button></form>
       </Card>
-      <Card><h3 className="font-extrabold">Décision administrative</h3><p className="mt-1 text-xs text-slate-500">{item.statut === 'ACTIF' ? 'La suspension est refusée tant qu’un sondage financé est actif.' : 'L’activation autorise ce partenaire à financer de nouveaux sondages.'}</p>
+      <Card><h3 className="font-extrabold">Décision administrative</h3><p className="mt-1 text-xs text-slate-500">{item.statut === 'ACTIF' ? 'La suspension est refusée tant qu’un Miitch i financé est actif.' : 'L’activation autorise ce partenaire à financer de nouveaux Miitchs i.'}</p>
         <label className="mt-4 block"><span className={labelCls}>Motif obligatoire</span><textarea className="min-h-20 w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-violet-400" value={reason} onChange={e => setReason(e.target.value)} placeholder="Justifiez la décision pour le journal d’audit…" /></label>
         <button onClick={changeStatus} disabled={action === 'status'} className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white ${item.statut === 'ACTIF' ? 'bg-rose-600' : 'bg-emerald-600'}`}>{item.statut === 'ACTIF' ? <ShieldOff size={16} /> : <ShieldCheck size={16} />}{item.statut === 'ACTIF' ? 'Suspendre' : 'Activer'}</button>
         {item.motifStatut && <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-500"><strong className="text-slate-700">Dernier motif :</strong> {item.motifStatut}</p>}
       </Card>
     </div>
 
-    <Card noPad><div className="flex items-center justify-between border-b border-slate-100 p-4"><div><h3 className="font-extrabold">Historique financier</h3><p className="text-xs text-slate-400">50 derniers mouvements traçables</p></div><span className="text-xs font-bold text-slate-500">{item.nombreSondages || 0} sondage(s), {item.sondagesActifs || 0} actif(s)</span></div>
+    <Card noPad><div className="flex items-center justify-between border-b border-slate-100 p-4"><div><h3 className="font-extrabold">Historique financier</h3><p className="text-xs text-slate-400">50 derniers mouvements traçables</p></div><span className="text-xs font-bold text-slate-500">{item.nombreSondages || 0} Miitch{item.nombreSondages === 1 ? '' : 's'} i, {item.sondagesActifs || 0} actif(s)</span></div>
       {movements.length === 0 ? <div className="p-10 text-center text-sm text-slate-400">Aucun mouvement pour le moment.</div> : <Table><thead><tr><Th>Date</Th><Th>Opération</Th><Th>Montant</Th><Th>Solde disponible</Th><Th>Référence</Th></tr></thead><tbody>{movements.map(m => <Tr key={m.id}><Td>{formatDate(m.createdAt)}</Td><Td><Badge color={{ ALIMENTATION: 'emerald', RESERVATION: 'violet', DISTRIBUTION: 'amber', LIBERATION: 'sky' }[m.type]}>{m.type}</Badge></Td><Td><strong className={m.type === 'ALIMENTATION' || m.type === 'LIBERATION' ? 'text-emerald-700' : 'text-slate-900'}>{fmt(m.montant)} FCFA</strong></Td><Td>{fmt(m.soldeApres)} FCFA</Td><Td>{m.reference || '—'}</Td></Tr>)}</tbody></Table>}
     </Card>
   </div>

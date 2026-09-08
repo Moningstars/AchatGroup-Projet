@@ -60,9 +60,9 @@ function ParticipantLink({ participant, compact = false }) {
 }
 
 const CATEGORIES = ['Mode', 'Électronique', 'Véhicules', 'Maison', 'Alimentaire', 'Informatique', 'Beauté', 'Mobilier', 'Sport']
-const MESSAGE_PARTAGE_DEFAUT = "🔥 Bon plan OpportuniHub !\n\nDécouvrez « {titre} » à partir de {prix} FCFA grâce à l’achat groupé.\n⏳ Rejoignez l’offre avant sa clôture et profitez du meilleur tarif.\n\n👉 Voir l’offre et participer :"
+const MESSAGE_PARTAGE_DEFAUT = "🔥 Bon plan Miitcha Deal !\n\nDécouvrez « {titre} » à partir de {prix} FCFA grâce à l’achat groupé.\n⏳ Rejoignez l’offre avant sa clôture et profitez du meilleur tarif.\n\n👉 Voir l’offre et participer :"
 const CREATION_STEPS = [
-  { label: 'Présentation', short: 'Opportunité', icon: FileText },
+  { label: 'Présentation', short: 'Miitch', icon: FileText },
   { label: 'Tarification', short: 'Prix', icon: BadgeDollarSign },
   { label: 'Fournisseur', short: 'Fournisseur', icon: Building2 },
   { label: 'Contenu', short: 'Médias', icon: ImagePlus },
@@ -319,7 +319,7 @@ function FormulaireComplementaireEditor({ champs, onChange }) {
         </div>
       </div>
       {champs.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-slate-200 bg-white p-4 text-xs font-semibold text-slate-400">Aucun champ demandé au client pour cette opportunité.</div>
+        <div className="rounded-lg border border-dashed border-slate-200 bg-white p-4 text-xs font-semibold text-slate-400">Aucun champ demandé au client pour ce Miitch.</div>
       ) : (
         <div className="space-y-3">
           {champs.map((champ, index) => (
@@ -416,7 +416,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
         ? { icon: Truck, title: 'Contrôler les dates promises', text: `${livraisonCounts.EN_LIVRAISON} participant(s) ont une livraison annoncée par le fournisseur.`, color: 'sky' }
         : (livraisonCounts.A_PREPARER || 0) + (livraisonCounts.PREPARATION || 0) + (livraisonCounts.PRET_LIVRAISON || 0) > 0
           ? { icon: ClipboardList, title: 'Transmettre le prochain lot', text: 'Sélectionnez les participants, exportez la liste et consignez la réponse du fournisseur.', color: 'violet' }
-          : { icon: CheckSquare, title: 'Suivi à jour', text: 'Aucune action urgente détectée sur cette opportunité.', color: 'emerald' }
+          : { icon: CheckSquare, title: 'Suivi à jour', text: 'Aucune action urgente détectée sur ce Miitch.', color: 'emerald' }
 
   const savePlan = (nextPlan) => {
     setPlan(nextPlan)
@@ -569,7 +569,7 @@ function DetailDrawer({ item, onClose, onActiver, onCloturer, onModifier, action
       <div className="mx-auto flex max-w-[1440px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
         <div className="border-b border-slate-200 bg-white p-4 sm:px-5">
           <button onClick={onClose} className="mb-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-400 hover:text-violet-700">
-            <ArrowLeft size={14} /> Retour aux opportunités
+            <ArrowLeft size={14} /> Retour aux Miitchs
           </button>
           <div className="grid gap-4 md:grid-cols-[190px_minmax(0,1fr)_auto] md:items-center xl:grid-cols-[210px_minmax(0,1fr)_auto]">
             <div className="relative h-32 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 sm:h-36 md:h-28">
@@ -1251,7 +1251,7 @@ function SpecsEditor({ titre, description, categorie, specs, setSpecs }) {
     <div className="space-y-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
       <div className="flex items-center justify-between">
         <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-          Fiche opportunité enrichie <span className="font-normal normal-case text-slate-400 tracking-normal">(optionnel)</span>
+          Fiche Miitch enrichie <span className="font-normal normal-case text-slate-400 tracking-normal">(optionnel)</span>
         </p>
         <button type="button" onClick={handleGenerer} disabled={generating || !titre}
           className="inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-100 transition disabled:opacity-50">
@@ -1349,10 +1349,10 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
   }
 
   const validateStep = (index) => {
-    if (index === 0 && !form.titre.trim()) return 'Renseignez le titre de l’opportunité.'
+    if (index === 0 && !form.titre.trim()) return 'Renseignez le titre du Miitch.'
     if (index === 1) {
       if (!form.prixNormal || Number(form.prixNormal) <= 0) return 'Renseignez un prix normal supérieur à zéro.'
-      if (form.modePlafond === 'PLAFONNE' && (!form.seuilMaximal || Number(form.seuilMaximal) < 1)) return 'Renseignez le stock maximal pour une opportunité plafonnée.'
+      if (form.modePlafond === 'PLAFONNE' && (!form.seuilMaximal || Number(form.seuilMaximal) < 1)) return 'Renseignez le stock maximal pour un Miitch plafonnée.'
       if (!form.dateExpiration) return 'Choisissez une date d’expiration.'
       if (new Date(form.dateExpiration) <= new Date()) return 'La date d’expiration doit être située dans le futur.'
       const paliersCalcules = calculerPaliers(paliers)
@@ -1445,12 +1445,12 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <header className="border-b border-slate-100 px-4 py-4 sm:px-6">
           <div className="flex items-start gap-3">
-            <button type="button" onClick={onClose} disabled={loading} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-50" aria-label="Retour aux opportunités">
+            <button type="button" onClick={onClose} disabled={loading} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-50" aria-label="Retour aux Miitchs">
               <ArrowLeft size={18} />
             </button>
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-600">Création guidée</p>
-              <h2 className="mt-0.5 text-xl font-black text-slate-950">Nouvelle opportunité</h2>
+              <h2 className="mt-0.5 text-xl font-black text-slate-950">Nouveau Miitch</h2>
               <p className="mt-1 text-xs text-slate-500">Étape {step + 1} sur {CREATION_STEPS.length} · {CREATION_STEPS[step].label}</p>
             </div>
             <div className="hidden rounded-xl bg-violet-50 px-3 py-2 text-right sm:block">
@@ -1483,14 +1483,14 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
               <div>
                 <h3 className="text-base font-black text-slate-900">{CREATION_STEPS[step].label}</h3>
                 <p className="text-xs text-slate-500">{
-                  ['Présentez clairement l’opportunité aux futurs participants.', 'Définissez le prix, les objectifs et les remises de groupe.', 'Identifiez le fournisseur de l’opportunité et préparez le suivi de livraison.', 'Enrichissez la fiche avec des arguments et des visuels.', 'Relisez les informations avant de publier.'][step]
+                  ['Présentez clairement le Miitch aux futurs participants.', 'Définissez le prix, les objectifs et les remises de groupe.', 'Identifiez le fournisseur du Miitch et préparez le suivi de livraison.', 'Enrichissez la fiche avec des arguments et des visuels.', 'Relisez les informations avant de publier.'][step]
                 }</p>
               </div>
             </div>
 
             {step === 0 && (
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="sm:col-span-2"><label className={labelCls}>Titre de l’opportunité *</label><input autoFocus value={form.titre} onChange={e => setField('titre', e.target.value)} className={inputCls} placeholder="Ex. Table pliante de marché renforcée" /></div>
+                <div className="sm:col-span-2"><label className={labelCls}>Titre du Miitch *</label><input autoFocus value={form.titre} onChange={e => setField('titre', e.target.value)} className={inputCls} placeholder="Ex. Table pliante de marché renforcée" /></div>
                 <div className="sm:col-span-2 flex flex-col gap-3 rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-white p-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 items-start gap-2.5">
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-600 text-white"><Sparkles size={15} /></span>
@@ -1507,7 +1507,7 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
                 {aiError && <p className="sm:col-span-2 rounded-lg bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700">{aiError}</p>}
                 {aiNotice && <p className="sm:col-span-2 rounded-lg bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-700">{aiNotice}</p>}
                 <div><label className={labelCls}>Catégorie <span className="font-normal normal-case tracking-normal text-slate-400">(suggérée si vide)</span></label><select value={form.categorie} onChange={e => setField('categorie', e.target.value)} className={inputCls}><option value="">— Sélectionner —</option>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-                <div className="sm:col-span-2"><label className={labelCls}>Description de l’opportunité</label><textarea value={form.description} onChange={e => setField('description', e.target.value)} rows={4} className={`${inputCls} resize-none`} placeholder="Décrivez l’opportunité, ses caractéristiques et ses avantages…" /></div>
+                <div className="sm:col-span-2"><label className={labelCls}>Description du Miitch</label><textarea value={form.description} onChange={e => setField('description', e.target.value)} rows={4} className={`${inputCls} resize-none`} placeholder="Décrivez le Miitch, ses caractéristiques et ses avantages…" /></div>
                 <div className="sm:col-span-2 rounded-xl border border-violet-100 bg-violet-50/60 p-4"><label className={labelCls}>Message de partage</label><textarea value={form.messagePartage} onChange={e => setField('messagePartage', e.target.value)} rows={6} maxLength={500} className={`${inputCls} resize-none bg-white`} /><p className="mt-1.5 text-[10px] leading-4 text-slate-500">Ajouté automatiquement au lien partagé. Utilisez <strong>{'{titre}'}</strong> et <strong>{'{prix}'}</strong> pour insérer les informations de l’offre.</p></div>
               </div>
             )}
@@ -1542,7 +1542,7 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
               <div className="space-y-5">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <FilterSelect label="Fournisseur enregistré" value={form.fournisseurId} onChange={handleFournisseurChange} options={[{ value: '', label: '— Sélectionner un fournisseur —' }, ...fournisseurs.map(item => ({ value: item.id, label: nomPublicFournisseur(item) || item.email }))]} />
-                  <p className="mt-2 text-[10px] text-slate-500">Les fournisseurs sont liés aux opportunités. Les commanditaires restent exclusivement liés aux sondages.</p>
+                  <p className="mt-2 text-[10px] text-slate-500">Les fournisseurs sont liés aux Miitchs. Les commanditaires restent exclusivement liés aux Miitchs i.</p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div><label className={labelCls}>Nom public du fournisseur</label><input value={form.partenaireNom} onChange={e => setField('partenaireNom', e.target.value)} className={inputCls} /></div>
@@ -1561,14 +1561,14 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
             {step === 3 && (
               <div className="space-y-5">
                 <SpecsEditor titre={form.titre} description={form.description} categorie={form.categorie} specs={specs} setSpecs={setSpecs} />
-                <div className="rounded-xl border border-slate-200 p-4"><label className={`${labelCls} mb-2`}>Galerie de l’opportunité <span className="font-normal normal-case text-slate-400 tracking-normal">(optionnel)</span></label><ImagePicker images={images} onChange={setImages} /></div>
+                <div className="rounded-xl border border-slate-200 p-4"><label className={`${labelCls} mb-2`}>Galerie du Miitch <span className="font-normal normal-case text-slate-400 tracking-normal">(optionnel)</span></label><ImagePicker images={images} onChange={setImages} /></div>
               </div>
             )}
 
             {step === 4 && (
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Opportunité</p><p className="mt-2 text-sm font-black text-slate-900">{form.titre}</p><p className="mt-1 text-xs text-slate-500">{form.categorie || 'Sans catégorie'}</p></div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Miitch</p><p className="mt-2 text-sm font-black text-slate-900">{form.titre}</p><p className="mt-1 text-xs text-slate-500">{form.categorie || 'Sans catégorie'}</p></div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Prix normal</p><p className="mt-2 text-sm font-black text-slate-900">{prixLisible}</p><p className="mt-1 text-xs text-slate-500">Objectif : {form.seuilMinimum || '—'} unités</p></div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Fournisseur</p><p className="mt-2 text-sm font-black text-slate-900">{form.partenaireNom || 'À confirmer'}</p><p className="mt-1 text-xs text-slate-500">{form.fournisseurId ? 'Fiche fournisseur liée' : 'Aucune fiche liée'}</p></div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Infos client</p><p className="mt-2 text-sm font-black text-slate-900">{formulaireComplementaire.length} champ{formulaireComplementaire.length > 1 ? 's' : ''}</p><p className="mt-1 text-xs text-slate-500">Demandé à la réservation si configuré</p></div>
@@ -1583,7 +1583,7 @@ function NouvelleOpportuniteWizard({ onClose, onSaved }) {
                     </button>
                   </div>
                 </div>
-                <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-xs font-semibold leading-5 text-amber-900">Vérifiez le prix, la date d’expiration et l’identité du fournisseur. Après création, toutes ces informations resteront modifiables depuis la fiche de l’opportunité.</div>
+                <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-xs font-semibold leading-5 text-amber-900">Vérifiez le prix, la date d’expiration et l’identité du fournisseur. Après création, toutes ces informations resteront modifiables depuis la fiche du Miitch.</div>
               </div>
             )}
 
@@ -1760,7 +1760,7 @@ function ModifierOpportuniteForm({ item, onClose, onSaved }) {
       <div className="w-full rounded-2xl bg-white p-6 shadow-sm border border-slate-200">
         <div className="mb-5 flex items-center justify-between">
           <div>
-            <h3 className="text-base font-bold text-slate-900">Modifier l'opportunité</h3>
+            <h3 className="text-base font-bold text-slate-900">Modifier l'Miitch</h3>
             <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{item.titre}</p>
           </div>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 transition">
@@ -1827,7 +1827,7 @@ function ModifierOpportuniteForm({ item, onClose, onSaved }) {
           <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="mb-4">
               <h4 className="text-sm font-black text-slate-900">Fournisseur et engagement financier</h4>
-              <p className="mt-1 text-xs text-slate-500">Le fournisseur approvisionne l’opportunité. Son contact reste privé ; son nom, logo et lien public peuvent apparaître côté client.</p>
+              <p className="mt-1 text-xs text-slate-500">Le fournisseur approvisionne le Miitch. Son contact reste privé ; son nom, logo et lien public peuvent apparaître côté client.</p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
@@ -1843,7 +1843,7 @@ function ModifierOpportuniteForm({ item, onClose, onSaved }) {
                     })),
                   ]}
                 />
-                <p className="mt-1.5 text-[10px] leading-4 text-slate-400">Vous pouvez changer le fournisseur lié. Les commanditaires sont gérés séparément pour les sondages.</p>
+                <p className="mt-1.5 text-[10px] leading-4 text-slate-400">Vous pouvez changer le fournisseur lié. Les commanditaires sont gérés séparément pour les Miitchs i.</p>
               </div>
               <div><label className={labelCls}>Nom public du fournisseur</label><input value={form.partenaireNom} onChange={e => setField('partenaireNom', e.target.value)} className={inputCls} /></div>
               <div><label className={labelCls}>Logo (URL)</label><input type="url" value={form.partenaireLogoUrl} onChange={e => setField('partenaireLogoUrl', e.target.value)} className={inputCls} /></div>
@@ -1916,7 +1916,7 @@ export function OpportuniteDetailPage() {
   }
 
   if (loading) return <Spinner py="py-24" />
-  if (!item) return <EmptyState icon={Package} title="Opportunité introuvable" sub="Revenez à la liste et choisissez une autre campagne." />
+  if (!item) return <EmptyState icon={Package} title="Miitch introuvable" sub="Revenez à la liste et choisissez une autre campagne." />
   return <DetailDrawer key={item.id} item={item} onClose={() => navigate('/opportunites')} onActiver={activer} onCloturer={cloturer} onModifier={() => navigate(`/opportunites/${id}/modifier`)} actionId={actionId} />
 }
 
@@ -1929,7 +1929,7 @@ export function ModifierOpportunitePage() {
     getAdminOpportunite(id).then(setItem).finally(() => setLoading(false))
   }, [id])
   if (loading) return <Spinner py="py-24" />
-  if (!item) return <EmptyState icon={Package} title="Opportunité introuvable" />
+  if (!item) return <EmptyState icon={Package} title="Miitch introuvable" />
   return <ModifierOpportuniteForm item={item} onClose={() => navigate(`/opportunites/${id}`)} onSaved={() => navigate(`/opportunites/${id}`)} />
 }
 
@@ -2080,7 +2080,7 @@ export default function Opportunites({ mode = 'encours' }) {
     const groupes = new Map()
     tentatives.forEach(item => {
       const cle = item.opportuniteId || item.opportuniteTitre
-      const courant = groupes.get(cle) || { name: item.opportuniteTitre || 'Opportunité', tentatives: 0, montant: 0 }
+      const courant = groupes.get(cle) || { name: item.opportuniteTitre || 'Miitch', tentatives: 0, montant: 0 }
       courant.tentatives += 1
       courant.montant += Number(item.montantTransaction || 0)
       groupes.set(cle, courant)
@@ -2111,7 +2111,7 @@ export default function Opportunites({ mode = 'encours' }) {
           </div>
           <button onClick={() => navigate('/opportunites')}
             className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 sm:w-auto">
-            <ArrowLeft size={15} /> Retour aux opportunités
+            <ArrowLeft size={15} /> Retour aux Miitchs
           </button>
         </div>
 
@@ -2159,8 +2159,8 @@ export default function Opportunites({ mode = 'encours' }) {
             </div>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2 xl:col-span-1">
-            <div className="mb-3"><p className="text-sm font-black text-slate-900">Opportunités à surveiller</p><p className="text-[10px] text-slate-400">Classement par nombre d’échecs</p></div>
-            {opportunitesImpactees.length === 0 ? <div className="flex h-44 items-center justify-center text-xs text-slate-400">Aucune opportunité impactée</div> : <div className="space-y-3 py-1">{opportunitesImpactees.map(item => <div key={item.name}><div className="mb-1 flex items-center justify-between gap-3 text-[10px]"><span className="truncate font-bold text-slate-600" title={item.name}>{item.name}</span><span className="shrink-0 font-black text-slate-900">{item.tentatives}</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-sky-500" style={{ width: `${Math.max(8, (item.tentatives / maximumOpportunite) * 100)}%` }} /></div></div>)}</div>}
+            <div className="mb-3"><p className="text-sm font-black text-slate-900">Miitchs à surveiller</p><p className="text-[10px] text-slate-400">Classement par nombre d’échecs</p></div>
+            {opportunitesImpactees.length === 0 ? <div className="flex h-44 items-center justify-center text-xs text-slate-400">Aucun Miitch impactée</div> : <div className="space-y-3 py-1">{opportunitesImpactees.map(item => <div key={item.name}><div className="mb-1 flex items-center justify-between gap-3 text-[10px]"><span className="truncate font-bold text-slate-600" title={item.name}>{item.name}</span><span className="shrink-0 font-black text-slate-900">{item.tentatives}</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-sky-500" style={{ width: `${Math.max(8, (item.tentatives / maximumOpportunite) * 100)}%` }} /></div></div>)}</div>}
           </div>
         </section>
 
@@ -2171,7 +2171,7 @@ export default function Opportunites({ mode = 'encours' }) {
             <>
               <div className="divide-y divide-slate-100 lg:hidden">{tentativesPageItems.map(item => <article key={item.id} className="space-y-3 p-4"><div className="flex items-start justify-between gap-3"><Link to={`/utilisateurs?focus=${item.utilisateurId}`} className="font-black text-slate-900 hover:text-violet-700">{item.utilisateurNom || 'Client'} →</Link><Badge color={item.motif === 'ERREUR_TECHNIQUE' ? 'rose' : item.motif === 'SOLDE_INSUFFISANT' ? 'amber' : 'gray'}>{MOTIF_TENTATIVE_LABEL[item.motif] || item.motif}</Badge></div><p className="text-[10px] text-slate-400">ID : {item.utilisateurId}</p><button onClick={() => navigate(`/opportunites/${item.opportuniteId}`)} className="text-left text-xs font-bold text-violet-700 hover:underline">{item.opportuniteTitre}</button><div className="grid grid-cols-2 gap-2"><div className="rounded-xl bg-slate-50 p-2.5 text-xs"><span className="text-slate-400">Montant</span><p className="font-black">{formatMontant(item.montantTransaction)} FCFA</p></div><div className="rounded-xl bg-slate-50 p-2.5 text-xs"><span className="text-slate-400">Quantité</span><p className="font-black">×{item.quantite || 0}</p></div></div><p className="text-[11px] text-slate-500">{item.detail}</p></article>)}</div>
               <div className="hidden overflow-x-auto lg:block"><Table>
-                <thead><tr><Th>Client / identifiant</Th><Th>Opportunité</Th><Th>Cause</Th><Th>Montant</Th><Th>Quantité</Th><Th>Date</Th><Th>Action conseillée</Th></tr></thead>
+                <thead><tr><Th>Client / identifiant</Th><Th>Miitch</Th><Th>Cause</Th><Th>Montant</Th><Th>Quantité</Th><Th>Date</Th><Th>Action conseillée</Th></tr></thead>
                 <tbody>{tentativesPageItems.map(item => <Tr key={item.id}>
                   <Td><Link to={`/utilisateurs?focus=${item.utilisateurId}`} className="font-bold text-slate-800 hover:text-violet-700 hover:underline">{item.utilisateurNom || 'Client'}</Link><p title={item.utilisateurId} className="mt-0.5 max-w-40 truncate font-mono text-[9px] text-slate-400">{item.utilisateurId}</p></Td>
                   <Td><button onClick={() => navigate(`/opportunites/${item.opportuniteId}`)} className="max-w-48 truncate text-left text-xs font-bold text-violet-700 hover:underline">{item.opportuniteTitre}</button></Td>
@@ -2194,7 +2194,7 @@ export default function Opportunites({ mode = 'encours' }) {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
-          <p className="text-[13px] font-bold text-slate-900">{traitementMode ? 'Traitement et livraisons' : 'Opportunités en cours'}</p>
+          <p className="text-[13px] font-bold text-slate-900">{traitementMode ? 'Traitement et livraisons' : 'Miitchs en cours'}</p>
           <p className="text-[11px] text-slate-400 mt-0.5">
             {traitementMode
               ? 'Campagnes clôturées par échéance ou manuellement, à préparer, livrer ou finaliser'
@@ -2212,7 +2212,7 @@ export default function Opportunites({ mode = 'encours' }) {
               onClick={() => navigate('/opportunites/nouvelle')}
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-700 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 hover:bg-violet-800 sm:w-auto"
             >
-              <Plus size={15} /> Nouvelle opportunité
+              <Plus size={15} /> Nouveau Miitch
             </button>
           </div>
         )}
@@ -2223,7 +2223,7 @@ export default function Opportunites({ mode = 'encours' }) {
           <div className="relative min-w-0 flex-1">
             <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input value={recherche} onChange={e => setRecherche(e.target.value)}
-              placeholder="Rechercher par opportunité, catégorie, fournisseur…"
+              placeholder="Rechercher par Miitch, catégorie, fournisseur…"
               className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50" />
             {recherche && (
               <button onClick={() => setRecherche('')} aria-label="Effacer la recherche"
@@ -2276,13 +2276,13 @@ export default function Opportunites({ mode = 'encours' }) {
           <Spinner py="py-12" />
         ) : opportunitesFiltrees.length === 0 ? (
           <EmptyState icon={Package}
-            title={opportunitesDuParcours.length === 0 ? (traitementMode ? 'Aucune campagne à traiter' : 'Aucune opportunité en cours') : 'Aucun résultat'}
-            sub={opportunitesDuParcours.length === 0 ? (traitementMode ? 'Les campagnes clôturées avec des dossiers à préparer, livrer ou finaliser apparaîtront ici, même si elles ont été arrêtées en avance.' : 'Créez votre première opportunité.') : 'Modifiez la recherche ou retirez certains filtres.'} />
+            title={opportunitesDuParcours.length === 0 ? (traitementMode ? 'Aucune campagne à traiter' : 'Aucun Miitch en cours') : 'Aucun résultat'}
+            sub={opportunitesDuParcours.length === 0 ? (traitementMode ? 'Les campagnes clôturées avec des dossiers à préparer, livrer ou finaliser apparaîtront ici, même si elles ont été arrêtées en avance.' : 'Créez votre première Miitch.') : 'Modifiez la recherche ou retirez certains filtres.'} />
         ) : (
           <><Table>
             <thead>
               <tr>
-                <Th>Opportunité</Th>
+                <Th>Miitch</Th>
                 <Th>Prix normal</Th>
                 <Th>Avancement</Th>
                 <Th>Expiration</Th>

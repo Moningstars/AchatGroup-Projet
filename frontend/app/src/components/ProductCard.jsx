@@ -73,7 +73,7 @@ const ProductCard = ({ opportunity }) => {
 
         <div className="absolute right-2.5 top-2.5">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-2.5 py-1 text-[8px] font-black uppercase tracking-wider text-primary shadow-sm backdrop-blur-md">
-            <i className="ti ti-users-group text-[10px] text-success" /> Opportunité
+            <i className="ti ti-users-group text-[10px] text-success" /> Miitch
           </span>
         </div>
 

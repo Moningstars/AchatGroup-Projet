@@ -37,7 +37,7 @@ export default function Login() {
               <ShieldCheck size={20} className="relative text-white" />
             </div>
             <div>
-              <p className="text-base font-black leading-none text-slate-950">OpportuniHub</p>
+              <p className="text-base font-black leading-none text-slate-950">Miitcha Deal</p>
               <p className="mt-1 text-[9px] font-black uppercase tracking-[0.2em] text-violet-600">Administration</p>
             </div>
           </div>
@@ -45,7 +45,7 @@ export default function Login() {
           <div className="mb-8">
             <p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-violet-600">Bienvenue</p>
             <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">Pilotez votre activité avec clarté.</h1>
-            <p className="mt-3 text-sm leading-6 text-slate-500">Connectez-vous à l’espace sécurisé de gestion OpportuniHub.</p>
+            <p className="mt-3 text-sm leading-6 text-slate-500">Connectez-vous à l’espace sécurisé de gestion Miitcha Deal.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -122,7 +122,7 @@ export default function Login() {
             </div>
           </div>
         </div>
-        <p className="relative text-xs text-violet-200">© {new Date().getFullYear()} OpportuniHub</p>
+        <p className="relative text-xs text-violet-200">© {new Date().getFullYear()} Miitcha Deal</p>
       </section>
     </main>
   )

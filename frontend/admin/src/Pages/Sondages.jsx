@@ -156,7 +156,7 @@ function QuestionsEditor({ questions, setQuestions, eligibilite = false }) {
     <div>
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium text-slate-700">
-          {eligibilite ? 'Questions du test *' : 'Questions du sondage *'}
+          {eligibilite ? 'Questions du test *' : 'Questions du Miitch i *'}
         </span>
         <button type="button" onClick={addQ}
           className="inline-flex items-center gap-1 rounded-xl bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100">
@@ -381,7 +381,7 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-6">
           <div>
             <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-violet-600">Création guidée</p>
-            <h3 className="text-xl font-bold text-slate-950">Nouveau sondage</h3>
+            <h3 className="text-xl font-bold text-slate-950">Nouveau Miitch i</h3>
           </div>
           <button type="button" onClick={onClose} aria-label="Fermer"
             className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900">
@@ -410,16 +410,16 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
             <p className="mb-4 text-sm text-slate-500">Définissez le cadre, la récompense et les règles de participation.</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <label className="mb-1 block text-sm font-medium text-slate-700">Commanditaire du sondage</label>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Commanditaire du Miitch i</label>
                 <select value={form.commanditaireId} onChange={e => setField('commanditaireId', e.target.value)} className={inputCls}>
-                  <option value="">— Aucun (sondage interne) —</option>
+                  <option value="">— Aucun (Miitch i interne) —</option>
                   {commanditaires.map(c => (
                     <option key={c.id} value={c.id}>
                       {c.nom} {c.prenom}{c.societe ? ` — ${c.societe}` : ''}
                     </option>
                   ))}
                 </select>
-                <p className="mt-1 text-[10px] text-slate-400">Sponsor de l’enquête — ce choix n’est jamais utilisé comme fournisseur d’opportunité.</p>
+                <p className="mt-1 text-[10px] text-slate-400">Sponsor de l’enquête — ce choix n’est jamais utilisé comme fournisseur de Miitch.</p>
               </div>
               <div className="sm:col-span-2">
                 <label className="mb-1 block text-sm font-medium text-slate-700">Titre *</label>
@@ -507,7 +507,7 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
 
           {/* ── Section 2 : questions du sondage ── */}
           {step === 2 && <div>
-            <p className="mb-1 text-base font-bold text-slate-900">Questions du sondage</p>
+            <p className="mb-1 text-base font-bold text-slate-900">Questions du Miitch i</p>
             <p className="mb-4 text-sm text-slate-500">Ajoutez les questions qui seront présentées aux participants.</p>
             <QuestionsEditor questions={questions} setQuestions={setQuestions} eligibilite={false} />
           </div>}
@@ -527,7 +527,7 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
             </div>
             <div className="rounded-xl bg-amber-100/60 border border-amber-200 p-3 mb-3 text-xs text-amber-800">
               Cochez <span className="font-bold">☑</span> la bonne réponse sur chaque option.
-              Le participant doit obtenir ≥ <span className="font-bold">{form.seuilEligibilite || '80'}%</span> pour accéder au sondage.
+              Le participant doit obtenir ≥ <span className="font-bold">{form.seuilEligibilite || '80'}%</span> pour accéder au Miitch i.
             </div>
             <QuestionsEditor questions={eligQuestions} setQuestions={setEligQuestions} eligibilite={true} />
           </div>}
@@ -538,7 +538,7 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
               <p className="mb-5 text-sm text-slate-500">Un dernier contrôle des informations importantes.</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Sondage</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Miitch i</p>
                   <p className="mt-1 text-lg font-bold text-slate-900">{form.titre}</p>
                   <p className="mt-1 text-sm text-slate-500">{form.description || 'Aucune description'}</p>
                 </div>
@@ -578,7 +578,7 @@ function NouveauSondageForm({ onClose, onSaved, modal = false }) {
               <button type="submit" disabled={loading}
                 className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-violet-200 transition hover:bg-violet-800 disabled:opacity-60">
                 {loading && <Loader2 size={14} className="animate-spin" />}
-                Créer le sondage
+                Créer le Miitch i
               </button>
             )}
           </div>
@@ -739,11 +739,11 @@ function ModifierSondageForm({ sondage, onClose, onSaved }) {
     <div className="mx-auto w-full max-w-3xl pb-8">
       <div className="w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <div className="mb-5 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-slate-950">Modifier le sondage</h3>
+          <h3 className="text-lg font-bold text-slate-950">Modifier le Miitch i</h3>
           <button onClick={onClose} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"><ArrowLeft size={15} /> Retour</button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {budgetVerrouille && <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-relaxed text-sky-800"><strong>Sondage déjà activé.</strong> Le titre, la description, l’image et l’expiration restent modifiables. Le quota et la récompense sont verrouillés car le budget a déjà été réservé.</div>}
+          {budgetVerrouille && <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-relaxed text-sky-800"><strong>Miitch i déjà activé.</strong> Le titre, la description, l’image et l’expiration restent modifiables. Le quota et la récompense sont verrouillés car le budget a déjà été réservé.</div>}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Titre</label>
             <input value={form.titre} onChange={e => setField('titre', e.target.value)} className={inputCls} />
@@ -1090,7 +1090,7 @@ function ResultatsSondageContent({ sondageId, onClose }) {
       <div className="w-full rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <div>
-            <h3 className="text-lg font-bold text-slate-950">Résultats du sondage</h3>
+            <h3 className="text-lg font-bold text-slate-950">Résultats du Miitch i</h3>
             {resultats && (
               <p className="text-sm text-slate-500 mt-0.5 line-clamp-1">
                 {resultats.titre}
@@ -1448,7 +1448,7 @@ function SondageCard({ survey, actionId, onActiver, onDistribuer, onCloturer, on
       {/* ── Questions expand ── */}
       {expanded && survey.questions?.length > 0 && (
         <div className="overflow-hidden rounded-b-2xl border-t border-slate-100 bg-slate-50 px-4 py-4 sm:px-5">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Questions du sondage</p>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Questions du Miitch i</p>
           <div className="space-y-3">
             {survey.questions.map(q => (
               <div key={q.id} className="rounded-xl border border-slate-200 bg-white p-3.5">
@@ -1516,7 +1516,7 @@ export function DetailSondagePage() {
   }, [sondage?.id])
 
   if (loading) return <SondageRouteLoading />
-  if (!sondage) return <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">Sondage introuvable.</p>
+  if (!sondage) return <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">Miitch i introuvable.</p>
 
   const cfg = STATUT_CONFIG[sondage.statut] || STATUT_CONFIG.BROUILLON
   const progression = sondage.quotaVise ? Math.min(100, Math.round((sondage.repondantsActuels / sondage.quotaVise) * 100)) : 0
@@ -1525,7 +1525,7 @@ export function DetailSondagePage() {
 
   return (
     <div className="space-y-4 pb-8">
-      <button onClick={() => navigate('/sondages')} className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-violet-700"><ArrowLeft size={15} /> Retour aux sondages</button>
+      <button onClick={() => navigate('/sondages')} className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-violet-700"><ArrowLeft size={15} /> Retour aux Miitchs i</button>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="grid lg:grid-cols-[260px_1fr]">
@@ -1538,7 +1538,7 @@ export function DetailSondagePage() {
                 <div className="mb-2 flex flex-wrap gap-2"><Badge color={cfg.color}>{cfg.label}</Badge><Badge color="gray">{MODE_LABEL[sondage.modeDistribution]}</Badge><Badge color="gray">{RECOMPENSE_LABEL[sondage.typeRecompense]}</Badge></div>
                 <h2 className="text-2xl font-black leading-tight text-slate-950">{sondage.titre}</h2>
                 {sondage.description && <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-500">{sondage.description}</p>}
-                <p className="mt-3 text-xs font-semibold text-indigo-600">{sondage.commanditaireNom ? `${sondage.commanditaireNom}${sondage.commanditaireSociete ? ` · ${sondage.commanditaireSociete}` : ''}` : 'Sondage interne'}</p>
+                <p className="mt-3 text-xs font-semibold text-indigo-600">{sondage.commanditaireNom ? `${sondage.commanditaireNom}${sondage.commanditaireSociete ? ` · ${sondage.commanditaireSociete}` : ''}` : 'Miitch i interne'}</p>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
                 <button onClick={() => navigate(`/sondages/${sondage.id}/modifier`)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"><Edit2 size={13} className="mr-1 inline" />Modifier</button>
@@ -1563,7 +1563,7 @@ export function DetailSondagePage() {
 
       <section className="grid gap-4 xl:grid-cols-[1fr_320px]">
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="mb-4 flex items-center justify-between"><h3 className="font-black text-slate-900">Questions du sondage</h3><Badge color="gray">{sondage.questions?.length || 0} questions</Badge></div>
+          <div className="mb-4 flex items-center justify-between"><h3 className="font-black text-slate-900">Questions du Miitch i</h3><Badge color="gray">{sondage.questions?.length || 0} questions</Badge></div>
           <div className="space-y-2">{(sondage.questions || []).map(q => <div key={q.id} className="rounded-xl bg-slate-50 p-3"><div className="flex items-start justify-between gap-3"><p className="text-sm font-bold text-slate-800"><span className="mr-2 text-slate-400">{String(q.ordre).padStart(2, '0')}.</span>{q.texte}</p><span className="shrink-0 text-[10px] font-bold text-slate-400">{TYPE_Q[q.typeQuestion]}</span></div>{q.options?.length > 0 && <p className="mt-2 text-xs text-slate-500">{q.options.map(o => o.libelle).join(' · ')}</p>}</div>)}</div>
         </div>
         <aside className="space-y-3">
@@ -1588,7 +1588,7 @@ export function ModifierSondagePage() {
   const navigate = useNavigate()
   const { sondage, loading } = useSondageRoute()
   if (loading) return <SondageRouteLoading />
-  if (!sondage) return <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">Sondage introuvable.</p>
+  if (!sondage) return <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">Miitch i introuvable.</p>
   return <ModifierSondageForm sondage={sondage} onClose={() => navigate('/sondages')} onSaved={() => navigate('/sondages')} />
 }
 
@@ -1596,7 +1596,7 @@ export function EligibiliteSondagePage() {
   const navigate = useNavigate()
   const { sondage, loading } = useSondageRoute()
   if (loading) return <SondageRouteLoading />
-  if (!sondage) return <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">Sondage introuvable.</p>
+  if (!sondage) return <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">Miitch i introuvable.</p>
   return <ConfigurerEligibiliteForm sondage={sondage} onClose={() => navigate('/sondages')} onSaved={() => navigate('/sondages')} />
 }
 
@@ -1672,17 +1672,17 @@ export default function Sondages() {
 
   const handleActiver = (id) => {
     const sondage = sondages.find(item => item.id === id)
-    if (!window.confirm(`Activer « ${sondage?.titre || 'ce sondage'} » et réserver son budget ?`)) return
+    if (!window.confirm(`Activer « ${sondage?.titre || 'ce Miitch i'} » et réserver son budget ?`)) return
     act(id, '-activer', () => activerSondage(id))
   }
   const handleDistribuer = (id) => {
     const sondage = sondages.find(item => item.id === id)
-    if (!window.confirm(`Finaliser définitivement « ${sondage?.titre || 'ce sondage'} », distribuer les récompenses dues et libérer le reliquat ?`)) return
+    if (!window.confirm(`Finaliser définitivement « ${sondage?.titre || 'ce Miitch i'} », distribuer les récompenses dues et libérer le reliquat ?`)) return
     act(id, '-distribuer', () => distribuerSondage(id))
   }
   const handleCloturer = (id) => {
     const sondage = sondages.find(item => item.id === id)
-    if (!window.confirm(`Fermer « ${sondage?.titre || 'ce sondage'} » aux nouvelles réponses ? Les validations en attente devront encore être traitées.`)) return
+    if (!window.confirm(`Fermer « ${sondage?.titre || 'ce Miitch i'} » aux nouvelles réponses ? Les validations en attente devront encore être traitées.`)) return
     act(id, '-cloturer', () => cloturerSondage(id))
   }
   const handleSupprimer  = (id) => act(id, '-supprimer',  () => supprimerSondage(id))
@@ -1720,7 +1720,7 @@ export default function Sondages() {
       {/* ── En-tête compact ── */}
       <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
-          <span><strong className="text-slate-900">{sondages.length}</strong> sondage{sondages.length !== 1 ? 's' : ''}</span>
+          <span><strong className="text-slate-900">{sondages.length}</strong> Miitch{sondages.length !== 1 ? 's' : ''} i</span>
           <span className="h-1 w-1 rounded-full bg-slate-300" />
           <span><strong className="text-sky-600">{countByStatut('ACTIF')}</strong> en cours</span>
           <span className="h-1 w-1 rounded-full bg-slate-300" />
@@ -1728,7 +1728,7 @@ export default function Sondages() {
         </div>
         <button onClick={() => setCreateOpen(true)}
           className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-700 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 hover:bg-violet-800 sm:w-auto">
-          <Plus size={15} /> Nouveau sondage
+          <Plus size={15} /> Nouveau Miitch i
         </button>
       </div>
 
@@ -1779,7 +1779,7 @@ export default function Sondages() {
           <select aria-label="Filtrer par récompense" value={rewardFilter} onChange={e => setRewardFilter(e.target.value)} className="h-11 min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
             <option value="TOUS">Toutes récompenses</option><option value="ARGENT">Paiement FCFA</option><option value="POINTS">Points</option>
           </select>
-          <select aria-label="Trier les sondages" value={sort} onChange={e => setSort(e.target.value)} className="h-11 min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
+          <select aria-label="Trier les Miitchs i" value={sort} onChange={e => setSort(e.target.value)} className="h-11 min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400">
             <option value="RECENTS">Plus récents</option><option value="EXPIRATION">Expiration proche</option><option value="PROGRESSION">Progression</option>
           </select>
           </div>
@@ -1798,7 +1798,7 @@ export default function Sondages() {
       ) : sondagesFiltres.length === 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-white py-16 text-center shadow-sm">
           <ClipboardList size={36} className="mx-auto mb-3 text-slate-300" />
-          <p className="text-slate-400 font-semibold">Aucun sondage{filtre !== 'TOUS' ? ' dans cette catégorie' : ''}</p>
+          <p className="text-slate-400 font-semibold">Aucun Miitch i{filtre !== 'TOUS' ? ' dans cette catégorie' : ''}</p>
         </div>
       ) : (
         <><div className="space-y-3">

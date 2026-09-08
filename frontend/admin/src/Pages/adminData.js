@@ -4,14 +4,14 @@ export const menuSections = [
     items: [
       { label: "Vue d'ensemble", path: '', badge: 'NEW' },
       {
-        label: 'Opportunités',
+        label: 'Miitchs',
         path: 'opportunites',
         children: [
           { label: 'En cours', path: 'opportunites' },
           { label: 'À traiter', path: 'opportunites/traitement', treatmentBadge: true },
         ],
       },
-      { label: 'Sondages', path: 'sondages' },
+      { label: 'Miitchs i', path: 'sondages' },
       { label: 'Utilisateurs', path: 'utilisateurs' },
       { label: 'Portefeuilles', path: 'portefeuilles' },
       { label: 'Fournisseurs', path: 'fournisseurs' },
@@ -80,11 +80,11 @@ export const surveyList = [
 ]
 
 export const participantRows = [
-  { name: 'Kouassi Aimé', phone: '+225 07 12 34 56', verification: 'Complet', available: '45 000', frozen: '120 000', points: '2 500', activity: '3 opp. · 7 sondages', since: '12 mar. 2025', status: 'Actif', statusClass: 'bg-emerald-100 text-emerald-700' },
-  { name: 'Fatou Diallo', phone: '+221 77 98 76 54', verification: 'Partiel', available: '12 500', frozen: '-', points: '800', activity: '1 opp. · 4 sondages', since: '20 mai 2025', status: 'Actif', statusClass: 'bg-emerald-100 text-emerald-700' },
-  { name: 'Ibrahim Traoré', phone: '+223 65 43 21 09', verification: 'Complet', available: '0', frozen: '75 000', points: '150', activity: '2 opp. · 2 sondages', since: '08 jan. 2025', status: 'Suspendu', statusClass: 'bg-rose-100 text-rose-700' },
-  { name: 'Aminata Koné', phone: '+225 05 56 78 90', verification: 'Complet', available: '87 500', frozen: '350 000', points: '5 100', activity: '5 opp. · 12 sondages', since: '03 nov. 2024', status: 'Actif', statusClass: 'bg-emerald-100 text-emerald-700' },
-  { name: 'Moussa', phone: '+225 05 78 45 21 12', verification: 'Partiel', available: '32 000', frozen: '15 000', points: '1 100', activity: '1 opp. · 1 sondage', since: '15 jan. 2025', status: 'Actif', statusClass: 'bg-emerald-100 text-emerald-700' },
+  { name: 'Kouassi Aimé', phone: '+225 07 12 34 56', verification: 'Complet', available: '45 000', frozen: '120 000', points: '2 500', activity: '3 opp. · 7 Miitchs i', since: '12 mar. 2025', status: 'Actif', statusClass: 'bg-emerald-100 text-emerald-700' },
+  { name: 'Fatou Diallo', phone: '+221 77 98 76 54', verification: 'Partiel', available: '12 500', frozen: '-', points: '800', activity: '1 opp. · 4 Miitchs i', since: '20 mai 2025', status: 'Actif', statusClass: 'bg-emerald-100 text-emerald-700' },
+  { name: 'Ibrahim Traoré', phone: '+223 65 43 21 09', verification: 'Complet', available: '0', frozen: '75 000', points: '150', activity: '2 opp. · 2 Miitchs i', since: '08 jan. 2025', status: 'Suspendu', statusClass: 'bg-rose-100 text-rose-700' },
+  { name: 'Aminata Koné', phone: '+225 05 56 78 90', verification: 'Complet', available: '87 500', frozen: '350 000', points: '5 100', activity: '5 opp. · 12 Miitchs i', since: '03 nov. 2024', status: 'Actif', statusClass: 'bg-emerald-100 text-emerald-700' },
+  { name: 'Moussa', phone: '+225 05 78 45 21 12', verification: 'Partiel', available: '32 000', frozen: '15 000', points: '1 100', activity: '1 opp. · 1 Miitch i', since: '15 jan. 2025', status: 'Actif', statusClass: 'bg-emerald-100 text-emerald-700' },
 ]
 
 export const walletSummary = {
