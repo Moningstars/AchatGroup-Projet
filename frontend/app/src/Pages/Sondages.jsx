@@ -1,21 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2 } from 'lucide-react'
+import { Clock3, Loader2 } from 'lucide-react'
 import { getSondages, getBannieres, imgUrl } from '../services/api'
 import PageCarousel from '../components/PageCarousel'
 import { useSSE } from '../hooks/useSSE'
+import { useCountdown } from '../hooks/useCountdown'
 import { formatMontant as fmt } from '../utils/format'
-const REFERENCE_TEMPS = Date.now()
 
-
-function formatDate(dt) {
-  if (!dt) return null
-  const d = new Date(dt)
-  const diff = Math.ceil((d - REFERENCE_TEMPS) / (1000 * 60 * 60 * 24))
-  if (diff <= 0) return 'Expiré'
-  if (diff === 1) return 'Expire demain'
-  if (diff <= 7) return `Expire dans ${diff}j`
-  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
+function pad(value) {
+  return String(value || 0).padStart(2, '0')
 }
 const STATUT = {
   ACTIF: { label: 'Ouvert', cls: 'bg-success/15 text-success border-success/20' },
@@ -117,7 +110,7 @@ export default function Sondages() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-0">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
 
         {/* ── Carousel promo ── */}
         <div className="pt-5">
@@ -125,21 +118,21 @@ export default function Sondages() {
         </div>
 
         {/* ── Search ── */}
-        <div className="py-5 space-y-4">
+        <div className="space-y-3 py-4 sm:space-y-4 sm:py-5">
           <div>
-            <div className="relative flex-1">
+            <div className="relative flex-1 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm sm:rounded-2xl">
               <i className="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg" />
               <input
                 type="text"
                 placeholder="Thème, récompense..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full bg-white border-2 border-gray-100 rounded-2xl py-3.5 pl-11 pr-4 text-sm font-semibold focus:border-primary focus:outline-none transition-all shadow-sm"
+                className="w-full bg-transparent py-3 pl-11 pr-4 text-sm font-semibold outline-none transition-all focus:ring-2 focus:ring-primary/20 sm:py-3.5"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {[['TOUS', 'Toutes les récompenses'], ['ARGENT', 'Paiement FCFA'], ['POINTS', 'Points']].map(([value, label]) => (
               <button key={value} type="button" onClick={() => setRewardFilter(value)}
                 className={`whitespace-nowrap rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-colors ${rewardFilter === value ? 'border-primary bg-primary text-white' : 'border-gray-100 bg-white text-gray-500 hover:border-primary/30'}`}>
@@ -185,7 +178,7 @@ export default function Sondages() {
                     {actifs.slice(1).length > 0 ? 'Autres sondages' : 'Terminés ou en attente'}
                   </p>
                 )}
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                   {visibleGrid.map(s => (
                     <SurveyCardCompact key={s.id} survey={s} onClick={() => navigate(`/sondages/${s.id}`)} />
                   ))}
@@ -212,7 +205,6 @@ export default function Sondages() {
 }
 function SurveyCardFeatured({ survey: s, onClick }) {
   const statut = STATUT[s.statut] || STATUT.CLOTURE
-  const expiry = formatDate(s.dateExpiration)
 
   return (
     <button
@@ -263,12 +255,9 @@ function SurveyCardFeatured({ survey: s, onClick }) {
           )}
         </div>
 
-        {expiry && (
-          <div className="mt-5 pt-5 border-t border-white/10 flex items-center gap-1.5 text-white/40 text-[11px] font-bold">
-            <i className="ti ti-clock text-sm" />
-            {expiry}
-          </div>
-        )}
+        <div className="mt-5 border-t border-white/10 pt-5">
+          <SurveyCountdown dateExpiration={s.dateExpiration} featured />
+        </div>
       </div>
 
       {/* Decorative circles */}
@@ -279,44 +268,69 @@ function SurveyCardFeatured({ survey: s, onClick }) {
 }
 function SurveyCardCompact({ survey: s, onClick }) {
   const statut = STATUT[s.statut] || STATUT.CLOTURE
-  const expiry = formatDate(s.dateExpiration)
 
   return (
     <button
       onClick={onClick}
-      className="w-full text-left bg-white border-2 border-gray-100 hover:border-primary/30 hover:shadow-md overflow-hidden group active:scale-[0.98] transition-all"
+      className="group relative aspect-[4/3] w-full overflow-hidden border border-white/15 bg-primary text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98]"
     >
-      {/* Image de couverture */}
-      <div className="relative h-24 w-full overflow-hidden bg-primary/10">
-          <img
-            src={surveyImage(s)}
-            alt=""
-            onError={useFallbackImage}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-          <span className={`absolute top-1.5 right-1.5 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-tight border ${statut.cls} bg-white/90`}>
+      <img
+        src={surveyImage(s)}
+        alt=""
+        onError={useFallbackImage}
+        className="absolute inset-0 h-full w-full object-cover opacity-50 transition duration-500 group-hover:scale-105 group-hover:opacity-60"
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-primary/35 via-primary/55 to-primary/95" />
+
+      <div className="relative z-10 flex h-full flex-col p-3">
+        <div className="flex items-start justify-between gap-2">
+          <span className={`border px-2 py-1 text-[8px] font-black uppercase tracking-wider backdrop-blur-sm ${statut.cls} bg-white/90`}>
             {statut.label}
           </span>
-      </div>
-
-      <div className="p-3 space-y-2.5">
-        {/* Titre */}
-        <h3 className="font-heading font-bold text-[11px] text-primary leading-tight line-clamp-2 min-h-[2.4em]">{s.titre}</h3>
-
-        {/* Récompense */}
-        <div className="flex items-baseline gap-1">
-          <span className="text-base font-heading font-extrabold text-accent tabular-nums leading-none">{fmt(s.recompense)}</span>
-          <span className="text-[9px] font-bold text-gray-400">FCFA{s.typeRecompense === 'POINTS' ? ' → pts' : ''}</span>
+          {s.repondantsActuels > 0 && (
+            <span className="text-[9px] font-bold text-white/70">{s.repondantsActuels} rép.</span>
+          )}
         </div>
 
-        {/* Expiry */}
-        {expiry && (
-          <p className="text-[9px] text-gray-400 font-bold flex items-center gap-1">
-            <i className="ti ti-clock text-[10px]" />{expiry}
-          </p>
-        )}
+        <div className="mt-auto space-y-2">
+          <h3 className="line-clamp-2 font-heading text-xs font-black leading-tight text-white sm:text-[13px]">{s.titre}</h3>
+
+          <div className="flex items-end justify-between gap-2 border-t border-white/15 pt-2">
+            <div className="min-w-0">
+              <span className="block text-[8px] font-bold uppercase tracking-widest text-white/55">Récompense</span>
+              <span className="font-heading text-base font-black leading-none text-accent tabular-nums">{fmt(s.recompense)}</span>
+              <span className="ml-1 text-[8px] font-bold text-white/65">FCFA{s.typeRecompense === 'POINTS' ? ' → pts' : ''}</span>
+            </div>
+            <SurveyCountdown dateExpiration={s.dateExpiration} compact />
+          </div>
+        </div>
       </div>
     </button>
+  )
+}
+
+function SurveyCountdown({ dateExpiration, compact = false, featured = false }) {
+  const countdown = useCountdown(dateExpiration)
+  if (!countdown) return null
+
+  if (countdown.expired) {
+    return (
+      <span className={`inline-flex items-center gap-1 font-black uppercase ${compact ? 'text-[8px] text-white/60' : 'text-[10px] text-white/50'}`}>
+        <Clock3 size={compact ? 10 : 13} />
+        Terminé
+      </span>
+    )
+  }
+
+  return (
+    <div className={`flex shrink-0 items-center gap-1.5 tabular-nums ${compact ? 'text-white' : featured ? 'text-white/80' : 'text-primary'}`}>
+      <Clock3 size={compact ? 11 : 14} className="text-accent" />
+      <div className="text-right">
+        {!compact && <span className="block text-[8px] font-bold uppercase tracking-widest opacity-60">Temps restant</span>}
+        <span className={`font-heading font-black tracking-wide ${compact ? 'text-[9px]' : 'text-xs'}`}>
+          {pad(countdown.days)}j&nbsp;{pad(countdown.hours)}:{pad(countdown.minutes)}:{pad(countdown.seconds)}
+        </span>
+      </div>
+    </div>
   )
 }
