@@ -326,6 +326,7 @@ public class WalletService {
                 .build();
         transactionRepository.save(tx);
         notifierCredit(participantId, montant, portefeuille, "RECOMPENSE");
+        notifierSoldeDisponible(participantId, "RECOMPENSE", montant, portefeuille, "ARGENT");
 
         eventPublisher.publishEvent(new SseNotificationEvent(this,
                 "user:" + participantId, "RECOMPENSE",
@@ -355,6 +356,7 @@ public class WalletService {
                 .statut(StatutTransaction.SUCCESS)
                 .build();
         transactionRepository.save(tx);
+        notifierSoldeDisponible(participantId, "RECOMPENSE", points, portefeuille, "POINTS");
 
         eventPublisher.publishEvent(new SseNotificationEvent(this,
                 "user:" + participantId, "RECOMPENSE",

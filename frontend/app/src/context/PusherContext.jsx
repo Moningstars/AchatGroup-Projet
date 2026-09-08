@@ -5,8 +5,8 @@ import { BACKEND_ORIGIN } from '../services/api'
 
 const PusherContext = createContext(null)
 
-const PUSHER_KEY    = '81299440ac749487df29'
-const PUSHER_CLUSTER = 'eu'
+const PUSHER_KEY = import.meta.env.VITE_PUSHER_KEY || '81299440ac749487df29'
+const PUSHER_CLUSTER = import.meta.env.VITE_PUSHER_CLUSTER || 'eu'
 
 export function PusherProvider({ children }) {
   const { user, isAuthenticated } = useAuth()

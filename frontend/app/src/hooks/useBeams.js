@@ -3,7 +3,7 @@ import * as PusherPushNotifications from '@pusher/push-notifications-web'
 import { useAuth } from '../context/AuthContext'
 import { BACKEND_ORIGIN, getToken } from '../services/api'
 
-const BEAMS_INSTANCE_ID = '91f310a4-24e6-49e4-b83f-eec41cad76e5'
+const BEAMS_INSTANCE_ID = import.meta.env.VITE_BEAMS_INSTANCE_ID || '91f310a4-24e6-49e4-b83f-eec41cad76e5'
 
 let beamsClient = null
 
@@ -18,6 +18,8 @@ export function useBeams() {
   useEffect(() => {
     if (!isAuthenticated || !user?.id || !window.isSecureContext) return
 
+    let cancelled = false
+
     try {
       if (!beamsClient) {
         beamsClient = new PusherPushNotifications.Client({ instanceId: BEAMS_INSTANCE_ID })
@@ -29,13 +31,17 @@ export function useBeams() {
       })
 
       beamsClient.start()
-        .then(() => beamsClient.setUserId(user.id, tokenProvider))
+        .then(() => {
+          if (cancelled) return beamsClient.stop()
+          return beamsClient.setUserId(user.id, tokenProvider)
+        })
         .catch(err => console.error('[Beams] Erreur initialisation', err))
     } catch (err) {
       console.error('[Beams] Erreur initialisation', err)
     }
 
     return () => {
+      cancelled = true
       beamsClient?.stop().catch(() => {})
     }
   }, [isAuthenticated, user?.id])

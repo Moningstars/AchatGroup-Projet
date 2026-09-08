@@ -9,6 +9,7 @@ import com.plateformeopportunites.common.enums.TypeRecompense;
 import com.plateformeopportunites.common.event.RecompenseEvent;
 import com.plateformeopportunites.common.event.SseNotificationEvent;
 import com.plateformeopportunites.common.redis.RedisService;
+import com.plateformeopportunites.common.service.PusherNotificationService;
 import com.plateformeopportunites.finance.service.WalletService;
 import com.plateformeopportunites.identity.entity.Administrateur;
 import com.plateformeopportunites.identity.entity.Commanditaire;
@@ -65,6 +66,7 @@ public class SondageService {
     private final WalletService walletService;
     private final ApplicationEventPublisher eventPublisher;
     private final RedisService redisService;
+    private final PusherNotificationService pusherNotificationService;
 
     // ─── Création ─────────────────────────────────────────────────────────────
 
@@ -530,6 +532,14 @@ public class SondageService {
         String anciennePreuve = reponse.getFichierPreuve();
         reponse.setFichierPreuve(fichierUrl);
         sondageReponseRepository.save(reponse);
+        Sondage sondage = reponse.getSondage();
+        Map<String, Object> payload = Map.of(
+                "sondageId", sondage.getId(),
+                "reponseId", reponse.getId(),
+                "participantId", participantId,
+                "titre", sondage.getTitre()
+        );
+        notifierApresCommit(() -> pusherNotificationService.notifierAdmins("SONDAGE_PREUVE_SOUMISE", payload));
         return anciennePreuve;
     }
 
@@ -562,6 +572,13 @@ public class SondageService {
         reponse.setStatutValidation(approuve ? StatutValidation.VALIDE : StatutValidation.REJETE);
         reponse.setValideeAt(LocalDateTime.now());
         sondageReponseRepository.save(reponse);
+        Map<String, Object> validationPayload = Map.of(
+                "sondageId", sondage.getId(),
+                "titre", sondage.getTitre(),
+                "statut", approuve ? "VALIDE" : "REJETE"
+        );
+        notifierApresCommit(() -> pusherNotificationService.notifierUtilisateur(
+                reponse.getUtilisateur().getId(), "SONDAGE_VALIDATION", validationPayload));
 
         if (approuve) {
             // repondantsActuels ne compte que les réponses VALIDES
@@ -773,8 +790,26 @@ public class SondageService {
 
         // 3. Tracker le budget distribué sur le sondage
         BigDecimal distribue = sondage.getBudgetDistribue() != null ? sondage.getBudgetDistribue() : BigDecimal.ZERO;
-        sondage.setBudgetDistribue(distribue.add(montantFCFA));
+        BigDecimal nouveauDistribue = distribue.add(montantFCFA);
+        sondage.setBudgetDistribue(nouveauDistribue);
         sondageRepository.save(sondage);
+        if (sondage.getBudgetReserve() != null
+                && sondage.getBudgetReserve().compareTo(BigDecimal.ZERO) > 0
+                && nouveauDistribue.multiply(BigDecimal.valueOf(100))
+                        .compareTo(sondage.getBudgetReserve().multiply(BigDecimal.valueOf(80))) >= 0) {
+            Map<String, Object> budgetPayload = Map.of(
+                    "sondageId", sondage.getId(),
+                    "titre", sondage.getTitre(),
+                    "budgetDistribue", nouveauDistribue,
+                    "budgetReserve", sondage.getBudgetReserve()
+            );
+            notifierApresCommit(() -> {
+                if (redisService.marquerNotificationSiAbsent(
+                        "sondage:" + sondage.getId() + ":budget-80", 604_800)) {
+                    pusherNotificationService.notifierAdmins("SONDAGE_BUDGET_PRESQUE_EPUISE", budgetPayload);
+                }
+            });
+        }
 
         // 4. Marquer la récompense comme versée
         reponse.setRecompenseVersee(true);
@@ -963,6 +998,20 @@ public class SondageService {
     private Sondage getSondage(UUID id) {
         return sondageRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Sondage introuvable"));
+    }
+
+    private void notifierApresCommit(Runnable notification) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()
+                && TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    notification.run();
+                }
+            });
+        } else {
+            notification.run();
+        }
     }
 
     private Sondage getSondageForUpdate(UUID id) {

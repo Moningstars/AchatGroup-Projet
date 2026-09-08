@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import * as PusherPushNotifications from '@pusher/push-notifications-web'
 import { useAuth } from '../context/AuthContext'
 
-const BEAMS_INSTANCE_ID = import.meta.env.VITE_BEAMS_INSTANCE_ID
+const BEAMS_INSTANCE_ID = import.meta.env.VITE_BEAMS_INSTANCE_ID || '91f310a4-24e6-49e4-b83f-eec41cad76e5'
 const INTERET_ADMIN = 'admin-global'
 
 let beamsClient = null
@@ -17,14 +17,27 @@ export function useBeams() {
   const { isAuthenticated } = useAuth()
 
   useEffect(() => {
-    if (!isAuthenticated || !BEAMS_INSTANCE_ID) return
+    if (!isAuthenticated || !BEAMS_INSTANCE_ID || !window.isSecureContext) return
+
+    let cancelled = false
 
     if (!beamsClient) {
       beamsClient = new PusherPushNotifications.Client({ instanceId: BEAMS_INSTANCE_ID })
     }
 
     beamsClient.start()
-      .then(() => beamsClient.addDeviceInterest(INTERET_ADMIN))
+      .then(() => {
+        if (cancelled) return beamsClient.stop()
+        return beamsClient.addDeviceInterest(INTERET_ADMIN)
+      })
       .catch(err => console.error('[Beams] Erreur initialisation', err))
+
+    return () => {
+      cancelled = true
+      if (!beamsClient) return
+      beamsClient.removeDeviceInterest(INTERET_ADMIN)
+        .catch(() => {})
+        .finally(() => beamsClient.stop().catch(() => {}))
+    }
   }, [isAuthenticated])
 }

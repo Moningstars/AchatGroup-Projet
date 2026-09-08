@@ -158,7 +158,7 @@ export default function AdminShell() {
                           notifications.map(n => {
                             const content = (
                               <>
-                                {NOTIF_ICONS[n.style]}
+                                {NOTIF_ICONS[n.style] || NOTIF_ICONS.info}
                                 <div className="flex-1 min-w-0">
                                   <p className="text-xs text-slate-700 leading-snug">{n.msg}</p>
                                   <p className="text-[10px] text-slate-400 font-bold mt-1">{heureRelative(n.ts)}</p>

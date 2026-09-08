@@ -103,15 +103,23 @@ public class PusherNotificationService {
             case "RETRAIT" -> new String[]{"Retrait",
                     "APPROUVE".equals(data.get("statut")) ? "Votre retrait a été approuvé." : "Votre retrait a été rejeté."};
             case "RECOMPENSE" -> new String[]{"Récompense reçue",
-                    "Vous avez reçu " + data.get("montant") + ("POINTS".equals(data.get("type")) ? " points." : " FCFA.")};
+                    "Vous avez reçu " + data.get("montant") + ("POINTS".equals(data.getOrDefault("type", data.get("raison"))) ? " points." : " FCFA.")};
             case "OPPORTUNITE_VALIDEE" -> new String[]{"Achat groupé validé", "\"" + data.get("titre") + "\" a atteint son seuil minimum."};
-            case "OPPORTUNITE_ECHEC" -> new String[]{"Opportunité annulée", "\"" + data.get("titre") + "\" n'a pas atteint son seuil."};
+            case "OPPORTUNITE_ECHEC" -> new String[]{"Miitch clôturé", "\"" + data.get("titre") + "\" n'a pas atteint son seuil. Les fonds ont été remboursés."};
             case "OPPORTUNITE_EXPIRATION_PROCHE" -> new String[]{"Expire bientôt", "\"" + data.get("titre") + "\" expire sous 24h."};
+            case "LIVRAISON_PLANIFIEE" -> new String[]{"Livraison planifiée", String.valueOf(data.getOrDefault("message", "Votre date de livraison est disponible."))};
+            case "CONFIRMATION_RECEPTION_REQUISE" -> new String[]{"Confirmation requise", String.valueOf(data.getOrDefault("message", "Confirmez la réception ou signalez un problème."))};
+            case "SONDAGE_VALIDATION" -> new String[]{"Participation vérifiée",
+                    "VALIDE".equals(data.get("statut")) ? "Votre participation a été validée." : "Votre participation n'a pas été retenue."};
             case "KYC_SOUMIS" -> new String[]{"Nouvelle demande KYC", "Une vérification d'identité est à traiter."};
             case "RETRAIT_DEMANDE" -> new String[]{"Nouvelle demande de retrait", data.get("montant") + " FCFA à traiter."};
             case "OPPORTUNITE_PRESQUE_COMPLETE" -> new String[]{"Opportunité presque complète", "\"" + data.get("titre") + "\" approche son plafond."};
             case "OPPORTUNITE_RISQUE_ECHEC" -> new String[]{"Risque d'échec", "\"" + data.get("titre") + "\" expire bientôt sans atteindre son seuil."};
             case "SONDAGE_BUDGET_PRESQUE_EPUISE" -> new String[]{"Budget sondage presque épuisé", "\"" + data.get("titre") + "\" a distribué 80% de son budget."};
+            case "SONDAGE_PREUVE_SOUMISE" -> new String[]{"Preuve à vérifier", "Une nouvelle participation au Miitch i \"" + data.get("titre") + "\" attend votre décision."};
+            case "RECEPTION_PARTICIPANT" -> new String[]{"Retour de livraison",
+                    Boolean.TRUE.equals(data.get("recu")) ? "Un participant a confirmé la réception." : "Un participant a signalé un problème."};
+            case "RECEPTION_EN_RETARD" -> new String[]{"Confirmation en retard", data.get("participant") + " n'a pas confirmé sa livraison."};
             default -> null;
         };
     }

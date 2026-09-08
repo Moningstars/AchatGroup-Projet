@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { usePusher } from './PusherContext'
 import { useAuth } from './AuthContext'
 import { formatMontant as fmt } from '../utils/format'
@@ -20,9 +20,9 @@ const WALLET_DEBIT_LABELS = {
   AJUSTEMENT_ADMIN: 'Votre solde a été débité par l\'administration.',
 }
 
-function buildMessage(type, data) {
+function buildMessage(type, data = {}) {
   if (type === 'RECOMPENSE') {
-    return data.type === 'POINTS'
+    return (data.type || data.raison) === 'POINTS'
       ? `Récompense reçue : ${fmt(data.montant)} points crédités !`
       : `Récompense reçue : ${fmt(data.montant)} FCFA crédités sur votre portefeuille !`
   }
@@ -59,6 +59,17 @@ function buildMessage(type, data) {
   if (type === 'OPPORTUNITE_EXPIRATION_PROCHE') {
     return `"${data.titre}" expire dans moins de 24h.`
   }
+  if (type === 'LIVRAISON_PLANIFIEE') {
+    return data.message || `La livraison de votre Miitch est planifiée${data.dateLivraisonPrevue ? ` pour le ${new Date(data.dateLivraisonPrevue).toLocaleDateString('fr-FR')}` : ''}.`
+  }
+  if (type === 'CONFIRMATION_RECEPTION_REQUISE') {
+    return data.message || 'Votre livraison est arrivée. Confirmez sa réception ou signalez un problème.'
+  }
+  if (type === 'SONDAGE_VALIDATION') {
+    return data.statut === 'VALIDE'
+      ? `Votre participation à « ${data.titre || 'ce Miitch i'} » a été validée.`
+      : `Votre participation à « ${data.titre || 'ce Miitch i'} » n’a pas été retenue.`
+  }
   return null
 }
 
@@ -72,23 +83,38 @@ function toastStyle(type, data) {
   if (type === 'OPPORTUNITE_PROGRESSION') return 'info'
   if (type === 'OPPORTUNITE_VALIDEE') return 'success'
   if (type === 'OPPORTUNITE_ECHEC') return 'error'
-  if (type === 'OPPORTUNITE_EXPIRATION_PROCHE') return 'info'
+  if (type === 'OPPORTUNITE_EXPIRATION_PROCHE') return 'warning'
+  if (type === 'LIVRAISON_PLANIFIEE') return 'success'
+  if (type === 'CONFIRMATION_RECEPTION_REQUISE') return 'warning'
+  if (type === 'SONDAGE_VALIDATION') return data.statut === 'VALIDE' ? 'success' : 'error'
   return 'info'
 }
 
-function hrefFor(type, data) {
-  if (type.startsWith('OPPORTUNITE_') && data.id) return `/opportunity/${data.id}`
+function hrefFor(type, data = {}) {
+  const opportuniteId = data.opportuniteId || data.id
+  if ((type.startsWith('OPPORTUNITE_') || type === 'LIVRAISON_PLANIFIEE' || type === 'CONFIRMATION_RECEPTION_REQUISE') && opportuniteId) {
+    return `/opportunity/${opportuniteId}`
+  }
+  if (type === 'SONDAGE_VALIDATION' && data.sondageId) return `/sondages/${data.sondageId}`
+  if (type === 'KYC') return '/verification'
+  if (type === 'RETRAIT' || type.startsWith('WALLET_') || type === 'RECOMPENSE') return '/portefeuille'
   return null
 }
 
 const MAX_NOTIFICATIONS = 50
-let nextId = 0
+
+function createId() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
 
 function storageKey(userId) { return `opportunihub-notifications-${userId}` }
 
 function loadStored(userId) {
   if (!userId) return []
-  try { return JSON.parse(localStorage.getItem(storageKey(userId))) || [] }
+  try {
+    const stored = JSON.parse(localStorage.getItem(storageKey(userId)))
+    return Array.isArray(stored) ? stored.filter(item => item?.id && item?.msg).slice(0, MAX_NOTIFICATIONS) : []
+  }
   catch { return [] }
 }
 
@@ -98,6 +124,7 @@ export function NotificationsProvider({ children }) {
 
   const [toasts, setToasts] = useState([])
   const [notifications, setNotifications] = useState([])
+  const recentEvents = useRef(new Map())
 
   // Charger l'historique persistant à la connexion / changement d'utilisateur
   useEffect(() => {
@@ -110,18 +137,23 @@ export function NotificationsProvider({ children }) {
     localStorage.setItem(storageKey(user.id), JSON.stringify(notifications))
   }, [notifications, isAuthenticated, user?.id])
 
-  const add = (type, data) => {
+  const add = useCallback((type, data = {}) => {
     const msg = buildMessage(type, data)
     if (!msg) return
-    const id = ++nextId
+    const signature = `${type}:${data.id || data.opportuniteId || data.sondageId || ''}:${data.statut || ''}:${data.montant || ''}`
+    const now = Date.now()
+    if (now - (recentEvents.current.get(signature) || 0) < 1500) return
+    recentEvents.current.set(signature, now)
+
+    const id = createId()
     const style = toastStyle(type, data)
     const href = hrefFor(type, data)
 
-    setToasts(prev => [...prev, { id, msg, style }])
+    setToasts(prev => [...prev.slice(-2), { id, msg, style }])
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 6000)
 
-    setNotifications(prev => [{ id, msg, style, href, ts: Date.now(), lu: false }, ...prev].slice(0, MAX_NOTIFICATIONS))
-  }
+    setNotifications(prev => [{ id, msg, style, href, ts: now, lu: false }, ...prev].slice(0, MAX_NOTIFICATIONS))
+  }, [])
 
   // Toutes les notifications personnelles arrivent par Pusher, sur le canal privé de
   // l'utilisateur (private-user-{id}) — voir PusherContext.
@@ -137,13 +169,16 @@ export function NotificationsProvider({ children }) {
       'OPPORTUNITE_VALIDEE': data => add('OPPORTUNITE_VALIDEE', data),
       'OPPORTUNITE_ECHEC': data => add('OPPORTUNITE_ECHEC', data),
       'OPPORTUNITE_EXPIRATION_PROCHE': data => add('OPPORTUNITE_EXPIRATION_PROCHE', data),
+      'LIVRAISON_PLANIFIEE': data => add('LIVRAISON_PLANIFIEE', data),
+      'CONFIRMATION_RECEPTION_REQUISE': data => add('CONFIRMATION_RECEPTION_REQUISE', data),
+      'SONDAGE_VALIDATION': data => add('SONDAGE_VALIDATION', data),
       'wallet.credited': data => add('WALLET_CREDIT', data),
       'wallet.debited': data => add('WALLET_DEBIT', data),
     }
 
     Object.entries(handlers).forEach(([event, handler]) => on(event, handler))
     return () => { Object.entries(handlers).forEach(([event, handler]) => off(event, handler)) }
-  }, [isAuthenticated, off, on])
+  }, [add, isAuthenticated, off, on])
 
   const dismissToast = (id) => setToasts(prev => prev.filter(t => t.id !== id))
   const dismissNotification = (id) => setNotifications(prev => prev.filter(n => n.id !== id))

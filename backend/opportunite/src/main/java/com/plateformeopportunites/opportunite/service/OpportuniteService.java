@@ -623,6 +623,7 @@ public class OpportuniteService {
             throw new IllegalStateException("Cette commande est déjà validée ou clôturée : elle ne peut plus être augmentée");
         }
 
+        int participantsAvant = opp.getParticipantsActuels();
         BigDecimal prixActuel = calculerPrixActuel(opp);
         BigDecimal montantTotal = prixActuel.multiply(BigDecimal.valueOf(quantite));
 
@@ -682,6 +683,40 @@ public class OpportuniteService {
         }
 
         BigDecimal prixApres = calculerPrixActuel(opp);
+        List<UUID> destinataires = participationRepository.findByOpportuniteId(opportuniteId).stream()
+                .map(p -> p.getUtilisateur().getId())
+                .distinct()
+                .toList();
+        if (prixApres.compareTo(prixActuel) < 0) {
+            Map<String, Object> payloadPalier = Map.of(
+                    "id", opportuniteId,
+                    "titre", opp.getTitre(),
+                    "nouveauPrix", prixApres
+            );
+            notifierApresCommit(() -> destinataires.forEach(utilisateurId ->
+                    pusherNotificationService.notifierUtilisateur(
+                            utilisateurId, "OPPORTUNITE_PALIER", payloadPalier)));
+        }
+        int progressionAvant = Math.min(100, participantsAvant * 100 / opp.getSeuilMinimum());
+        int progressionApres = Math.min(100, opp.getParticipantsActuels() * 100 / opp.getSeuilMinimum());
+        for (int palierProgression : List.of(25, 50, 75)) {
+            if (progressionAvant < palierProgression && progressionApres >= palierProgression) {
+                Map<String, Object> payloadProgression = Map.of(
+                        "id", opportuniteId,
+                        "titre", opp.getTitre(),
+                        "pourcentage", palierProgression,
+                        "participantsActuels", opp.getParticipantsActuels(),
+                        "seuilMinimum", opp.getSeuilMinimum()
+                );
+                notifierApresCommit(() -> {
+                    if (redisService.marquerNotificationSiAbsent(
+                            "opportunite:" + opportuniteId + ":progression-" + palierProgression, 604_800)) {
+                        destinataires.forEach(utilisateurId -> pusherNotificationService.notifierUtilisateur(
+                                utilisateurId, "OPPORTUNITE_PROGRESSION", payloadProgression));
+                    }
+                });
+            }
+        }
         String payloadCompteur = "{\"id\":\"" + opportuniteId + "\",\"participantsActuels\":" + opp.getParticipantsActuels()
                 + ",\"prixActuel\":" + prixApres.toPlainString() + "}";
         eventPublisher.publishEvent(new SseNotificationEvent(this,
@@ -779,6 +814,13 @@ public class OpportuniteService {
     public void cloturerAvecEchec(UUID opportuniteId) {
         Opportunite opp = getOpportuniteForUpdate(opportuniteId);
         if (opp.getStatut() == StatutOpportunite.ANNULEE) return;
+        List<Participation> participationsImpactees = participationRepository
+                .findByOpportuniteIdAndStatut(opportuniteId, StatutParticipation.EN_ATTENTE);
+        List<UUID> participantsImpactes = participationsImpactees
+                .stream()
+                .map(p -> p.getUtilisateur().getId())
+                .distinct()
+                .toList();
         opp.setStatut(StatutOpportunite.ANNULEE);
         opportuniteRepository.save(opp);
         redisService.supprimerCompteur(opportuniteId);
@@ -790,13 +832,28 @@ public class OpportuniteService {
                 "opportunites:global", "STATUT", payloadAnnulation));
         // Le remboursement fait partie de la même transaction que l'annulation.
         // Si un seul remboursement échoue, l'annulation entière est annulée.
-        rembourserTous(opportuniteId);
+        rembourserParticipations(participationsImpactees);
+        Map<String, Object> payload = Map.of(
+                "id", opportuniteId,
+                "titre", opp.getTitre(),
+                "participantsActuels", opp.getParticipantsActuels(),
+                "seuilMinimum", opp.getSeuilMinimum()
+        );
+        notifierApresCommit(() -> {
+            participantsImpactes.forEach(utilisateurId ->
+                    pusherNotificationService.notifierUtilisateur(utilisateurId, "OPPORTUNITE_ECHEC", payload));
+            pusherNotificationService.notifierAdmins("OPPORTUNITE_ECHEC", payload);
+        });
     }
 
     @Transactional
     public void rembourserTous(UUID opportuniteId) {
         List<Participation> participations = participationRepository
                 .findByOpportuniteIdAndStatut(opportuniteId, StatutParticipation.EN_ATTENTE);
+        rembourserParticipations(participations);
+    }
+
+    private void rembourserParticipations(List<Participation> participations) {
         for (Participation p : participations) {
             rembourserParticipation(p, p.getMontantGele());
             p.setStatut(StatutParticipation.REMBOURSEE);
