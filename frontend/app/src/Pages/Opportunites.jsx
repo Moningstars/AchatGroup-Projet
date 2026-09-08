@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
-import { Loader2, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { getOpportunites, getSondages, getBannieres, imgUrl, enregistrerImpressionBanniere, enregistrerClicBanniere } from '../services/api'
 import ProductCard from '../components/ProductCard'
@@ -78,6 +78,7 @@ export default function Opportunites() {
   const [visible, setVisible] = useState(true)
   const [lastChancePaused, setLastChancePaused] = useState(false)
   const lastChanceRef = useRef(null)
+  const lastChanceResumeRef = useRef(null)
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -218,22 +219,42 @@ export default function Opportunites() {
     .sort((a, b) => new Date(a.dateExpiration) - new Date(b.dateExpiration))
   , [opportunites])
 
+  const scrollLastChance = useCallback((direction = 1) => {
+    const rail = lastChanceRef.current
+    const firstCard = rail?.firstElementChild
+    if (!rail || !firstCard) return
+
+    const gap = Number.parseFloat(window.getComputedStyle(rail).columnGap) || 12
+    const step = firstCard.getBoundingClientRect().width + gap
+    const atStart = rail.scrollLeft <= 8
+    const atEnd = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 8
+    const nextLeft = direction > 0
+      ? (atEnd ? 0 : rail.scrollLeft + step)
+      : (atStart ? rail.scrollWidth - rail.clientWidth : rail.scrollLeft - step)
+
+    rail.scrollTo({ left: nextLeft, behavior: 'smooth' })
+  }, [])
+
+  const handleLastChanceArrow = useCallback((direction) => {
+    setLastChancePaused(true)
+    scrollLastChance(direction)
+    window.clearTimeout(lastChanceResumeRef.current)
+    lastChanceResumeRef.current = window.setTimeout(() => setLastChancePaused(false), 4_500)
+  }, [scrollLastChance])
+
+  useEffect(() => () => window.clearTimeout(lastChanceResumeRef.current), [])
+
   useEffect(() => {
     const rail = lastChanceRef.current
     if (!rail || expirantBientot.length < 2 || lastChancePaused) return undefined
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
 
     const id = window.setInterval(() => {
-      const firstCard = rail.firstElementChild
-      if (!firstCard) return
-      const gap = Number.parseFloat(window.getComputedStyle(rail).columnGap) || 12
-      const step = firstCard.getBoundingClientRect().width + gap
-      const reachedEnd = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 8
-      rail.scrollTo({ left: reachedEnd ? 0 : rail.scrollLeft + step, behavior: 'smooth' })
-    }, 3500)
+      scrollLastChance(1)
+    }, 4_000)
 
     return () => window.clearInterval(id)
-  }, [expirantBientot.length, lastChancePaused])
+  }, [expirantBientot.length, lastChancePaused, scrollLastChance])
 
   if (loading) {
     return (
@@ -345,9 +366,6 @@ export default function Opportunites() {
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <span className="hidden sm:flex items-center gap-1 text-[10px] text-gray-300 font-bold">
-                  <i className="ti ti-arrows-left-right" /> défiler
-                </span>
                 <Link to="/opportunites" state={{ category: 'Tout' }} className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-primary transition-colors flex items-center gap-1">
                   Voir tout <i className="ti ti-arrow-right" />
                 </Link>
@@ -366,7 +384,8 @@ export default function Opportunites() {
                 onBlur={(event) => {
                   if (!event.currentTarget.contains(event.relatedTarget)) setLastChancePaused(false)
                 }}
-                className="flex max-w-full gap-3 overflow-x-auto overscroll-x-contain pb-3 snap-x snap-mandatory scroll-smooth scrollbar-thin sm:gap-4"
+                className="flex max-w-full gap-3 overflow-x-auto overscroll-x-contain snap-x snap-mandatory scroll-smooth scrollbar-hide sm:gap-4"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
               >
                 {expirantBientot.map(op => {
                   const diff = op.dateExpiration
@@ -436,8 +455,25 @@ export default function Opportunites() {
                 })}
               </div>
 
-              {/* Fondu droite */}
-              <div className="pointer-events-none absolute bottom-3 right-0 top-0 w-10 bg-gradient-to-l from-bg-light via-bg-light/80 to-transparent sm:w-16" />
+              <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-bg-light/90 to-transparent" />
+              <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-bg-light/90 to-transparent" />
+
+              <button
+                type="button"
+                aria-label="Voir les offres précédentes"
+                onClick={() => handleLastChanceArrow(-1)}
+                className="absolute left-2 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-gray-100 bg-white/95 text-primary shadow-lg backdrop-blur transition hover:scale-105 hover:bg-primary hover:text-white active:scale-95 sm:h-10 sm:w-10"
+              >
+                <ChevronLeft size={19} />
+              </button>
+              <button
+                type="button"
+                aria-label="Voir les offres suivantes"
+                onClick={() => handleLastChanceArrow(1)}
+                className="absolute right-2 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-gray-100 bg-white/95 text-primary shadow-lg backdrop-blur transition hover:scale-105 hover:bg-primary hover:text-white active:scale-95 sm:h-10 sm:w-10"
+              >
+                <ChevronRight size={19} />
+              </button>
             </div>
           </section>
         )}
