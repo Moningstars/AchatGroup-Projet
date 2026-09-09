@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Clock3, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { getSondages, getBannieres, imgUrl } from '../services/api'
 import PageCarousel from '../components/PageCarousel'
+import CountdownClock from '../components/CountdownClock'
 import { useSSE } from '../hooks/useSSE'
-import { useCountdown } from '../hooks/useCountdown'
 import { formatMontant as fmt } from '../utils/format'
 
-function pad(value) {
-  return String(value || 0).padStart(2, '0')
-}
 const STATUT = {
   ACTIF: { label: 'Ouvert', cls: 'bg-success/15 text-success border-success/20' },
   EN_ATTENTE: { label: 'En attente', cls: 'bg-accent/15 text-accent border-accent/20' },
@@ -25,7 +22,6 @@ function surveyImage(survey) {
   const index = [...key].reduce((total, char) => total + char.charCodeAt(0), 0) % SURVEY_FALLBACK_IMAGES.length
   return SURVEY_FALLBACK_IMAGES[index]
 }
-
 function useFallbackImage(event) {
   const image = event.currentTarget
   if (image.dataset.fallbackApplied === 'true') return
@@ -82,9 +78,7 @@ export default function Sondages() {
   const actifs = filtered.filter(s => s.statut === 'ACTIF')
   const autres = filtered.filter(s => s.statut !== 'ACTIF')
 
-  // Featured = premier actif, grille = le reste (actifs suivants + autres)
-  const featured = actifs[0] || null
-  const gridItems = [...actifs.slice(featured ? 1 : 0), ...autres]
+  const gridItems = [...actifs, ...autres]
   const visibleGrid = gridItems.slice(0, page * GRID_LIMIT)
   const hasMore = gridItems.length > page * GRID_LIMIT
 
@@ -165,20 +159,10 @@ export default function Sondages() {
           </div>
         ) : (
           <div className="space-y-6 pb-8">
-            {/* ── Featured (premier actif) ── */}
-            {featured && (
-              <SurveyCardFeatured survey={featured} onClick={() => navigate(`/sondages/${featured.id}`)} />
-            )}
-
-            {/* ── Grille 5 colonnes ── */}
+            {/* Toutes les Miitchs insight utilisent désormais le même format compact. */}
             {gridItems.length > 0 && (
               <section className="space-y-4">
-                {featured && gridItems.length > 0 && (
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">
-                    {actifs.slice(1).length > 0 ? 'Autres Miitchs insight' : 'Terminés ou en attente'}
-                  </p>
-                )}
-                <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-1 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {visibleGrid.map(s => (
                     <SurveyCardCompact key={s.id} survey={s} onClick={() => navigate(`/sondages/${s.id}`)} />
                   ))}
@@ -201,69 +185,6 @@ export default function Sondages() {
         )}
       </div>
     </div>
-  )
-}
-function SurveyCardFeatured({ survey: s, onClick }) {
-  const statut = STATUT[s.statut] || STATUT.CLOTURE
-
-  return (
-    <button
-      onClick={onClick}
-      className="w-full text-left bg-primary rounded-3xl text-white relative overflow-hidden shadow-2xl shadow-primary/30 active:scale-[0.98] transition-transform"
-    >
-      {/* Image de couverture */}
-      <div className="absolute inset-0 z-0">
-        <img
-          src={surveyImage(s)}
-          alt=""
-          onError={useFallbackImage}
-          className="h-full w-full object-cover opacity-70 transition-transform duration-500 hover:scale-105"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/95 via-primary/80 to-primary/40" />
-      </div>
-
-      <div className="relative z-10 p-7">
-        <div className="flex justify-between items-center mb-6">
-          <div className="bg-success/20 text-success text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest border border-success/30">
-            {statut.label}
-          </div>
-          {s.repondantsActuels > 0 && (
-            <div className="flex items-center gap-1.5 text-white/60">
-              <i className="ti ti-users-group text-sm" />
-              <span className="text-[11px] font-bold">{s.repondantsActuels?.toLocaleString('fr-FR')} répondants</span>
-            </div>
-          )}
-        </div>
-
-        <h3 className="text-2xl font-heading font-extrabold mb-3 leading-tight tracking-tight">{s.titre}</h3>
-        {s.description && (
-          <p className="text-white/50 text-sm mb-8 font-medium leading-relaxed line-clamp-2">{s.description}</p>
-        )}
-
-        <div className="flex items-end justify-between">
-          <div className="flex flex-col">
-            <span className="text-[9px] text-white/40 font-bold uppercase tracking-widest mb-1">Récompense</span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-3xl font-heading font-extrabold text-accent">{fmt(s.recompense)}</span>
-              <span className="text-sm font-bold text-white/50">FCFA{s.typeRecompense === 'POINTS' ? ' → points' : ''}</span>
-            </div>
-          </div>
-          {s.statut === 'ACTIF' && (
-            <div className="bg-accent text-primary px-6 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest shadow-lg shadow-accent/20">
-              Répondre →
-            </div>
-          )}
-        </div>
-
-        <div className="mt-5 border-t border-white/10 pt-5">
-          <SurveyCountdown dateExpiration={s.dateExpiration} featured />
-        </div>
-      </div>
-
-      {/* Decorative circles */}
-      <div className="absolute -right-16 -bottom-16 w-48 h-48 bg-accent/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -left-8 -top-8 w-32 h-32 bg-white/5 rounded-full pointer-events-none" />
-    </button>
   )
 }
 function SurveyCardCompact({ survey: s, onClick }) {
@@ -301,36 +222,10 @@ function SurveyCardCompact({ survey: s, onClick }) {
               <span className="font-heading text-base font-black leading-none text-accent tabular-nums">{fmt(s.recompense)}</span>
               <span className="ml-1 text-[8px] font-bold text-white/65">FCFA{s.typeRecompense === 'POINTS' ? ' → pts' : ''}</span>
             </div>
-            <SurveyCountdown dateExpiration={s.dateExpiration} compact />
+            <CountdownClock dateExpiration={s.dateExpiration} compact className="shrink-0" />
           </div>
         </div>
       </div>
     </button>
-  )
-}
-
-function SurveyCountdown({ dateExpiration, compact = false, featured = false }) {
-  const countdown = useCountdown(dateExpiration)
-  if (!countdown) return null
-
-  if (countdown.expired) {
-    return (
-      <span className={`inline-flex items-center gap-1 font-black uppercase ${compact ? 'text-[8px] text-white/60' : 'text-[10px] text-white/50'}`}>
-        <Clock3 size={compact ? 10 : 13} />
-        Terminé
-      </span>
-    )
-  }
-
-  return (
-    <div className={`flex shrink-0 items-center gap-1.5 tabular-nums ${compact ? 'text-white' : featured ? 'text-white/80' : 'text-primary'}`}>
-      <Clock3 size={compact ? 11 : 14} className="text-accent" />
-      <div className="text-right">
-        {!compact && <span className="block text-[8px] font-bold uppercase tracking-widest opacity-60">Temps restant</span>}
-        <span className={`font-heading font-black tracking-wide ${compact ? 'text-[9px]' : 'text-xs'}`}>
-          {pad(countdown.days)}j&nbsp;{pad(countdown.hours)}:{pad(countdown.minutes)}:{pad(countdown.seconds)}
-        </span>
-      </div>
-    </div>
   )
 }

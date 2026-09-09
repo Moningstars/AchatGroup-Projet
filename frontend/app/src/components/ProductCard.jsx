@@ -1,25 +1,8 @@
 import { Link } from 'react-router-dom'
 import { imgUrl } from '../services/api'
 import { calculerProgression } from '../utils/progression'
-import { useCountdown } from '../hooks/useCountdown'
 import { formatMontant as fmt } from '../utils/format'
-
-function OpportunityCountdown({ dateExpiration }) {
-  const countdown = useCountdown(dateExpiration, 1_000)
-  if (!countdown) return null
-  const pad = value => String(value).padStart(2, '0')
-
-  return (
-    <div className="flex min-w-0 items-center justify-between gap-2 text-[8px] font-bold uppercase tracking-wide text-white/70">
-      <span className="flex shrink-0 items-center gap-1"><i className="ti ti-clock text-[10px] text-accent" /> Temps restant</span>
-      <span className={countdown.expired ? 'text-red-300' : 'truncate tabular-nums text-white'}>
-        {countdown.expired
-          ? 'Expirée'
-          : `${countdown.days}j · ${pad(countdown.hours)}:${pad(countdown.minutes)}:${pad(countdown.seconds)}`}
-      </span>
-    </div>
-  )
-}
+import CountdownClock from './CountdownClock'
 
 const ProductCard = ({ opportunity }) => {
   if (!opportunity) return null
@@ -78,7 +61,7 @@ const ProductCard = ({ opportunity }) => {
         </div>
 
         {/* Progression recentrée sur le visuel pour libérer la fiche blanche. */}
-        <div className="absolute inset-x-2.5 bottom-2.5 rounded-xl bg-primary/75 px-2.5 py-2 shadow-lg backdrop-blur-md ring-1 ring-white/10">
+        <div className="absolute inset-x-0 bottom-0 bg-primary/80 px-3 py-2.5 backdrop-blur-md ring-1 ring-white/10">
           <div className="mb-1 flex items-center justify-between gap-2 text-[8px] font-black uppercase tracking-wider">
             <span className="text-white/70">Progression</span>
             <span className="text-accent">{progress}%</span>
@@ -86,7 +69,7 @@ const ProductCard = ({ opportunity }) => {
           <div className="mb-1.5 h-1 overflow-hidden rounded-full bg-white/20">
             <div className="h-full rounded-full bg-success transition-all" style={{ width: `${progress}%` }} />
           </div>
-          <OpportunityCountdown dateExpiration={dateExpiration} />
+          <CountdownClock dateExpiration={dateExpiration} compact fullWidth />
         </div>
       </div>
 

@@ -11,8 +11,8 @@ import {
 } from '../services/api'
 import { formatMontant } from '../utils/format'
 import { useAuth } from '../context/AuthContext'
-import { useCountdown } from '../hooks/useCountdown'
 import { useSSE } from '../hooks/useSSE'
+import CountdownClock from '../components/CountdownClock'
 
 const SURVEY_FALLBACK_IMAGES = ['/hero/slide-2.jpg', '/hero/slide-3.jpg', '/hero/slide-4.jpg']
 
@@ -33,10 +33,6 @@ function useFallbackImage(event) {
   if (image.dataset.fallbackApplied === 'true') return
   image.dataset.fallbackApplied = 'true'
   image.src = '/hero/slide-2.jpg'
-}
-
-function pad(value) {
-  return String(value || 0).padStart(2, '0')
 }
 
 // ─── Composant question ───────────────────────────────────────────────────────
@@ -203,49 +199,13 @@ function SondageCard({ sondage }) {
 }
 
 function DeadlineCountdown({ dateExpiration }) {
-  const countdown = useCountdown(dateExpiration)
-  if (!countdown) return null
-
-  if (countdown.expired) {
-    return (
-      <div className="flex items-center gap-2 border-t border-white/10 pt-3 text-xs font-black text-white/60">
-        <Clock size={14} className="text-accent" />
-        Miitch i terminé
-      </div>
-    )
-  }
-
-  const units = [
-    ['Jours', countdown.days],
-    ['Heures', countdown.hours],
-    ['Min', countdown.minutes],
-    ['Sec', countdown.seconds],
-  ]
-
   return (
     <div className="border-t border-white/10 pt-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-primary shadow-lg shadow-accent/20">
-            <Clock size={16} />
-          </span>
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">Temps restant</p>
-            <p className="text-[10px] font-bold text-white/60">Jusqu'au {formatDate(dateExpiration)}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {units.map(([label, value], index) => (
-            <div key={label} className="flex items-center gap-1.5">
-              {index > 0 && <span className="font-heading text-sm font-black text-white/35">:</span>}
-              <div className="min-w-10 bg-white/10 px-2 py-1.5 text-center backdrop-blur-sm ring-1 ring-white/10">
-                <span className="block font-heading text-sm font-black leading-none text-white tabular-nums">{pad(value)}</span>
-                <span className="mt-1 block text-[7px] font-black uppercase tracking-wider text-white/45">{label}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <CountdownClock
+        dateExpiration={dateExpiration}
+        title="Temps restant"
+        subtitle={`Jusqu'au ${formatDate(dateExpiration)}`}
+      />
     </div>
   )
 }

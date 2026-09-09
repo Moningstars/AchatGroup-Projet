@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { getOpportunites, getSondages, getBannieres, imgUrl, enregistrerImpressionBanniere, enregistrerClicBanniere } from '../services/api'
 import ProductCard from '../components/ProductCard'
+import CountdownClock from '../components/CountdownClock'
 import { useSSE } from '../hooks/useSSE'
 import { formatMontant as fmt } from '../utils/format'
 
@@ -12,6 +13,22 @@ const CATS = [
 ]
 
 const REFERENCE_TEMPS = Date.now()
+const SURVEY_FALLBACK_IMAGES = ['/hero/slide-2.jpg', '/hero/slide-3.jpg', '/hero/slide-4.jpg']
+
+function surveyImage(survey) {
+  if (survey?.imageUrl) return imgUrl(survey.imageUrl)
+  const key = String(survey?.id || survey?.titre || 'sondage')
+  const index = [...key].reduce((total, char) => total + char.charCodeAt(0), 0) % SURVEY_FALLBACK_IMAGES.length
+  return SURVEY_FALLBACK_IMAGES[index]
+}
+
+function useSurveyFallbackImage(event) {
+  const image = event.currentTarget
+  if (image.dataset.fallbackApplied === 'true') return
+  image.dataset.fallbackApplied = 'true'
+  image.src = '/hero/slide-2.jpg'
+}
+
 function formatDate(dt) {
   if (!dt) return null
   const d = new Date(dt)
@@ -79,6 +96,9 @@ export default function Opportunites() {
   const [lastChancePaused, setLastChancePaused] = useState(false)
   const lastChanceRef = useRef(null)
   const lastChanceResumeRef = useRef(null)
+  const [surveysPaused, setSurveysPaused] = useState(false)
+  const surveysRef = useRef(null)
+  const surveysResumeRef = useRef(null)
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -244,6 +264,31 @@ export default function Opportunites() {
 
   useEffect(() => () => window.clearTimeout(lastChanceResumeRef.current), [])
 
+  const scrollSurveys = useCallback((direction = 1) => {
+    const rail = surveysRef.current
+    const firstCard = rail?.firstElementChild
+    if (!rail || !firstCard) return
+
+    const gap = Number.parseFloat(window.getComputedStyle(rail).columnGap) || 16
+    const step = firstCard.getBoundingClientRect().width + gap
+    const atStart = rail.scrollLeft <= 8
+    const atEnd = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 8
+    const nextLeft = direction > 0
+      ? (atEnd ? 0 : rail.scrollLeft + step)
+      : (atStart ? rail.scrollWidth - rail.clientWidth : rail.scrollLeft - step)
+
+    rail.scrollTo({ left: nextLeft, behavior: 'smooth' })
+  }, [])
+
+  const handleSurveyArrow = useCallback((direction) => {
+    setSurveysPaused(true)
+    scrollSurveys(direction)
+    window.clearTimeout(surveysResumeRef.current)
+    surveysResumeRef.current = window.setTimeout(() => setSurveysPaused(false), 4_500)
+  }, [scrollSurveys])
+
+  useEffect(() => () => window.clearTimeout(surveysResumeRef.current), [])
+
   useEffect(() => {
     const rail = lastChanceRef.current
     if (!rail || expirantBientot.length < 2 || lastChancePaused) return undefined
@@ -255,6 +300,15 @@ export default function Opportunites() {
 
     return () => window.clearInterval(id)
   }, [expirantBientot.length, lastChancePaused, scrollLastChance])
+
+  useEffect(() => {
+    const rail = surveysRef.current
+    if (!rail || sondages.length < 2 || surveysPaused) return undefined
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
+
+    const id = window.setInterval(() => scrollSurveys(1), 4_500)
+    return () => window.clearInterval(id)
+  }, [sondages.length, surveysPaused, scrollSurveys])
 
   if (loading) {
     return (
@@ -564,9 +618,24 @@ export default function Opportunites() {
                 </p>
               </div>
               <div className="flex items-center gap-4">
-                <span className="hidden sm:flex items-center gap-1 text-[10px] text-gray-300 font-bold">
-                  <i className="ti ti-arrows-left-right" /> défiler
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-label="Voir les Miitchs insight précédents"
+                    onClick={() => handleSurveyArrow(-1)}
+                    className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-gray-100 bg-white text-primary transition hover:border-primary hover:bg-primary hover:text-white active:scale-95"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Voir les Miitchs insight suivants"
+                    onClick={() => handleSurveyArrow(1)}
+                    className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-gray-100 bg-white text-primary transition hover:border-primary hover:bg-primary hover:text-white active:scale-95"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
                 <button
                   onClick={() => navigate('/sondages')}
                   className="bg-white border-2 border-gray-100 text-primary font-black uppercase text-[10px] tracking-widest px-6 py-3.5 rounded-2xl hover:border-primary transition-all active:scale-95"
@@ -576,22 +645,32 @@ export default function Opportunites() {
               </div>
             </div>
 
-            <div className="flex gap-4 overflow-x-auto pb-3 snap-x scrollbar-thin sm:gap-6">
+            <div
+              ref={surveysRef}
+              onMouseEnter={() => setSurveysPaused(true)}
+              onMouseLeave={() => setSurveysPaused(false)}
+              onTouchStart={() => setSurveysPaused(true)}
+              onTouchEnd={() => setSurveysPaused(false)}
+              onFocus={() => setSurveysPaused(true)}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) setSurveysPaused(false)
+              }}
+              className="flex gap-4 overflow-x-auto overscroll-x-contain snap-x snap-mandatory scroll-smooth scrollbar-hide sm:gap-6"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
               {sondages.slice(0, 4).map(s => (
                 <button
                   key={s.id}
                   onClick={() => navigate(`/sondages/${s.id}`)}
                   className="group relative min-w-[min(82vw,310px)] snap-start overflow-hidden border-2 border-primary bg-primary p-6 text-left shadow-2xl shadow-primary/20 transition-transform active:scale-[0.98] sm:p-8 md:min-w-[380px]"
                 >
-                  {s.imageUrl && (
-                    <img
-                      src={imgUrl(s.imageUrl)}
-                      alt=""
-                      className="absolute inset-0 h-full w-full object-cover opacity-55 transition-transform duration-500 group-hover:scale-105"
-                      onError={(event) => { event.currentTarget.style.display = 'none' }}
-                    />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/85 to-primary/45" />
+                  <img
+                    src={surveyImage(s)}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover opacity-75 transition-transform duration-500 group-hover:scale-105"
+                    onError={useSurveyFallbackImage}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-primary/95 via-primary/65 to-primary/25" />
                   <div className="relative z-10 flex flex-col h-full justify-between min-h-[200px]">
                     <div>
                       <div className="flex items-center gap-3 mb-6">
@@ -608,7 +687,7 @@ export default function Opportunites() {
                         {s.titre}
                       </h3>
                     </div>
-                    <div className="flex items-end justify-between pt-4 border-t border-white/10">
+                    <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
                       <div>
                         <span className="text-success text-[10px] font-black uppercase tracking-widest block mb-1">
                           Récompense
@@ -617,8 +696,11 @@ export default function Opportunites() {
                           {fmt(s.recompense)} <span className="text-sm font-bold text-white/40">FCFA</span>
                         </span>
                       </div>
-                      <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg group-hover:bg-accent transition-colors">
-                        <i className="ti ti-player-play-filled text-xl text-primary ml-0.5" />
+                      <div className="flex min-w-0 items-end justify-between gap-3 sm:flex-1 sm:justify-end">
+                        <CountdownClock dateExpiration={s.dateExpiration} compact className="shrink-0" />
+                        <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white transition-colors group-hover:bg-accent sm:flex">
+                          <i className="ti ti-player-play-filled text-base text-primary ml-0.5" />
+                        </div>
                       </div>
                     </div>
                   </div>

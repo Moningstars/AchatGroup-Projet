@@ -1,17 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom'
 import {
-  ShieldCheck, Users, Loader2, ChevronRight, CheckCircle2, AlertCircle, Layers, Timer, Minus, Plus, Copy, Share2, ShoppingCart, PackageCheck, ExternalLink, Gift, Store, Coins
+  ShieldCheck, Users, Loader2, ChevronRight, CheckCircle2, AlertCircle, Layers, Minus, Plus, Copy, Share2, ShoppingCart, PackageCheck, ExternalLink, Gift, Store, Coins
 } from 'lucide-react'
 import { getApiErrorMessage, getOpportunite, getOpportunites, getMesParticipationsOpportunites, getSolde, souscrire, imgUrl } from '../services/api'
 import { useAuth } from '../context/AuthContext'
-import { useCountdown } from '../hooks/useCountdown'
 import { useSSE } from '../hooks/useSSE'
 import ProductCard from '../components/ProductCard'
+import CountdownClock from '../components/CountdownClock'
 import { formatMontant as fmt } from '../utils/format'
 import { calculerProgression } from '../utils/progression'
-
-function pad(n) { return String(n).padStart(2, '0') }
 
 function WhatsAppLogo({ className = 'h-5 w-5' }) {
   return (
@@ -71,38 +69,9 @@ const SUIVI_PARTICIPATION = {
 }
 
 function FloatingCountdown({ dateExpiration }) {
-  const c = useCountdown(dateExpiration, 1000)
-  if (!c) return null
-
-  if (c.expired) {
-    return (
-      <div className="bg-primary/80 backdrop-blur-md border border-white/10 rounded-2xl shadow-xl shadow-black/20 px-6 py-3.5 text-center">
-        <p className="text-xs font-black text-white uppercase tracking-widest">Offre expirée</p>
-      </div>
-    )
-  }
-
-  const blocks = c.days > 0
-    ? [{ v: c.days, l: 'Jours' }, { v: c.hours, l: 'Heures' }, { v: c.minutes, l: 'Min' }, { v: c.seconds, l: 'Sec' }]
-    : [{ v: c.hours, l: 'Heures' }, { v: c.minutes, l: 'Min' }, { v: c.seconds, l: 'Sec' }]
-
   return (
     <div className="bg-primary/80 backdrop-blur-md border border-white/10 rounded-2xl shadow-xl shadow-black/20 px-4 py-3">
-      <div className="flex items-center justify-center gap-1.5 mb-2.5">
-        <Timer size={12} className="text-accent" />
-        <span className="text-[10px] font-black text-white uppercase tracking-widest">L'offre expire dans</span>
-      </div>
-      <div className="flex items-center justify-center gap-1 sm:gap-2">
-        {blocks.map(({ v, l }, i) => (
-          <div key={l} className="flex items-center gap-1 sm:gap-2">
-            <div className="text-center min-w-[40px] sm:min-w-[46px]">
-              <p className="text-xl sm:text-2xl font-black tabular-nums text-white leading-none">{pad(v)}</p>
-              <p className="text-[8px] sm:text-[9px] text-white/40 uppercase tracking-wider mt-1">{l}</p>
-            </div>
-            {i < blocks.length - 1 && <span className="text-white/20 font-black text-lg -mt-3">:</span>}
-          </div>
-        ))}
-      </div>
+      <CountdownClock dateExpiration={dateExpiration} title="L'offre expire dans" />
     </div>
   )
 }
