@@ -253,7 +253,7 @@ export default function Catalogue() {
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-7xl px-4 pt-6 space-y-6 pb-8 sm:px-5 lg:px-6 xl:px-8">
+      <div className="mx-auto w-full max-w-7xl xl:max-w-[85%] px-4 pt-6 space-y-6 pb-8 sm:px-5 lg:px-6 xl:px-8">
 
         {/* ── Carousel promo ── */}
         {slides.length > 0 && <PageCarousel slides={slides} />}
@@ -331,7 +331,7 @@ export default function Catalogue() {
           </div>
         ) : (
           <div className="space-y-8">
-            <div className="grid grid-cols-1 gap-4 min-[520px]:grid-cols-2 min-[860px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+            <div className="grid grid-cols-1 gap-4 min-[520px]:grid-cols-2 min-[860px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4">
               {visibleItems.map(op => <ProductCard key={op.id} opportunity={op} />)}
             </div>
 

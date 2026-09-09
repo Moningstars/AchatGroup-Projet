@@ -228,6 +228,14 @@ export default function DetailOpportunite() {
       // Réactive le bouton après un court instant pour permettre d'ajouter encore de la quantité.
       setTimeout(() => setJoinSuccess(false), 2500)
     } catch (e) {
+      console.error('[souscription] Échec de la réservation avec dépôt', {
+        status: e.response?.status,
+        url: e.config?.url,
+        method: e.config?.method,
+        response: e.response?.data,
+        message: e.message,
+        error: e,
+      })
       const errorPayload = `${e.response?.data?.code || ''} ${e.response?.data?.motif || ''} ${e.response?.data?.message || ''}`
       if (/solde|fonds|portefeuille|insuffisant/i.test(errorPayload)) {
         navigate('/portefeuille', {
@@ -825,8 +833,8 @@ export default function DetailOpportunite() {
                 {!joining && !joinSuccess && <ShoppingCart size={20} />}
                 {joinSuccess ? <><CheckCircle2 size={18} /> Inscrit avec succès</>
                   : isComplet ? 'Offre complète'
-                  : dejaSouscrit ? `Ajouter ${quantiteEffective} — dépôt de ${fmt(totalCommande)} FCFA`
-                  : `Réserver avec un dépôt — ${fmt(totalCommande)} FCFA`}
+                  : dejaSouscrit ? `Miitcher Plus - ${quantiteEffective} : ${fmt(totalCommande)} FCFA`
+                  : `Miitcher - ${fmt(totalCommande)} FCFA`}
               </button>
               <div className="flex items-start justify-center gap-1.5 px-2 text-center text-[10px] font-bold leading-4 text-gray-500">
                 <ShieldCheck size={12} className="mt-0.5 shrink-0 text-success" />
@@ -842,8 +850,8 @@ export default function DetailOpportunite() {
         {similaires.length > 0 && (
           <section className="pt-16 space-y-8">
             <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="text-3xl font-heading font-extrabold text-primary tracking-tight">Plus d'Miitchs</h2>
+              <div className="flex flex-col">
+                <h2 className="text-2xl font-heading font-extrabold text-primary tracking-tight">Plus de Miitchs</h2>
                 <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Dans la catégorie {opportunite.categorie}</p>
               </div>
               <Link to="/" className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2 hover:text-accent transition-colors">

@@ -67,7 +67,7 @@ export function AuthProvider({ children }) {
       res => res,
       err => {
         const url = err.config?.url || ''
-        if (err.response?.status === 401 && !url.includes('/auth/')) {
+        if ([401, 403].includes(err.response?.status) && !url.includes('/auth/')) {
           clearSession()
           setUser(null)
           navigate('/connexion', { replace: true })

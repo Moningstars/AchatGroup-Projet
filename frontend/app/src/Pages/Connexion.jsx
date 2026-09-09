@@ -246,7 +246,7 @@ export default function Connexion() {
 
           <div className="z-10 text-center space-y-3 max-w-[220px]">
             <h1 className="text-3xl font-heading font-extrabold leading-tight tracking-tighter">
-              Puissance <span className="text-accent italic">Collective.</span>
+              LE&nbsp;&nbsp;POUVOIR <span className="text-accent italic block">du&nbsp;&nbsp;nous.</span>
             </h1>
             <p className="text-white/60 text-xs font-medium leading-relaxed">
               Le premier réseau d'achat groupé d'Afrique de l'Ouest.

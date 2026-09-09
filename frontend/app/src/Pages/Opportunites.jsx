@@ -350,11 +350,11 @@ export default function Opportunites() {
             </div>
       </div>
 
-      <main className="mx-auto w-full max-w-7xl space-y-6 px-4 pt-6 sm:space-y-10 sm:px-5 sm:pt-8 lg:px-6 xl:px-8">
+      <main className="mx-auto w-full max-w-7xl xl:max-w-[85%] space-y-6 px-4 pt-6 sm:space-y-10 sm:px-5 sm:pt-8 lg:px-6 xl:px-8">
 
         {/* ── Expire bientôt ── */}
         {expirantBientot.length > 0 && (
-          <section className="overflow-hidden rounded-[1.75rem] bg-bg-light/70 py-1 space-y-5">
+          <section className="overflow-hidden rounded-[1.75rem] bg-bg-light/70 space-y-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 bg-urgency/10 rounded-xl flex items-center justify-center">
@@ -515,7 +515,7 @@ export default function Opportunites() {
         </section>
 
         {/* ── Product Grid ── */}
-        <section id="catalogue" className="mx-auto w-[92%] space-y-6 xl:w-[90%]">
+        <section id="catalogue" className="mx-auto w-[92%] space-y-6 xl:w-[100%]">
           {filtered.length === 0 ? (
             <div className="py-24 text-center bg-white border-4 border-dashed border-gray-50 flex flex-col items-center gap-4">
               <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center">

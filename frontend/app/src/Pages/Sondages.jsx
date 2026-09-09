@@ -95,7 +95,7 @@ export default function Sondages() {
       <div className="sticky top-0 z-40 glass-header border-b border-gray-100/70 px-4 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="font-heading font-extrabold text-xl tracking-tight text-primary leading-none">Miitchs i</h1>
+            <h1 className="font-heading font-extrabold text-xl tracking-tight text-primary leading-none">Miitchs insight</h1>
             <p className="text-[11px] text-success font-bold uppercase tracking-widest mt-0.5">
               {actifs.length} disponible{actifs.length !== 1 ? 's' : ''}
             </p>
@@ -110,7 +110,7 @@ export default function Sondages() {
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl xl:max-w-[85%] px-4 sm:px-6 lg:px-8">
 
         {/* ── Carousel promo ── */}
         <div className="pt-5">
@@ -133,7 +133,7 @@ export default function Sondages() {
           </div>
 
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {[['TOUS', 'Toutes les récompenses'], ['ARGENT', 'Paiement FCFA'], ['POINTS', 'Points']].map(([value, label]) => (
+            {[['TOUS', 'Toutes les récompenses'], ['ARGENT', 'Rénuméré'], ['POINTS', 'Points']].map(([value, label]) => (
               <button key={value} type="button" onClick={() => setRewardFilter(value)}
                 className={`whitespace-nowrap rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-colors ${rewardFilter === value ? 'border-primary bg-primary text-white' : 'border-gray-100 bg-white text-gray-500 hover:border-primary/30'}`}>
                 {label}
@@ -175,10 +175,10 @@ export default function Sondages() {
               <section className="space-y-4">
                 {featured && gridItems.length > 0 && (
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">
-                    {actifs.slice(1).length > 0 ? 'Autres Miitchs i' : 'Terminés ou en attente'}
+                    {actifs.slice(1).length > 0 ? 'Autres Miitchs insight' : 'Terminés ou en attente'}
                   </p>
                 )}
-                <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-1 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-4">
                   {visibleGrid.map(s => (
                     <SurveyCardCompact key={s.id} survey={s} onClick={() => navigate(`/sondages/${s.id}`)} />
                   ))}

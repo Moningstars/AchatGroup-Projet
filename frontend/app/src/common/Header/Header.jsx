@@ -106,7 +106,7 @@ const Header = () => {
     : null
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-gray-100 px-4 md:px-8 py-4 flex items-center justify-between glass-header">
+    <header className="sticky top-0 z-50 bg-white border-b border-gray-5 px-4 md:px-8 py-4 flex items-center justify-between glass-header ">
 
       {/* Logo */}
       <Link to="/" className="flex items-center gap-2 group shrink-0">
@@ -115,7 +115,7 @@ const Header = () => {
         </div>
         <div className="flex flex-col">
           <h1 className="text-primary font-heading font-extrabold text-lg leading-none">Miitcha Deal</h1>
-          <span className="text-[10px] text-success font-bold uppercase tracking-widest hidden sm:block">Le Pouvoir de nous</span>
+          <span className="text-[10px] text-success font-bold uppercase tracking-widest hidden sm:block">Le Pouvoir du nous</span>
         </div>
       </Link>
 
@@ -126,7 +126,7 @@ const Header = () => {
             <>
               <Link to="/" className={`text-sm font-bold transition-colors ${pathname === '/' ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}>Accueil</Link>
               <Link to="/opportunites" className={`text-sm font-bold transition-colors ${pathname === '/opportunites' ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}>Miitchs</Link>
-              <Link to="/sondages"    className={`text-sm font-bold transition-colors ${pathname === '/sondages'    ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}>Miitchs i</Link>
+              <Link to="/sondages"    className={`text-sm font-bold transition-colors ${pathname === '/sondages'    ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}>Miitchs insight</Link>
             </>
           ) : (
             <>

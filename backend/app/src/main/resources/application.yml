@@ -14,7 +14,7 @@ spring:
   jpa:
     hibernate:
       # Valeur sûre par défaut. La stack Docker locale la surcharge à "update".
-      ddl-auto: ${JPA_DDL_AUTO:validate}
+      ddl-auto: update
 
 
     open-in-view: false
@@ -42,7 +42,7 @@ server:
 
 app:
   seed:
-    enabled: ${APP_SEED_ENABLED:false}
+    enabled: ${APP_SEED_ENABLED:true}
   jwt:
     secret-participant: ${JWT_SECRET_PARTICIPANT}
     secret-admin: ${JWT_SECRET_ADMIN}
