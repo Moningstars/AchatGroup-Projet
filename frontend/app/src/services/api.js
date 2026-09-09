@@ -21,10 +21,6 @@ export const getApiErrorMessage = (error, fallback = 'Une erreur est survenue. R
   return fallback
 }
 
-const createRequestId = () =>
-  globalThis.crypto?.randomUUID?.()
-  || `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
-
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem(TOKEN_KEY)
   if (token) config.headers.Authorization = `Bearer ${token}`
@@ -38,8 +34,13 @@ const createRequestId = () => {
   if (typeof globalThis.crypto?.randomUUID === 'function') {
     return globalThis.crypto.randomUUID()
   }
+
+  if (typeof globalThis.crypto?.getRandomValues !== 'function') {
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
+  }
+
   const bytes = new Uint8Array(16)
-  globalThis.crypto?.getRandomValues?.(bytes)
+  globalThis.crypto.getRandomValues(bytes)
   bytes[6] = (bytes[6] & 0x0f) | 0x40
   bytes[8] = (bytes[8] & 0x3f) | 0x80
   return [...bytes].map((byte, index) => {
